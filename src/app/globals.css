@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/*
+  Brand palette sampled directly from Assets/PNG Logos:
+  deep teal #007a8f (shield + palm) and bright teal #12abb8 (wordmark).
+*/
+@theme {
+  --color-brand-50: #eefafc;
+  --color-brand-100: #d3f1f5;
+  --color-brand-200: #ade4eb;
+  --color-brand-300: #74d0dc;
+  --color-brand-400: #12abb8;
+  --color-brand-500: #0d94a4;
+  --color-brand-600: #007a8f;
+  --color-brand-700: #076174;
+  --color-brand-800: #0b4f5f;
+  --color-brand-900: #0e4251;
+  --color-brand-950: #052a35;
+
+  --color-surface: #ffffff;
+  --color-surface-muted: #f6f8f9;
+  --color-ink: #0f172a;
+  --color-ink-muted: #64748b;
+  --color-line: #e2e8f0;
+
+  --color-ok: #15803d;
+  --color-warn: #b45309;
+  --color-danger: #b91c1c;
+
+  /* The Arabic face carries Latin glyphs too, so one stack works for both
+     directions; Gilroy leads in English for the brand look. */
+  --font-sans: var(--font-arabic), system-ui, sans-serif;
+  --font-latin: var(--font-latin), var(--font-arabic), system-ui, sans-serif;
+}
+
+html {
+  font-family: var(--font-sans);
+}
+
+html[lang="en"] {
+  font-family: var(--font-latin);
+}
+
+body {
+  background: var(--color-surface-muted);
+  color: var(--color-ink);
+}
+
+/* Numbers and IDs read better left-to-right even inside Arabic text. */
+.ltr-nums {
+  direction: ltr;
+  unicode-bidi: embed;
+  display: inline-block;
+}
