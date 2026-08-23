@@ -1,3 +1,5 @@
+import { CLUB_TIME_ZONE } from '@/lib/time';
+
 /**
  * Date/time formatting.
  *
@@ -5,6 +7,11 @@
  * digits (`-u-ca-gregory-nu-latn`). Without that, `ar` defaults to the Hijri
  * calendar and Arabic-Indic digits, which does not match how the club writes
  * dates in practice.
+ *
+ * Every formatter below is pinned to the CLUB's timezone. Left unset, `Intl`
+ * uses whatever timezone the Node process runs in — Riyadh on a developer's
+ * laptop, UTC on a host — so the same booking would read as 14:00 locally and
+ * 11:00 in production. See src/lib/time.ts.
  */
 function intlLocale(locale: string) {
   return locale === 'ar' ? 'ar-u-ca-gregory-nu-latn' : 'en-GB';
@@ -13,6 +20,7 @@ function intlLocale(locale: string) {
 export function formatDate(value: string | Date | null | undefined, locale: string) {
   if (!value) return '—';
   return new Intl.DateTimeFormat(intlLocale(locale), {
+    timeZone: CLUB_TIME_ZONE,
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -25,6 +33,7 @@ export function formatDateTime(
 ) {
   if (!value) return '—';
   return new Intl.DateTimeFormat(intlLocale(locale), {
+    timeZone: CLUB_TIME_ZONE,
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -36,8 +45,10 @@ export function formatDateTime(
 export function formatTime(value: string | Date | null | undefined, locale: string) {
   if (!value) return '—';
   return new Intl.DateTimeFormat(intlLocale(locale), {
+    timeZone: CLUB_TIME_ZONE,
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
   }).format(new Date(value));
 }
 
@@ -52,14 +63,9 @@ export function localized<T extends Record<string, unknown>>(
   return String(row[key] ?? row[`${base}_en`] ?? '');
 }
 
-/** `2026-08-12` in the local timezone, for <input type="date"> values. */
-export function toDateInput(value: Date) {
-  const offset = value.getTimezoneOffset() * 60_000;
-  return new Date(value.getTime() - offset).toISOString().slice(0, 10);
-}
-
-/** `2026-08-12T14:30` for <input type="datetime-local"> values. */
-export function toDateTimeInput(value: Date) {
-  const offset = value.getTimezoneOffset() * 60_000;
-  return new Date(value.getTime() - offset).toISOString().slice(0, 16);
-}
+/*
+ * `toDateInput` / `toDateTimeInput` moved to src/lib/time.ts and are
+ * re-exported here so the many pages already importing them keep working. They
+ * now read the club's clock rather than the server's.
+ */
+export { toDateInput, toDateTimeInput } from '@/lib/time';

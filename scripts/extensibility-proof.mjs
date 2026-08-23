@@ -292,11 +292,50 @@ async function proveNewWorkflow(people, typeId) {
     JSON.stringify(outsider.body),
   );
 
-  const approve = await rpc(prDirector.token, 'transition_request', {
+  /*
+   * A status can insist on data before anything may sit in it (0033), and that
+   * too is one UPDATE rather than code. Here we say "Approved needs an agreed
+   * amount", watch the approval be refused, then supply it and watch it go
+   * through — all against the same running server.
+   */
+  await db.query(
+    `update request_statuses set required_data_keys = '{agreed_amount}'
+      where key = 'approved'
+        and request_type_id = (select id from request_types where key = $1)`,
+    [TYPE_KEY],
+  );
+
+  const missingData = await rpc(prDirector.token, 'transition_request', {
     p_request: requestId,
     p_to_status: 'approved',
     p_note: 'agreed',
   });
+  check(
+    'one UPDATE makes a status refuse a move that is missing its data',
+    !missingData.ok && JSON.stringify(missingData.body).includes('agreed_amount'),
+    JSON.stringify(missingData.body)?.slice(0, 90),
+  );
+
+  const withData = await rpc(prDirector.token, 'transition_request', {
+    p_request: requestId,
+    p_to_status: 'approved',
+    p_note: 'agreed',
+    p_patch: { agreed_amount: '5000' },
+  });
+  check(
+    '…and accepts the same move once the data is supplied with it',
+    withData.ok,
+    JSON.stringify(withData.body)?.slice(0, 90),
+  );
+
+  await db.query(
+    `update request_statuses set required_data_keys = '{}'
+      where key = 'approved'
+        and request_type_id = (select id from request_types where key = $1)`,
+    [TYPE_KEY],
+  );
+
+  const approve = { ok: withData.ok, body: withData.body };
   check('the PR Director can approve', approve.ok, JSON.stringify(approve.body));
 
   const { rows: history } = await db.query(

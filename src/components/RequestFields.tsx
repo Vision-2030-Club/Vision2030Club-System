@@ -2,7 +2,7 @@
 
 import { useLocale } from 'next-intl';
 import { Input, Label, Select, Textarea } from '@/components/ui';
-import type { RequestField } from '@/lib/requests';
+import type { FieldOptions, RequestField } from '@/lib/requests';
 
 /**
  * Renders a request type's custom form straight from its `field_schema`.
@@ -11,7 +11,14 @@ import type { RequestField } from '@/lib/requests';
  * shape of the form is data, and every type — existing or future — is drawn by
  * the same six branches below.
  */
-export function RequestFields({ fields }: { fields: RequestField[] }) {
+export function RequestFields({
+  fields,
+  options = {},
+}: {
+  fields: RequestField[];
+  /** Live option lists, for selects carrying an `options_source`. */
+  options?: FieldOptions;
+}) {
   const locale = useLocale();
   const label = (field: RequestField) =>
     locale === 'ar' ? field.label_ar : field.label_en;
@@ -31,12 +38,21 @@ export function RequestFields({ fields }: { fields: RequestField[] }) {
             ) : field.type === 'select' ? (
               <Select {...common}>
                 <option value="">—</option>
-                {(field.options ?? []).map((option) => (
+                {(field.options_source
+                  ? (options[field.options_source] ?? [])
+                  : (field.options ?? [])
+                ).map((option) => (
                   <option key={option.value} value={option.value}>
                     {locale === 'ar' ? option.label_ar : option.label_en}
                   </option>
                 ))}
               </Select>
+            ) : field.type === 'file' ? (
+              <Input
+                {...common}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml,application/pdf"
+              />
             ) : (
               <Input
                 {...common}

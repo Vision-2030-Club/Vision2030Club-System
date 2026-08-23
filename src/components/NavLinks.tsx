@@ -1,39 +1,82 @@
 'use client';
 
+import { useState } from 'react';
 import { Link, usePathname } from '@/i18n/navigation';
 import { cx } from '@/components/ui';
+import { NavIcon, type NavIconName } from '@/components/NavIcons';
 
 export type NavItem = {
   href: string;
   label: string;
+  icon: NavIconName;
   show: boolean;
 };
 
-export function NavLinks({ items }: { items: NavItem[] }) {
+/**
+ * The primary menu, rendered as a vertical list.
+ *
+ * Placement is driven entirely by `<html dir>` (set in the locale layout):
+ * the sidebar is the first flex child, so it lands on the inline START —
+ * left in English, right in Arabic — with no locale check in here. Same
+ * reason the icon sits before the label via `gap` rather than a margin.
+ *
+ * Below `lg` there is no room for a sidebar, so the list collapses behind a
+ * toggle and the same markup is reused as a dropdown panel.
+ */
+export function NavLinks({
+  items,
+  menuLabel,
+}: {
+  items: NavItem[];
+  menuLabel: string;
+}) {
   const pathname = usePathname();
+  const [open, setOpen] = useState(false);
 
   return (
-    <nav className="mx-auto max-w-7xl overflow-x-auto px-4">
-      <ul className="flex gap-1 whitespace-nowrap">
-        {items.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-          return (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                className={cx(
-                  'inline-block border-b-2 px-3 py-2 text-sm font-medium transition',
-                  active
-                    ? 'border-brand-600 text-brand-700'
-                    : 'border-transparent text-ink-muted hover:text-ink',
-                )}
-              >
-                {item.label}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="mb-2 flex w-full items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm font-medium text-ink lg:hidden"
+      >
+        <NavIcon name="menu" className="size-5 shrink-0 text-ink-muted" />
+        {menuLabel}
+      </button>
+
+      <nav className={cx(open ? 'block' : 'hidden', 'lg:block')}>
+        <ul className="space-y-1 rounded-xl border border-line bg-surface p-2 shadow-sm">
+          {items.map((item) => {
+            const active =
+              pathname === item.href || pathname.startsWith(`${item.href}/`);
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  aria-current={active ? 'page' : undefined}
+                  className={cx(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition',
+                    active
+                      ? 'bg-brand-50 font-semibold text-brand-700'
+                      : 'font-medium text-ink-muted hover:bg-surface-muted hover:text-ink',
+                  )}
+                >
+                  <NavIcon
+                    name={item.icon}
+                    className={cx(
+                      'size-5 shrink-0',
+                      active ? 'text-brand-600' : 'text-ink-muted',
+                    )}
+                  />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    </>
   );
 }

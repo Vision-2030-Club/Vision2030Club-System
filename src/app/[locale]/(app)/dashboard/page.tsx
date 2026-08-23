@@ -2,9 +2,26 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getMyMember } from '@/lib/auth/session';
-import { Badge, Card, EmptyState, PageHeader } from '@/components/ui';
+import { Badge, Card, EmptyState, PageHeader, cx } from '@/components/ui';
+import {
+  HEALTH_TONES,
+  RISK_CLASSES,
+  formatScore,
+  healthKey,
+  riskKey,
+  type ProjectHealth,
+  type TaskRisk,
+} from '@/lib/kpi';
 import { formatDate, formatDateTime, localized } from '@/lib/format';
 import { findStatus, loadStatusLookup } from '@/lib/requests';
+
+type ManagedProject = {
+  id: string;
+  name_en: string;
+  name_ar: string;
+  status: string;
+  ends_on: string | null;
+};
 
 export default async function DashboardPage({
   params,
@@ -16,6 +33,9 @@ export default async function DashboardPage({
 
   const t = await getTranslations('dashboard');
   const tNav = await getTranslations('nav');
+  const tTasks = await getTranslations('tasks');
+  const tProjects = await getTranslations('projects');
+  const tKpi = await getTranslations('kpi');
   const member = await getMyMember();
   const supabase = await createClient();
 
@@ -29,11 +49,13 @@ export default async function DashboardPage({
         .gte('ends_at', new Date().toISOString())
         .order('starts_at', { ascending: true })
         .limit(6),
+      // task_kpi carries §1's derived state; there is no status column to
+      // filter on any more, so "still on my plate" means not yet terminal.
       supabase
-        .from('tasks')
-        .select('id, title, status, due_date, task_assignees!inner(member_id)')
-        .eq('task_assignees.member_id', member!.id)
-        .neq('status', 'done')
+        .from('task_kpi')
+        .select('id, title, due_date, state, risk')
+        .eq('assignee_id', member!.id)
+        .not('state', 'in', '("completed","not_done")')
         .order('due_date', { ascending: true, nullsFirst: false })
         .limit(6),
       supabase
@@ -49,6 +71,49 @@ export default async function DashboardPage({
     (myRequests ?? []).map((r) => r.request_type_id as string),
   );
 
+  /*
+   * The dashboard is shaped by the role, not padded out for everyone. A
+   * Project Manager runs a handful of projects and little else, so theirs come
+   * to the front page and the club-wide project list drops out of their menu
+   * (see the app layout) rather than being a second place to look.
+   *
+   * `project_managers` — not `project_members` — is the source: managing a
+   * project and being staffed on one are different things everywhere else in
+   * the system, and conflating them here would put a PM's colleagues'
+   * projects on their dashboard.
+   */
+  const isProjectManager = member!.role_key === 'project_manager';
+
+  const { data: managed } = isProjectManager
+    ? await supabase
+        .from('project_managers')
+        .select('projects(id, name_en, name_ar, status, ends_on)')
+        .eq('member_id', member!.id)
+    : { data: null };
+
+  const myProjects = (managed ?? [])
+    .map((row) => row.projects as unknown as ManagedProject | null)
+    .filter((project): project is ManagedProject => Boolean(project));
+
+  // project_kpi is where §6's live health and completion come from; it is
+  // never recomputed here.
+  const { data: projectKpis } = myProjects.length
+    ? await supabase
+        .from('project_kpi')
+        .select('project_id, completion_pct, health')
+        .in(
+          'project_id',
+          myProjects.map((project) => project.id),
+        )
+    : { data: null };
+
+  const kpiByProject = new Map(
+    (projectKpis ?? []).map((row) => [
+      row.project_id as string,
+      row as { completion_pct: number | null; health: ProjectHealth },
+    ]),
+  );
+
   return (
     <>
       <PageHeader
@@ -59,6 +124,58 @@ export default async function DashboardPage({
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
+        {/* The projects this person runs, in place of a menu entry they would
+            only ever use to find these same rows. */}
+        {isProjectManager ? (
+          <Card className="lg:col-span-3">
+            <h2 className="mb-3 font-semibold">{t('myProjects')}</h2>
+
+            {myProjects.length ? (
+              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {myProjects.map((project) => {
+                  const projectKpi = kpiByProject.get(project.id);
+                  return (
+                    <li
+                      key={project.id}
+                      className="rounded-lg border border-line p-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <Link
+                          href={`/projects/${project.id}`}
+                          className="font-medium text-brand-700 hover:underline"
+                        >
+                          {localized(project, 'name', locale)}
+                        </Link>
+                        {projectKpi ? (
+                          <Badge tone={HEALTH_TONES[projectKpi.health]}>
+                            {tKpi(healthKey(projectKpi.health))}
+                          </Badge>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-2 flex items-baseline justify-between text-xs text-ink-muted">
+                        <span>
+                          {tProjects('completion')}:{' '}
+                          <span className="tabular-nums text-ink">
+                            {formatScore(projectKpi?.completion_pct ?? null)}
+                          </span>
+                        </span>
+                        {project.ends_on ? (
+                          <span>
+                            {tProjects('endsOn')}: {formatDate(project.ends_on, locale)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <EmptyState>{t('noProjects')}</EmptyState>
+            )}
+          </Card>
+        ) : null}
+
         <Card className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-semibold">{t('upcoming')}</h2>
@@ -95,7 +212,17 @@ export default async function DashboardPage({
             <ul className="divide-y divide-line">
               {myTasks.map((task) => (
                 <li key={task.id} className="py-2.5">
-                  <div className="text-sm font-medium">{task.title}</div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-sm font-medium">{task.title}</div>
+                    <span
+                      className={cx(
+                        'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
+                        RISK_CLASSES[task.risk as TaskRisk],
+                      )}
+                    >
+                      {tTasks(riskKey(task.risk as TaskRisk))}
+                    </span>
+                  </div>
                   <div className="text-xs text-ink-muted">
                     {task.due_date ? formatDate(task.due_date, locale) : t('noDueDate')}
                   </div>

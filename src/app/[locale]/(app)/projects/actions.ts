@@ -108,3 +108,125 @@ export async function removeProjectPersonAction(
   revalidatePath(`/${locale}/projects/${projectId}`);
   return ok();
 }
+
+// -----------------------------------------------------------------------------
+// §3 — Splits
+//
+// Optional per project. A split has a free-text name, one or more PMs who
+// confirm its tasks, and its own roster — and a person may sit in several
+// splits of the same project, which is unrelated to the club-wide "one team per
+// member" rule.
+// -----------------------------------------------------------------------------
+
+export async function createSplitAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const projectId = requiredText(formData, 'project_id');
+  const locale = requiredText(formData, 'locale');
+  const me = await getMyMember();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from('project_splits').insert({
+    project_id: projectId,
+    name: requiredText(formData, 'name'),
+    created_by: me?.id ?? null,
+  });
+
+  if (error) return fail(error.message);
+
+  revalidatePath(`/${locale}/projects/${projectId}`);
+  return ok();
+}
+
+export async function addSplitPersonAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const projectId = requiredText(formData, 'project_id');
+  const locale = requiredText(formData, 'locale');
+  const splitId = requiredText(formData, 'split_id');
+  const memberId = requiredText(formData, 'member_id');
+  const table = requiredText(formData, 'table');
+
+  if (table !== 'project_split_members' && table !== 'project_split_managers') {
+    return fail('Unknown table');
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from(table)
+    .insert({ split_id: splitId, member_id: memberId });
+
+  if (error) return fail(error.message);
+
+  // A split PM needs to be on the split's roster and on the project itself,
+  // otherwise they cannot see the work they are responsible for.
+  if (table === 'project_split_managers') {
+    await supabase
+      .from('project_split_members')
+      .upsert(
+        { split_id: splitId, member_id: memberId },
+        { onConflict: 'split_id,member_id', ignoreDuplicates: true },
+      );
+  }
+  await supabase
+    .from('project_members')
+    .upsert(
+      { project_id: projectId, member_id: memberId },
+      { onConflict: 'project_id,member_id', ignoreDuplicates: true },
+    );
+
+  revalidatePath(`/${locale}/projects/${projectId}`);
+  return ok();
+}
+
+export async function removeSplitPersonAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const projectId = requiredText(formData, 'project_id');
+  const locale = requiredText(formData, 'locale');
+  const table = requiredText(formData, 'table');
+
+  if (table !== 'project_split_members' && table !== 'project_split_managers') {
+    return fail('Unknown table');
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from(table)
+    .delete()
+    .eq('split_id', requiredText(formData, 'split_id'))
+    .eq('member_id', requiredText(formData, 'member_id'));
+
+  if (error) return fail(error.message);
+
+  revalidatePath(`/${locale}/projects/${projectId}`);
+  return ok();
+}
+
+/**
+ * Deleting a split does NOT delete its tasks — `tasks.split_id` is ON DELETE
+ * SET NULL, so they fall back to project-wide and the project's PMs become
+ * their confirmers. No score is touched, which matters because §7's "no way to
+ * preserve a score by deleting" cuts both ways: no way to lose one either.
+ */
+export async function deleteSplitAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const projectId = requiredText(formData, 'project_id');
+  const locale = requiredText(formData, 'locale');
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('project_splits')
+    .delete()
+    .eq('id', requiredText(formData, 'split_id'));
+
+  if (error) return fail(error.message);
+
+  revalidatePath(`/${locale}/projects/${projectId}`);
+  return ok();
+}

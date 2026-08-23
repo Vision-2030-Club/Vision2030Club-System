@@ -136,6 +136,9 @@ const PEOPLE = {
   dana: { role: 'team_director', team: 'DESIGN', student: '490000003', national: '1900000003' },
   huda: { role: 'team_director', team: 'HR', student: '490000004', national: '1900000004' },
   gina: { role: 'guest', team: 'CLUB_MGMT', student: '490000005', national: '1900000005' },
+  // 0023 moved asset custody to Finance, so the only people below the
+  // Presidency who can touch the register are this team's Director.
+  faisal: { role: 'team_director', team: 'FINANCE', student: '490000006', national: '1900000006' },
 };
 
 async function cleanUp() {
@@ -218,7 +221,7 @@ async function seed() {
 // -----------------------------------------------------------------------------
 
 async function run(people) {
-  const { root, alice, dana, huda, gina } = people;
+  const { root, alice, dana, huda, gina, faisal } = people;
 
   const teamId = async (key) =>
     (await db.query('select id from teams where key = $1', [key])).rows[0].id;
@@ -518,7 +521,37 @@ async function run(people) {
       }),
     });
 
-  const [first, second] = await Promise.all([checkout(alice), checkout(dana)]);
+  // 0023: the register is Finance's and the Presidency's. Everyone else asks
+  // for equipment through an Asset Request, so they cannot even read it.
+  const aliceAssets = await rest(alice.token, 'assets?select=id');
+  check(
+    'a plain member cannot read the asset register',
+    (aliceAssets.body ?? []).length === 0,
+    JSON.stringify(aliceAssets.body),
+  );
+
+  const danaAssets = await rest(dana.token, 'assets?select=id');
+  check(
+    'a Director outside Finance cannot read the asset register',
+    (danaAssets.body ?? []).length === 0,
+    JSON.stringify(danaAssets.body),
+  );
+
+  const faisalAssets = await rest(faisal.token, 'assets?select=id');
+  check(
+    "the Finance Director reads the register through their team's override",
+    (faisalAssets.body ?? []).some((row) => row.id === assetId),
+    JSON.stringify(faisalAssets.body),
+  );
+
+  const aliceCheckout = await checkout(alice);
+  check(
+    'a plain member cannot check an asset out to themselves',
+    !allowed(aliceCheckout),
+    JSON.stringify(aliceCheckout.body),
+  );
+
+  const [first, second] = await Promise.all([checkout(root), checkout(faisal)]);
   const succeeded = [first, second].filter((r) => allowed(r)).length;
   check(
     'two concurrent checkouts of one asset: exactly one succeeds',

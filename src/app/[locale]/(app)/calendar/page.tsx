@@ -186,8 +186,9 @@ export default async function CalendarPage({
                       bar.entry.color ?? DEFAULT_COLOR[bar.entry.kind] ?? DEFAULT_COLOR.club;
 
                     return (
-                      <div
+                      <Link
                         key={`${bar.entry.id}-${bar.startCol}`}
+                        href={`/calendar/${bar.entry.id}`}
                         title={`${bar.entry.title}${
                           bar.entry.location ? ` — ${bar.entry.location}` : ''
                         }`}
@@ -209,7 +210,7 @@ export default async function CalendarPage({
                           </span>
                         ) : null}
                         <span className="truncate font-medium">{bar.entry.title}</span>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
@@ -239,7 +240,12 @@ export default async function CalendarPage({
                       entry.color ?? DEFAULT_COLOR[entry.kind] ?? DEFAULT_COLOR.club,
                   }}
                 />
-                <span className="font-medium text-ink">{entry.title}</span>
+                <Link
+                  href={`/calendar/${entry.id}`}
+                  className="font-medium text-brand-700 hover:underline"
+                >
+                  {entry.title}
+                </Link>
                 <Badge tone={entry.kind === 'club' ? 'brand' : 'neutral'}>
                   {entry.kind === 'club' ? t('kindClub') : t('kindMeeting')}
                 </Badge>

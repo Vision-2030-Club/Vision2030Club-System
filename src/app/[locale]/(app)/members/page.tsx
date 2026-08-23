@@ -2,8 +2,11 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { hasPermission } from '@/lib/auth/session';
+import { Avatar } from '@/components/Avatar';
 import { Badge, Card, EmptyState, Input, Numeric, PageHeader } from '@/components/ui';
+import { signAvatars } from '@/lib/avatars';
 import { localized } from '@/lib/format';
+import { phoneSearchTerm } from '@/lib/phone';
 
 export default async function MembersPage({
   params,
@@ -23,22 +26,39 @@ export default async function MembersPage({
   let query = supabase
     .from('members')
     .select(
-      'id, name_en, name_ar, email, student_id, status, teams(name_en, name_ar), roles(key, name_en, name_ar)',
+      'id, name_en, name_ar, email, phone, avatar_path, status, teams(name_en, name_ar), roles(key, name_en, name_ar)',
     )
     .order('name_en')
     .limit(300);
 
+  /*
+   * Name, email, or phone (addendum §10 — the student ID is no longer a search
+   * key). Phone is matched on digits alone rather than on the raw text,
+   * because the column stores one canonical form: someone who types
+   * `0512345678` and someone who types `+966512345678` both mean the row
+   * holding `+966512345678`, and `phoneSearchTerm` reduces either to the
+   * digits that sit inside it.
+   */
   if (q?.trim()) {
     const term = `%${q.trim()}%`;
-    query = query.or(
-      `name_en.ilike.${term},name_ar.ilike.${term},email.ilike.${term},student_id.ilike.${term}`,
-    );
+    const digits = phoneSearchTerm(q);
+    const filters = [
+      `name_en.ilike.${term}`,
+      `name_ar.ilike.${term}`,
+      `email.ilike.${term}`,
+    ];
+    if (digits) filters.push(`phone.ilike.%${digits}%`);
+    query = query.or(filters.join(','));
   }
 
   // If the caller's role has no members.view scope, RLS returns just their own
   // row — the page needs no role check of its own.
   const { data: members } = await query;
   const canImport = await hasPermission('import.run');
+  const photos = await signAvatars(
+    supabase,
+    (members ?? []).map((member) => member.avatar_path as string | null),
+  );
 
   return (
     <>
@@ -76,7 +96,8 @@ export default async function MembersPage({
                 <th className="px-4 py-2.5 text-start font-medium">{t('name')}</th>
                 <th className="px-4 py-2.5 text-start font-medium">{t('role')}</th>
                 <th className="px-4 py-2.5 text-start font-medium">{t('team')}</th>
-                <th className="px-4 py-2.5 text-start font-medium">{t('studentId')}</th>
+                {/* Addendum §10: the result row shows phone, not student ID. */}
+                <th className="px-4 py-2.5 text-start font-medium">{t('phone')}</th>
                 <th className="px-4 py-2.5 text-start font-medium">{t('status')}</th>
               </tr>
             </thead>
@@ -87,14 +108,27 @@ export default async function MembersPage({
                 return (
                   <tr key={member.id} className="hover:bg-surface-muted">
                     <td className="px-4 py-2.5">
-                      <Link
-                        href={`/members/${member.id}`}
-                        className="font-medium text-brand-700 hover:underline"
-                      >
-                        {locale === 'ar' ? member.name_ar : member.name_en}
-                      </Link>
-                      <div className="text-xs text-ink-muted" dir="ltr">
-                        {member.email}
+                      <div className="flex items-center gap-3">
+                        <Avatar
+                          src={
+                            member.avatar_path
+                              ? photos.get(member.avatar_path as string)
+                              : null
+                          }
+                          name={locale === 'ar' ? member.name_ar : member.name_en}
+                          size={36}
+                        />
+                        <div className="min-w-0">
+                          <Link
+                            href={`/members/${member.id}`}
+                            className="font-medium text-brand-700 hover:underline"
+                          >
+                            {locale === 'ar' ? member.name_ar : member.name_en}
+                          </Link>
+                          <div className="truncate text-xs text-ink-muted" dir="ltr">
+                            {member.email}
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-2.5">
@@ -105,7 +139,7 @@ export default async function MembersPage({
                     </td>
                     <td className="px-4 py-2.5">{localized(team, 'name', locale)}</td>
                     <td className="px-4 py-2.5">
-                      <Numeric>{member.student_id}</Numeric>
+                      {member.phone ? <Numeric>{member.phone}</Numeric> : '—'}
                     </td>
                     <td className="px-4 py-2.5">
                       <Badge tone={member.status === 'active' ? 'ok' : 'neutral'}>

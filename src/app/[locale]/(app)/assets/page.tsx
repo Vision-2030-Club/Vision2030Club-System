@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { createClient } from '@/lib/supabase/server';
 import { hasPermission } from '@/lib/auth/session';
 import { ActionForm } from '@/components/ActionForm';
+import { Disclosure } from '@/components/Disclosure';
 import {
   Badge,
   Card,
@@ -42,6 +43,22 @@ export default async function AssetsPage({
   const tCommon = await getTranslations('common');
   const supabase = await createClient();
 
+  /*
+   * 0023 moved custody of the register to Finance and the Presidency. RLS
+   * would already return nothing to anyone else, but "no assets" and "not
+   * yours to see" are different answers and the page should not blur them —
+   * everybody else gets an asset by filing an Asset Request instead.
+   */
+  const canView = await hasPermission('assets.view');
+  if (!canView) {
+    return (
+      <>
+        <PageHeader title={t('title')} description={t('subtitle')} />
+        <EmptyState>{t('restricted')}</EmptyState>
+      </>
+    );
+  }
+
   const [{ data: assets }, { data: checkouts }, { data: members }] = await Promise.all([
     supabase
       .from('assets')
@@ -66,8 +83,41 @@ export default async function AssetsPage({
     <>
       <PageHeader title={t('title')} description={t('subtitle')} />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-3 lg:col-span-2">
+      {canManage ? (
+        <div className="mb-4">
+          <Disclosure label={t('newAsset')}>
+            <ActionForm action={createAssetAction} submitLabel={tCommon('create')}>
+              <input type="hidden" name="locale" value={locale} />
+              <div>
+                <Label htmlFor="tag">{t('tag')}</Label>
+                <Input id="tag" name="tag" />
+              </div>
+              <div>
+                <Label htmlFor="name_en">{t('nameEn')}</Label>
+                <Input id="name_en" name="name_en" required />
+              </div>
+              <div>
+                <Label htmlFor="name_ar">{t('nameAr')}</Label>
+                <Input id="name_ar" name="name_ar" required />
+              </div>
+              <div>
+                <Label htmlFor="description">{t('description')}</Label>
+                <Textarea id="description" name="description" rows={2} />
+              </div>
+              <div>
+                <Label htmlFor="status">{t('status')}</Label>
+                <Select id="status" name="status" defaultValue="available">
+                  <option value="available">{t('statusAvailable')}</option>
+                  <option value="maintenance">{t('statusMaintenance')}</option>
+                  <option value="retired">{t('statusRetired')}</option>
+                </Select>
+              </div>
+            </ActionForm>
+          </Disclosure>
+        </div>
+      ) : null}
+
+      <div className="space-y-3">
           {assets?.length ? (
             assets.map((asset) => {
               const active = activeByAsset.get(asset.id);
@@ -164,40 +214,6 @@ export default async function AssetsPage({
           ) : (
             <EmptyState>{t('empty')}</EmptyState>
           )}
-        </div>
-
-        {canManage ? (
-          <Card>
-            <h2 className="mb-3 font-semibold">{t('newAsset')}</h2>
-            <ActionForm action={createAssetAction} submitLabel={tCommon('create')}>
-              <input type="hidden" name="locale" value={locale} />
-              <div>
-                <Label htmlFor="tag">{t('tag')}</Label>
-                <Input id="tag" name="tag" />
-              </div>
-              <div>
-                <Label htmlFor="name_en">{t('nameEn')}</Label>
-                <Input id="name_en" name="name_en" required />
-              </div>
-              <div>
-                <Label htmlFor="name_ar">{t('nameAr')}</Label>
-                <Input id="name_ar" name="name_ar" required />
-              </div>
-              <div>
-                <Label htmlFor="description">{t('description')}</Label>
-                <Textarea id="description" name="description" rows={2} />
-              </div>
-              <div>
-                <Label htmlFor="status">{t('status')}</Label>
-                <Select id="status" name="status" defaultValue="available">
-                  <option value="available">{t('statusAvailable')}</option>
-                  <option value="maintenance">{t('statusMaintenance')}</option>
-                  <option value="retired">{t('statusRetired')}</option>
-                </Select>
-              </div>
-            </ActionForm>
-          </Card>
-        ) : null}
       </div>
     </>
   );

@@ -10,6 +10,10 @@
     "typecheck": "tsc --noEmit",
     "db:push": "node --env-file=.env.local scripts/db-push.mjs",
     "db:test": "node --env-file=.env.local scripts/permission-tests.mjs",
+    "db:kpi": "node --env-file=.env.local scripts/kpi-tests.mjs",
+    "db:rooms": "node --env-file=.env.local scripts/room-tests.mjs",
+    "db:meetings": "node --env-file=.env.local scripts/meeting-tests.mjs",
+    "db:design": "node --env-file=.env.local scripts/design-tests.mjs",
     "db:prove": "node --env-file=.env.local scripts/extensibility-proof.mjs"
   },
   "dependencies": {
@@ -17,6 +21,7 @@
     "@supabase/supabase-js": "^2.60.0",
     "next": "16.3.0",
     "next-intl": "^4.4.0",
+    "ngrok": "^5.0.0-beta.2",
     "papaparse": "^5.5.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",

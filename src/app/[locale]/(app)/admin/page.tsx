@@ -32,6 +32,18 @@ export default async function AdminPage({
       hint: t('importHint'),
       show: await hasPermission('import.run'),
     },
+    {
+      href: '/admin/rooms',
+      title: t('rooms'),
+      hint: t('roomsHint'),
+      show: await hasPermission('rooms.manage'),
+    },
+    {
+      href: '/admin/google',
+      title: t('google'),
+      hint: t('googleHint'),
+      show: await hasPermission('integrations.configure'),
+    },
   ].filter((section) => section.show);
 
   return (

@@ -14,7 +14,6 @@ insert into teams (key, name_en, name_ar) values
   ('DESIGN',     'Design',          'التصميم'),
   ('MEDIA',      'Media',           'الإعلام'),
   ('CONTENT',    'Content',         'المحتوى'),
-  ('TECHNICAL',  'Technical',       'الفني'),
   ('FINANCE',    'Finance',         'المالية'),
   ('PR',         'Public Relations','العلاقات العامة'),
   ('HR',         'Human Resources', 'الموارد البشرية'),
@@ -177,8 +176,6 @@ from (values
   ('team_director', 'requests.submit',   'all'),
   ('team_director', 'requests.approve',  'own_team'),
   ('team_director', 'calendar.manage',   'own_team'),
-  ('team_director', 'assets.view',       'all'),
-  ('team_director', 'assets.checkout',   'all'),
 
   -- Project Manager: full rights on projects they run, read elsewhere.
   ('project_manager', 'members.view',    'all'),
@@ -191,8 +188,6 @@ from (values
   ('project_manager', 'requests.submit', 'all'),
   ('project_manager', 'requests.approve','own_projects'),
   ('project_manager', 'calendar.manage', 'own_projects'),
-  ('project_manager', 'assets.view',     'all'),
-  ('project_manager', 'assets.checkout', 'all'),
 
   -- Member: only what is assigned to them or submitted by them.
   ('member', 'members.view',    'all'),
@@ -201,9 +196,7 @@ from (values
   ('member', 'tasks.view',      'own_team'),
   ('member', 'tasks.manage',    'assigned'),
   ('member', 'requests.view',   'own'),
-  ('member', 'requests.submit', 'all'),
-  ('member', 'assets.view',     'all'),
-  ('member', 'assets.checkout', 'all')
+  ('member', 'requests.submit', 'all')
 
   -- Guest: nothing. Guests see only what is explicitly public to signed-in
   -- users, which in this system means club-wide calendar entries (spec §6).
@@ -232,29 +225,12 @@ from (values
   -- Spec §9: attendance visibility defaults to HR and leadership.
   ('team_director', 'attendance.view',        'HR', 'all'),
   ('team_director', 'attendance.manage',      'HR', 'all'),
-  -- Operating choice, not a system rule: IT looks after club equipment.
-  ('team_director', 'assets.manage',          'IT', 'all')
+  -- Operating choice, not a system rule: Finance holds the club's assets, so
+  -- its Director is the only one below the Presidency who sees the register.
+  -- Everyone else asks for equipment through an Asset Request (0023).
+  ('team_director', 'assets.view',            'FINANCE', 'all'),
+  ('team_director', 'assets.manage',          'FINANCE', 'all'),
+  ('team_director', 'assets.checkout',        'FINANCE', 'all')
 ) as o (role_key, permission_key, team_key, scope)
 on conflict (role_id, permission_key, team_id) do update
   set scope = excluded.scope;
-
--- -----------------------------------------------------------------------------
--- Skills — a fixed list, but the list is data (spec §10).
--- -----------------------------------------------------------------------------
-
-insert into skills (key, name_en, name_ar) values
-  ('graphic_design',    'Graphic Design',    'التصميم الجرافيكي'),
-  ('video_editing',     'Video Editing',     'مونتاج الفيديو'),
-  ('photography',       'Photography',       'التصوير'),
-  ('copywriting',       'Copywriting',       'كتابة المحتوى'),
-  ('public_speaking',   'Public Speaking',   'الإلقاء'),
-  ('event_management',  'Event Management',  'تنظيم الفعاليات'),
-  ('web_development',   'Web Development',   'تطوير الويب'),
-  ('data_analysis',     'Data Analysis',     'تحليل البيانات'),
-  ('social_media',      'Social Media',      'التواصل الاجتماعي'),
-  ('translation',       'Translation',       'الترجمة'),
-  ('accounting',        'Accounting',        'المحاسبة'),
-  ('sponsorship',       'Sponsorship',       'الرعايات')
-on conflict (key) do update
-  set name_en = excluded.name_en,
-      name_ar = excluded.name_ar;

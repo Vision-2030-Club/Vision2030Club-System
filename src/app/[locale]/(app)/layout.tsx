@@ -1,7 +1,10 @@
 import Image from 'next/image';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { redirect } from '@/i18n/navigation';
+import { Link, redirect } from '@/i18n/navigation';
 import { getMyMember, getMyPermissions } from '@/lib/auth/session';
+import { createClient } from '@/lib/supabase/server';
+import { signAvatar } from '@/lib/avatars';
+import { Avatar } from '@/components/Avatar';
 import { LocaleSwitch } from '@/components/LocaleSwitch';
 import { NavLinks, type NavItem } from '@/components/NavLinks';
 import { signOutAction } from '../login/actions';
@@ -33,30 +36,74 @@ export default async function AppLayout({
   const t = await getTranslations('nav');
   const tApp = await getTranslations('app');
 
-  const items: NavItem[] = [
-    { href: '/dashboard', label: t('dashboard'), show: true },
-    { href: '/members', label: t('members'), show: can('members.view') },
-    { href: '/teams', label: t('teams'), show: can('members.view') },
-    { href: '/projects', label: t('projects'), show: can('projects.view') },
-    { href: '/tasks', label: t('tasks'), show: can('tasks.view') },
-    {
-      href: '/requests',
-      label: t('requests'),
-      show: can('requests.submit') || can('requests.view'),
-    },
-    { href: '/calendar', label: t('calendar'), show: true },
-    { href: '/assets', label: t('assets'), show: can('assets.view') },
-    { href: '/attendance', label: t('attendance'), show: can('attendance.view') },
-    {
-      href: '/admin',
-      label: t('admin'),
-      show:
-        can('roles.configure') || can('request_types.configure') || can('import.run'),
-    },
-  ].filter((item) => item.show);
+  /*
+   * A Project Manager's projects are on their dashboard, so the club-wide
+   * project list is not also in their menu — it would only ever be a second
+   * route to the same handful of rows. This is the one place a role KEY
+   * decides anything, and it decides a menu entry, not access: /projects still
+   * answers for them, and their projects.view scope is untouched.
+   */
+  const isProjectManager = member!.role_key === 'project_manager';
+
+  // `satisfies` (rather than a plain annotation) contextually types the
+  // literal so each `icon` narrows to NavIconName instead of widening to
+  // string — .filter() would otherwise strip that context away.
+  const items: NavItem[] = (
+    [
+      { href: '/dashboard', label: t('dashboard'), icon: 'dashboard', show: true },
+      {
+        href: '/members',
+        label: t('members'),
+        icon: 'members',
+        show: can('members.view'),
+      },
+      // Teams is where a team's posts live, so it follows the posts permission
+      // rather than the directory one — a Guest holds neither.
+      {
+        href: '/teams',
+        label: t('teams'),
+        icon: 'teams',
+        show: can('members.view') && can('team_posts.view'),
+      },
+      {
+        href: '/projects',
+        label: t('projects'),
+        icon: 'projects',
+        show: can('projects.view') && !isProjectManager,
+      },
+      { href: '/tasks', label: t('tasks'), icon: 'tasks', show: can('tasks.view') },
+      {
+        href: '/requests',
+        label: t('requests'),
+        icon: 'requests',
+        show: can('requests.submit') || can('requests.view'),
+      },
+      { href: '/calendar', label: t('calendar'), icon: 'calendar', show: true },
+      { href: '/assets', label: t('assets'), icon: 'assets', show: can('assets.view') },
+      {
+        href: '/attendance',
+        label: t('attendance'),
+        icon: 'attendance',
+        show: can('attendance.view'),
+      },
+      // §4/§6: the room schedule and the act of booking share one population.
+      // A plain Member holds no rooms.book scope and sees neither.
+      { href: '/rooms', label: t('rooms'), icon: 'rooms', show: can('rooms.book') },
+      // §8: View KPI is its own permission — nothing else unlocks this page.
+      { href: '/kpi', label: t('kpi'), icon: 'kpi', show: can('kpi.view') },
+      {
+        href: '/admin',
+        label: t('admin'),
+        icon: 'admin',
+        show:
+          can('roles.configure') || can('request_types.configure') || can('import.run'),
+      },
+    ] satisfies NavItem[]
+  ).filter((item) => item.show);
 
   const isArabic = locale === 'ar';
   const displayName = isArabic ? member!.name_ar : member!.name_en;
+  const photoUrl = await signAvatar(await createClient(), member!.avatar_path);
   const roleName = isArabic ? member!.role_name_ar : member!.role_name_en;
   const teamName = isArabic ? member!.team_name_ar : member!.team_name_en;
 
@@ -74,17 +121,25 @@ export default async function AppLayout({
           />
 
           <div className="ms-auto flex items-center gap-3">
-            <div className="text-end">
-              <div className="text-sm font-medium text-ink">{displayName}</div>
-              <div className="text-xs text-ink-muted">
-                {/* "Team Director" is one role; the UI composes the label. */}
-                {member!.role_key === 'team_director'
-                  ? isArabic
-                    ? `${roleName} — ${teamName}`
-                    : `Director of ${teamName}`
-                  : `${roleName} · ${teamName}`}
-              </div>
-            </div>
+            {/* The photo and the name are the way to your own profile — the
+                only page in here that is about you rather than about work. */}
+            <Link
+              href={`/members/${member!.id}`}
+              className="flex items-center gap-3 rounded-lg px-1 py-0.5 hover:bg-surface-muted"
+            >
+              <Avatar src={photoUrl} name={displayName} size={36} />
+              <span className="text-end">
+                <span className="block text-sm font-medium text-ink">{displayName}</span>
+                <span className="block text-xs text-ink-muted">
+                  {/* "Team Director" is one role; the UI composes the label. */}
+                  {member!.role_key === 'team_director'
+                    ? isArabic
+                      ? `${roleName} — ${teamName}`
+                      : `Director of ${teamName}`
+                    : `${roleName} · ${teamName}`}
+                </span>
+              </span>
+            </Link>
             <LocaleSwitch />
             <form action={signOutAction}>
               <input type="hidden" name="locale" value={locale} />
@@ -97,11 +152,23 @@ export default async function AppLayout({
             </form>
           </div>
         </div>
-
-        <NavLinks items={items} />
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+      {/*
+        The sidebar is the FIRST child of this row, so `dir` on <html> decides
+        which edge it hugs: left for English, right for Arabic. `min-w-0` on
+        <main> keeps wide tables scrolling inside themselves instead of
+        stretching the row.
+      */}
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 lg:flex-row">
+        <aside className="lg:w-60 lg:shrink-0">
+          <div className="lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto">
+            <NavLinks items={items} menuLabel={t('menu')} />
+          </div>
+        </aside>
+
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
     </div>
   );
 }

@@ -3,8 +3,15 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { createClient } from '@/lib/supabase/server';
 import { getMyMember, scopeFor } from '@/lib/auth/session';
 import { Badge, Card, EmptyState, PageHeader } from '@/components/ui';
-import { formatDateTime, localized, toDateTimeInput } from '@/lib/format';
-import { findStatus, loadStatusLookup, type RequestField } from '@/lib/requests';
+import { formatDateTime, localized } from '@/lib/format';
+import {
+  REQUEST_FILE_BUCKET,
+  findStatus,
+  loadFieldOptions,
+  loadStatusLookup,
+  optionLabel,
+  type RequestField,
+} from '@/lib/requests';
 import { RequestActions, type AvailableTransition } from './RequestActions';
 
 export default async function RequestPage({
@@ -22,7 +29,7 @@ export default async function RequestPage({
   const { data: request } = await supabase
     .from('requests')
     .select(
-      'id, status, data, created_at, request_type_id, submitted_by, target_kind, target_team_id, target_project_id, request_types(key, name_en, name_ar, field_schema), members(name_en, name_ar), teams(name_en, name_ar), projects(name_en, name_ar)',
+      'id, status, data, created_at, request_type_id, submitted_by, target_kind, target_team_id, target_project_id, target_member_id, request_types(key, name_en, name_ar, field_schema), members:submitted_by(name_en, name_ar), target_member:target_member_id(name_en, name_ar), teams(name_en, name_ar), projects(name_en, name_ar), meeting_details(booking_id, meet_link, meet_state)',
     )
     .eq('id', id)
     .maybeSingle();
@@ -37,7 +44,7 @@ export default async function RequestPage({
       .order('created_at', { ascending: true }),
     supabase
       .from('request_transitions')
-      .select('to_status, actor_rule, required_permission, label_en, label_ar, sort_order')
+      .select('to_status, actor_rule, required_permission, label_en, label_ar, sort_order, field_schema')
       .eq('request_type_id', request.request_type_id as string)
       .eq('from_status', request.status as string)
       .order('sort_order'),
@@ -89,6 +96,7 @@ export default async function RequestPage({
         label_ar: transition.label_ar as string,
         is_terminal: Boolean(target?.is_terminal),
         is_approved: Boolean(target?.is_approved),
+        field_schema: (transition.field_schema ?? []) as RequestField[],
       };
     });
 
@@ -100,18 +108,59 @@ export default async function RequestPage({
   };
   const data = (request.data ?? {}) as Record<string, string | number>;
 
-  // A request type that collects a proposed time is a scheduling one — that's
-  // what makes the counter-offer inputs appear, not the type's name.
-  const scheduling = (type.field_schema ?? []).some(
-    (field) => field.key === 'proposed_start',
-  );
+  /*
+   * A live-sourced select stores an id, so the label has to be looked up the
+   * same way the form built it — hence the shared loader rather than a second
+   * query written to taste here.
+   *
+   * Both schemas are passed: the TYPE's, for the answers shown above, and each
+   * TRANSITION's, for the questions a move is about to ask. A counter-offer's
+   * room picker lives in the second, and would silently render empty if only
+   * the first were loaded.
+   */
+  /*
+   * Any `file` answers, signed for download. Collected from the type's schema
+   * AND every transition's, because a deliverable is attached BY a move.
+   */
+  const filePaths = [...(type.field_schema ?? []), ...available.flatMap((a) => a.field_schema)]
+    .filter((field) => field.type === 'file')
+    .map((field) => data[field.key])
+    .filter((value): value is string => typeof value === 'string' && value.length > 0);
+
+  const fileLinks = new Map<string, string>();
+  if (filePaths.length) {
+    const { data: signed } = await supabase.storage
+      .from(REQUEST_FILE_BUCKET)
+      .createSignedUrls([...new Set(filePaths)], 60 * 60);
+    for (const row of signed ?? []) {
+      if (row.path && row.signedUrl) fileLinks.set(row.path, row.signedUrl);
+    }
+  }
+
+  const fieldOptions = await loadFieldOptions(supabase, [
+    type,
+    ...available.map((transition) => ({ field_schema: transition.field_schema })),
+  ]);
 
   const target =
     request.target_kind === 'team'
       ? localized(request.teams as unknown as Record<string, string>, 'name', locale)
       : request.target_kind === 'project'
         ? localized(request.projects as unknown as Record<string, string>, 'name', locale)
-        : t('targetPresidency');
+        : request.target_kind === 'individual'
+          ? localized(request.target_member as unknown as Record<string, string>, 'name', locale)
+          : t('targetPresidency');
+
+  /*
+   * A meeting's room and Meet link live beside the request, not in its
+   * answers — see migration 0029. `meeting_details` has no row for any other
+   * type, so its absence is what says "this is not a meeting".
+   */
+  const meeting = request.meeting_details as unknown as {
+    booking_id: string | null;
+    meet_link: string | null;
+    meet_state: 'not_needed' | 'pending' | 'ready' | 'failed';
+  } | null;
 
   return (
     <>
@@ -145,9 +194,29 @@ export default async function RequestPage({
                     {locale === 'ar' ? field.label_ar : field.label_en}
                   </dt>
                   <dd>
-                    {field.type === 'datetime'
-                      ? formatDateTime(String(value), locale)
-                      : String(value)}
+                    {field.type === 'datetime' ? (
+                      formatDateTime(String(value), locale)
+                    ) : field.type === 'select' ? (
+                      optionLabel(field, String(value), fieldOptions, locale)
+                    ) : field.type === 'file' ? (
+                      // The bucket is private, so this is a signed link — and
+                      // the storage policy grants it only to people who can
+                      // already see this request.
+                      fileLinks.get(String(value)) ? (
+                        <a
+                          href={fileLinks.get(String(value))}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-brand-700 underline"
+                        >
+                          {String(value).split('/').pop()}
+                        </a>
+                      ) : (
+                        String(value).split('/').pop()
+                      )
+                    ) : (
+                      String(value)
+                    )}
                   </dd>
                 </div>
               );
@@ -155,22 +224,39 @@ export default async function RequestPage({
           </dl>
         </Card>
 
+        {/* §2/§3: what confirmation produced — the room and the Meet link. */}
+        {meeting ? (
+          <Card>
+            <h2 className="mb-3 font-semibold">{t('meetingDetails')}</h2>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+              <dt className="text-ink-muted">{t('meetingRoom')}</dt>
+              <dd>{meeting.booking_id ? t('roomHeld') : t('noRoom')}</dd>
+
+              <dt className="text-ink-muted">{t('meetLink')}</dt>
+              <dd>
+                {meeting.meet_link ? (
+                  <a
+                    href={meeting.meet_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand-700 underline"
+                  >
+                    {meeting.meet_link}
+                  </a>
+                ) : (
+                  <span className="text-ink-muted">{t(`meet_${meeting.meet_state}`)}</span>
+                )}
+              </dd>
+            </dl>
+          </Card>
+        ) : null}
+
         <Card>
           <h2 className="mb-3 font-semibold">{t('actions')}</h2>
           <RequestActions
             requestId={request.id as string}
             transitions={available}
-            scheduling={scheduling}
-            proposedStart={
-              data.proposed_start
-                ? toDateTimeInput(new Date(String(data.proposed_start)))
-                : undefined
-            }
-            proposedEnd={
-              data.proposed_end
-                ? toDateTimeInput(new Date(String(data.proposed_end)))
-                : undefined
-            }
+            fieldOptions={fieldOptions}
           />
         </Card>
 

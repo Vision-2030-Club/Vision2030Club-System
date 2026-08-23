@@ -2,9 +2,15 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { getMyMember } from '@/lib/auth/session';
+import { getMyMember, hasPermission } from '@/lib/auth/session';
 import { fail, ok, requiredText, text, type ActionResult } from '@/lib/actions';
-import type { RequestField } from '@/lib/requests';
+import {
+  MAX_REQUEST_FILE_BYTES,
+  REQUEST_FILE_BUCKET,
+  type RequestField,
+} from '@/lib/requests';
+import { fromClubWallClock } from '@/lib/time';
+import { ensureMeetLink } from '@/lib/google/meetings';
 
 /**
  * Creating a request of ANY type goes through this one action. It reads the
@@ -22,11 +28,21 @@ export async function createRequestAction(
 
   const { data: type, error: typeError } = await supabase
     .from('request_types')
-    .select('id, key, owning_team_id, field_schema')
+    .select('id, key, owning_team_id, field_schema, submit_permission')
     .eq('id', typeId)
     .maybeSingle();
 
   if (typeError || !type) return fail(typeError?.message ?? 'Unknown request type');
+
+  /*
+   * §7 asks for this at BOTH layers. `requests_insert` refuses it in the
+   * database, so calling the API directly gets a real permission error — this
+   * check exists only to say so in a sentence rather than as a policy
+   * violation. Which permission (if any) is configuration on the type.
+   */
+  if (type.submit_permission && !(await hasPermission(type.submit_permission as string))) {
+    return fail(`Permission denied: ${type.submit_permission}`);
+  }
 
   // The starting status is configuration too, not a constant in the code.
   const { data: initial } = await supabase
@@ -50,9 +66,10 @@ export async function createRequestAction(
     if (field.type === 'number') {
       data[field.key] = Number(raw);
     } else if (field.type === 'datetime') {
-      // `datetime-local` has no timezone; anchor it to the browser's before
-      // storing so the calendar shows the time that was actually meant.
-      data[field.key] = new Date(raw).toISOString();
+      // `datetime-local` carries no timezone. Anchor it to the CLUB's clock —
+      // `new Date(raw)` would use the server's, which is UTC in production and
+      // Riyadh on a laptop, so the same form would store two different times.
+      data[field.key] = fromClubWallClock(raw).toISOString();
     } else {
       data[field.key] = raw;
     }
@@ -63,21 +80,27 @@ export async function createRequestAction(
   let targetKind = text(formData, 'target_kind') ?? 'team';
   let targetTeam: string | null = text(formData, 'target_team_id');
   let targetProject: string | null = text(formData, 'target_project_id');
+  let targetMember: string | null = text(formData, 'target_member_id');
 
   if (type.owning_team_id) {
     targetKind = 'team';
     targetTeam = type.owning_team_id as string;
     targetProject = null;
+    targetMember = null;
   }
 
   if (targetKind === 'team' && !targetTeam) return fail('Choose a team to send this to.');
   if (targetKind === 'project' && !targetProject) return fail('Choose a project to send this to.');
-  if (targetKind === 'presidency') {
-    targetTeam = null;
-    targetProject = null;
+  // §2: a meeting can be with one specific person.
+  if (targetKind === 'individual' && !targetMember) {
+    return fail('Choose the person to send this to.');
   }
-  if (targetKind === 'team') targetProject = null;
-  if (targetKind === 'project') targetTeam = null;
+
+  // `requests_target_shape` allows exactly one target column to be set, so
+  // clear the others rather than relying on the form never sending them.
+  if (targetKind !== 'team') targetTeam = null;
+  if (targetKind !== 'project') targetProject = null;
+  if (targetKind !== 'individual') targetMember = null;
 
   const { data: created, error } = await supabase
     .from('requests')
@@ -87,6 +110,7 @@ export async function createRequestAction(
       target_kind: targetKind,
       target_team_id: targetTeam,
       target_project_id: targetProject,
+      target_member_id: targetMember,
       status: initial.key,
       data,
     })
@@ -118,12 +142,77 @@ export async function transitionRequestAction(
   const toStatus = requiredText(formData, 'to_status');
   const supabase = await createClient();
 
-  // Counter-offers carry a new proposed time; everything else sends nothing.
-  const patch: Record<string, string> = {};
-  const proposedStart = text(formData, 'proposed_start');
-  const proposedEnd = text(formData, 'proposed_end');
-  if (proposedStart) patch.proposed_start = new Date(proposedStart).toISOString();
-  if (proposedEnd) patch.proposed_end = new Date(proposedEnd).toISOString();
+  /*
+   * Whatever THIS move asks for (0033). Previously this collected
+   * `proposed_start` and `proposed_end` by name, which meant the shared
+   * transition path knew what a meeting was. Now it reads the transition's own
+   * `field_schema` and collects exactly that — so a counter-offer can also
+   * change the room and the format, and a Design Request can collect its
+   * dates, without either being mentioned here.
+   */
+  const { data: request } = await supabase
+    .from('requests')
+    .select('request_type_id, status')
+    .eq('id', requestId)
+    .maybeSingle();
+
+  if (!request) return fail('That request no longer exists.');
+
+  const { data: transition } = await supabase
+    .from('request_transitions')
+    .select('field_schema')
+    .eq('request_type_id', request.request_type_id as string)
+    .eq('from_status', request.status as string)
+    .eq('to_status', toStatus)
+    .maybeSingle();
+
+  const patch: Record<string, string | number> = {};
+
+  for (const field of ((transition?.field_schema ?? []) as RequestField[])) {
+    /*
+     * A `file` answer is an upload, not a value. It goes to the private
+     * `design-files` bucket under the request's own id — which is the same
+     * string the bucket policy checks, so a file is exactly as visible as the
+     * request that delivered it — and what lands in `data` is the path.
+     */
+    if (field.type === 'file') {
+      const file = formData.get(`field_${field.key}`);
+      if (!(file instanceof File) || file.size === 0) {
+        if (field.required) return fail(`Missing required field: ${field.label_en}`);
+        continue;
+      }
+      if (file.size > MAX_REQUEST_FILE_BYTES) {
+        return fail('That file is over 10 MB. Share a link to it instead.');
+      }
+
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+      const path = `${requestId}/${Date.now()}-${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(REQUEST_FILE_BUCKET)
+        .upload(path, file, { contentType: file.type, upsert: false });
+
+      if (uploadError) return fail(uploadError.message);
+      patch[field.key] = path;
+      continue;
+    }
+
+    const raw = text(formData, `field_${field.key}`);
+    if (raw === null) {
+      if (field.required) {
+        return fail(`Missing required field: ${field.label_en}`);
+      }
+      continue;
+    }
+    if (field.type === 'number') {
+      patch[field.key] = Number(raw);
+    } else if (field.type === 'datetime') {
+      // The club's clock, for the same reason as the create path.
+      patch[field.key] = fromClubWallClock(raw).toISOString();
+    } else {
+      patch[field.key] = raw;
+    }
+  }
 
   const { error } = await supabase.rpc('transition_request', {
     p_request: requestId,
@@ -134,8 +223,22 @@ export async function transitionRequestAction(
 
   if (error) return fail(error.message);
 
+  /*
+   * §3: the moment a meeting is confirmed, its Meet link is created — no
+   * manual step. The database cannot do it (a trigger making a network call
+   * would hold the transaction open and turn a Google outage into "you cannot
+   * confirm your meeting"), so it happens here, after the transition has
+   * committed.
+   *
+   * Deliberately not awaited into the result: the meeting IS agreed and IS on
+   * the club's own calendar whatever Google says. A failure is recorded on the
+   * row, shown on this page, and retried later.
+   */
+  await ensureMeetLink(requestId);
+
   revalidatePath(`/${locale}/requests`);
   revalidatePath(`/${locale}/requests/${requestId}`);
   revalidatePath(`/${locale}/calendar`);
+  revalidatePath(`/${locale}/rooms`);
   return ok('transitioned');
 }

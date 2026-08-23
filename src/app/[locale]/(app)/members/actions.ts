@@ -4,7 +4,17 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { hasPermission } from '@/lib/auth/session';
-import { all, fail, fromPostgrest, ok, requiredText, text, type ActionResult } from '@/lib/actions';
+import { fail, fromPostgrest, ok, requiredText, text, type ActionResult } from '@/lib/actions';
+import { AVATAR_BUCKET } from '@/lib/avatars';
+
+/** Mirrors the bucket's own `allowed_mime_types` and size cap (migration 0024). */
+const AVATAR_TYPES = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+} as const;
+
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
 function revalidateMember(locale: string, id: string) {
   revalidatePath(`/${locale}/members/${id}`);
@@ -71,28 +81,116 @@ export async function changeRoleAction(
   return ok();
 }
 
-/** Skill assignment — available to whoever can edit member records (spec §4). */
-export async function setSkillsAction(
+/**
+ * Profile photo (spec addendum: a member profile carries a picture).
+ *
+ * The file goes to the PRIVATE `avatars` bucket under `<member_id>/…`, which
+ * is the same string the bucket's policy checks — so a member uploading into
+ * someone else's folder is refused by storage, not by the `if` below. The `if`
+ * is here only to give that refusal a readable message.
+ *
+ * The stored name carries a timestamp rather than being fixed, because a fixed
+ * name replaced in place keeps serving the old image from CDN and browser
+ * caches long after the new one is up.
+ */
+export async function uploadAvatarAction(
   _previous: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
   const id = requiredText(formData, 'id');
   const locale = requiredText(formData, 'locale');
-  const skillIds = all(formData, 'skill_id');
+  const file = formData.get('photo');
+
+  if (!(file instanceof File) || file.size === 0) {
+    return fail('Choose an image first.');
+  }
+  if (file.size > MAX_AVATAR_BYTES) {
+    return fail('That image is larger than 2 MB. Please pick a smaller one.');
+  }
+
+  const extension = AVATAR_TYPES[file.type as keyof typeof AVATAR_TYPES];
+  if (!extension) {
+    return fail('Profile photos must be a JPEG, PNG or WebP image.');
+  }
 
   const supabase = await createClient();
-  const { error: deleteError } = await supabase
-    .from('member_skills')
-    .delete()
-    .eq('member_id', id);
-  if (deleteError) return fail(deleteError.message);
+  const path = `${id}/${Date.now()}.${extension}`;
 
-  if (skillIds.length > 0) {
-    const { error } = await supabase
-      .from('member_skills')
-      .insert(skillIds.map((skill_id) => ({ member_id: id, skill_id })));
-    if (error) return fail(error.message);
+  const { error: uploadError } = await supabase.storage
+    .from(AVATAR_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (uploadError) return fail(uploadError.message);
+
+  /*
+   * Read the old path BEFORE overwriting it, so the replaced file can be
+   * deleted afterwards. Order matters the other way round too: the row is
+   * pointed at the new object first, so a failure here leaves an orphaned file
+   * rather than a profile pointing at one that is gone.
+   */
+  const { data: previousRow } = await supabase
+    .from('members')
+    .select('avatar_path')
+    .eq('id', id)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from('members')
+    .update({ avatar_path: path })
+    .eq('id', id);
+
+  if (error) {
+    await supabase.storage.from(AVATAR_BUCKET).remove([path]);
+    return fail(error.message);
   }
+
+  const previousPath = previousRow?.avatar_path as string | null | undefined;
+  if (previousPath && previousPath !== path) {
+    await supabase.storage.from(AVATAR_BUCKET).remove([previousPath]);
+  }
+
+  revalidateMember(locale, id);
+  return ok();
+}
+
+/**
+ * One entry in the experience history. Ending date left empty means "still
+ * there" — the table stores that as a NULL `ended_on` rather than a flag, so
+ * there is only one way to say it.
+ */
+export async function addExperienceAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const id = requiredText(formData, 'id');
+  const locale = requiredText(formData, 'locale');
+
+  const supabase = await createClient();
+  const { error } = await supabase.from('member_experience').insert({
+    member_id: id,
+    title: requiredText(formData, 'title'),
+    organization: requiredText(formData, 'organization'),
+    description: text(formData, 'description'),
+    started_on: requiredText(formData, 'started_on'),
+    ended_on: text(formData, 'ended_on'),
+  });
+
+  if (error) return fromPostgrest(error);
+
+  revalidateMember(locale, id);
+  return ok();
+}
+
+export async function deleteExperienceAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const id = requiredText(formData, 'id');
+  const locale = requiredText(formData, 'locale');
+  const entryId = requiredText(formData, 'entry_id');
+
+  const supabase = await createClient();
+  const { error } = await supabase.from('member_experience').delete().eq('id', entryId);
+  if (error) return fromPostgrest(error);
 
   revalidateMember(locale, id);
   return ok();

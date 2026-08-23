@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { Alert, Button, Card, Label, Select } from '@/components/ui';
 import { RequestFields } from '@/components/RequestFields';
 import type { ActionResult } from '@/lib/actions';
-import type { RequestField } from '@/lib/requests';
+import type { FieldOptions, RequestField } from '@/lib/requests';
 import { createRequestAction } from '../actions';
 
 export type RequestTypeOption = {
@@ -25,16 +25,22 @@ export function NewRequestForm({
   types,
   teams,
   projects,
+  members,
+  fieldOptions,
 }: {
   types: RequestTypeOption[];
   teams: Named[];
   projects: Named[];
+  members: Named[];
+  /** Options for selects whose choices come from a table, not the schema. */
+  fieldOptions: FieldOptions;
 }) {
   const locale = useLocale();
   const t = useTranslations('requests');
   const tCommon = useTranslations('common');
   const [typeId, setTypeId] = useState(types[0]?.id ?? '');
-  const [targetKind, setTargetKind] = useState<'team' | 'project' | 'presidency'>('team');
+  const [targetKind, setTargetKind] =
+    useState<'team' | 'project' | 'presidency' | 'individual'>('team');
   const [state, formAction, pending] = useActionState<ActionResult, FormData>(
     createRequestAction,
     { ok: false },
@@ -97,6 +103,7 @@ export function NewRequestForm({
                 <option value="team">{t('targetTeam')}</option>
                 <option value="project">{t('targetProject')}</option>
                 <option value="presidency">{t('targetPresidency')}</option>
+                <option value="individual">{t('targetIndividual')}</option>
               </Select>
             </div>
 
@@ -125,10 +132,26 @@ export function NewRequestForm({
                 </Select>
               </div>
             ) : null}
+
+            {/* §2: a meeting's target can be one specific person. */}
+            {targetKind === 'individual' ? (
+              <div>
+                <Label htmlFor="target_member_id">{t('targetIndividual')}</Label>
+                <Select id="target_member_id" name="target_member_id" required>
+                  {members.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {name(member)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            ) : null}
           </>
         )}
 
-        {type ? <RequestFields fields={type.field_schema ?? []} /> : null}
+        {type ? (
+          <RequestFields fields={type.field_schema ?? []} options={fieldOptions} />
+        ) : null}
 
         {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
         {state.ok ? <Alert tone="ok">{t('created')}</Alert> : null}

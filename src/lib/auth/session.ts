@@ -17,6 +17,8 @@ export type MyMember = {
   name_ar: string;
   status: 'active' | 'inactive' | 'alumni';
   student_id: string;
+  /** Path inside the private `avatars` bucket, not a URL — see src/lib/avatars.ts. */
+  avatar_path: string | null;
   team_id: string;
   team_key: string;
   team_name_en: string;
