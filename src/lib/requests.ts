@@ -104,7 +104,14 @@ const OPTION_SOURCES = {
     order: 'name_en',
     label: plainName,
   },
-  /** Projects, for tying a Design Request to one (§7 — optional). */
+  /** People the caller may assign a task to — see migration 0040. */
+  assignable_members: {
+    from: 'assignable_members',
+    select: 'id, name_en, name_ar',
+    order: 'name_en',
+    label: plainName,
+  },
+  /** Projects, for tying a Design or Media Request to one (optional). */
   projects: {
     from: 'projects',
     select: 'id, name_en, name_ar',

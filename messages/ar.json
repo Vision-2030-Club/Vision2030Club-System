@@ -250,7 +250,10 @@
     "leaveUnassigned": "اتركها متاحة للاستلام",
     "filterAll": "الكل",
     "filterOpen": "المفتوحة",
-    "filterReview": "بانتظار الاعتماد"
+    "filterReview": "بانتظار الاعتماد",
+    "submissionUrl": "رابط العمل",
+    "newStartingDate": "تاريخ البدء الجديد",
+    "newDeliveryDate": "تاريخ التسليم الجديد"
   },
   "requests": {
     "title": "الطلبات",

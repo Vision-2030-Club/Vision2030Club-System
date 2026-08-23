@@ -61,6 +61,12 @@ export type TaskKpi = {
   can_claim: boolean;
   can_confirm: boolean;
   can_administer: boolean;
+  /** Set when this task was created by an accepted request (migration 0038). */
+  source_request_id: string | null;
+  /** Where the finished work is. Requests deliver a link, never an upload. */
+  submission_url: string | null;
+  /** True when submitting requires that link. */
+  requires_link: boolean;
 };
 
 export type MemberKpi = {

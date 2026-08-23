@@ -1,10 +1,10 @@
 # Handoff — Vision 2030 Club System
 
 Build is green (`npm run build`, 43 routes) and `npx eslint` is clean.
-**All 37 migrations are applied** to a live Supabase project. Everything is
+**All 45 migrations are applied** to a live Supabase project. Everything is
 verified end to end against the real database over the REST API rather than
 through the UI: `db:test` 32/32 · `db:rooms` 27/27 · `db:meetings` 38/38 ·
-`db:design` 23/23 · `db:kpi` 72/72 · `db:prove` 12/12.
+`db:design` 48/48 · `db:kpi` 72/72 · `db:prove` 12/12.
 
 The Meetings / Rooms / Design Request build is underway — **steps 1–5 of 6 are
 done**: rooms and the booking window with the double-booking guarantee, the
@@ -70,7 +70,7 @@ Nothing is blocked. To get running from a fresh clone:
 ### State as of this commit
 
 - All 27 migrations applied to the live Supabase project.
-- `db:test` 32/32 · `db:rooms` 27/27 · `db:meetings` 38/38 · `db:design` 23/23 ·
+- `db:test` 32/32 · `db:rooms` 27/27 · `db:meetings` 38/38 · `db:design` 48/48 ·
   `db:kpi` 72/72 · `db:prove` 12/12.
 - One member exists: the Super Admin bootstrap account, password already set.
 - Public sign-ups should be **off** in the dashboard (Authentication → Sign In /
@@ -178,6 +178,7 @@ Two consequences worth remembering before changing anything:
 | `0034_workflow_hooks.sql` | `request_types.submit_permission`, `request_transitions.on_transition_hook`, `request_types.on_meeting_confirmed_hook`, and `app.system_transition` for moves a hook makes |
 | `0035_design_request.sql` | **The Design Request (§7).** Its statuses, transitions, the `open_meeting` / `resume_after_meeting` hooks, and the private `design-files` bucket |
 | `0036_status_clears_data.sql` | `request_statuses.clears_data_keys` — a status can void data that arriving there makes untrue |
+| `0038`–`0045` | **Requests that become one real Task.** `request_types.creates_task` and friends; `tasks.source_request_id` / `submission_url`; the `either` actor rule; Design and Media rebuilt on it; and four fixes the suites caught — see below |
 | `0037_derive_booking_identity.sql` | `app.default_booking_identity()` — the meeting form stops asking which group books the room; Money Request renamed to Fund Request / أمر صرف |
 
 Things in there that are easy to break by accident:
@@ -239,6 +240,24 @@ Things in there that are easy to break by accident:
   whatever that type registered. Nothing in the Meetings component names a
   design request — `db:design` asserts that by grepping the function
   definitions.
+- **"Becomes a task" is a capability, not a type.** `request_types.creates_task`
+  turns it on; `task_due_date_keys` is an ordered list of data keys so one type
+  can carry two flavours without a branch in code. Nothing names Design or
+  Media. Every other type has the flag off and is untouched.
+- **Confirming the task IS approving the request.** There is no second review
+  layer — the task's confirm/reject is the review, which is what puts this work
+  into the KPI like all other work. `tasks.source_request_id` plus
+  `app.notify_task_event` carry the news back, deliberately the same shape as
+  `app.notify_meeting_confirmed`.
+- **A function that is not SECURITY DEFINER answers for whoever called it.**
+  `submit_task_for_review` looked up "does this need a link?" by joining to the
+  request type — as the ASSIGNEE, who usually cannot see that request. The
+  lookup found nothing, the flag stayed false, and the check failed OPEN. If a
+  guard reads a row the actor may not see, it needs a definer helper (0044).
+- **`enforce_task_workflow` has two branches for a reason.** A task may be
+  CREATED already assigned; it may not be created already submitted. Rewriting
+  the function without the INSERT branch broke most task creation and was
+  caught by db:kpi's first check (0045).
 - **A test that assumes club configuration is a broken test.** `db:rooms` and
   `db:meetings` pin `booking_settings` to noon–midnight for the run and put the
   club's real window back afterwards. They started failing the day somebody set

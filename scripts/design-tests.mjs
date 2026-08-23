@@ -103,13 +103,24 @@ const allowed = (r) => r.ok && Array.isArray(r.body) && r.body.length > 0;
 
 const PEOPLE = {
   designer: { role: 'team_director', team: 'DESIGN', student: '493000001', national: '1930000001' },
+  // Somebody on Design to actually do the work. Section 8 bars a Director from
+  // confirming work they did themselves, so the two cannot be one person.
+  dmember: { role: 'member', team: 'DESIGN', student: '493000006', national: '1930000006' },
   media: { role: 'team_director', team: 'MEDIA', student: '493000002', national: '1930000002' },
+  mmember: { role: 'member', team: 'MEDIA', student: '493000007', national: '1930000007' },
   pm: { role: 'project_manager', team: 'CONTENT', student: '493000003', national: '1930000003' },
   member: { role: 'member', team: 'MEDIA', student: '493000004', national: '1930000004' },
   guest: { role: 'guest', team: 'CLUB_MGMT', student: '493000005', national: '1930000005' },
 };
 
 async function cleanUp() {
+  await db.query(
+    `delete from tasks where created_by in (select id from members where email like $1)
+        or source_request_id in
+          (select id from requests where submitted_by in
+             (select id from members where email like $1))`,
+    [`${PREFIX}%`],
+  );
   await db.query(
     `delete from calendar_entries where source_request_id in
        (select id from requests where submitted_by in
@@ -187,6 +198,14 @@ async function seed() {
 
   const { rows: designTeam } = await db.query(`select id from teams where key = 'DESIGN'`);
   people.designTeamId = designTeam[0].id;
+
+  const { rows: mediaType } = await db.query(
+    `select id from request_types where key = 'media_request'`,
+  );
+  people.mediaTypeId = mediaType[0].id;
+
+  const { rows: mediaTeam } = await db.query(`select id from teams where key = 'MEDIA'`);
+  people.mediaTeamId = mediaTeam[0].id;
 
   return people;
 }
@@ -366,112 +385,355 @@ async function run(p) {
     JSON.stringify(booked),
   );
 
-  // --- §7: the review / revision loop --------------------------------------
+  // --- §1: accepting turns the request into ONE real task -------------------
 
+  const acceptNoDates = await rpc(p.designer.token, 'transition_request', {
+    p_request: requestId,
+    p_to_status: 'in_progress',
+  });
+  check(
+    'accepting without dates is refused',
+    !acceptNoDates.ok && JSON.stringify(acceptNoDates.body).includes('starting_date'),
+    JSON.stringify(acceptNoDates.body)?.slice(0, 90),
+  );
+
+  const accept = await rpc(p.designer.token, 'transition_request', {
+    p_request: requestId,
+    p_to_status: 'in_progress',
+    p_patch: {
+      starting_date: dateOnly(1),
+      delivery_date: dateOnly(10),
+      assignee_id: p.dmember.id,
+    },
+  });
+  check('the Director accepts and sets the dates', accept.ok,
+    JSON.stringify(accept.body)?.slice(0, 90));
+
+  // Postgres hands a `date` back as a JS Date at local midnight, so reading it
+  // through toISOString() lands on the previous day west of Riyadh. Format it
+  // on the club's clock instead, the same way the app does.
+  const dayFmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Riyadh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const day10 = (v) => (v ? dayFmt.format(new Date(v)) : null);
+
+  const { rows: made } = await db.query(
+    `select t.id, t.team_id, t.project_id, t.due_date,
+            (t.assigned_at at time zone 'Asia/Riyadh')::date as start_date,
+            ta.member_id as assignee
+       from tasks t left join task_assignees ta on ta.task_id = t.id
+      where t.source_request_id = $1`,
+    [requestId],
+  );
+  check('exactly one real task appears', made.length === 1, `${made.length} tasks`);
+  const taskId = made[0]?.id;
+
+  check(
+    'Assigned Date is the Starting Date and Due Date is the Delivery Date (§1)',
+    day10(made[0]?.start_date) === dateOnly(1) && day10(made[0]?.due_date) === dateOnly(10),
+    JSON.stringify(made[0]),
+  );
+  check(
+    'the task belongs to the team that does the work, not to the project',
+    made[0]?.team_id === p.designTeamId && made[0]?.project_id === null,
+    JSON.stringify(made[0]),
+  );
+  check('and it is assigned to whoever the Director picked', made[0]?.assignee === p.dmember.id);
+
+  // --- §1: from here it is an ordinary task ---------------------------------
+
+  const submitNoLink = await rpc(p.dmember.token, 'submit_task_for_review', { p_task: taskId });
+  check(
+    'submitting without a link is refused — these are delivered as links (§1)',
+    !submitNoLink.ok && JSON.stringify(submitNoLink.body).includes('link'),
+    JSON.stringify(submitNoLink.body)?.slice(0, 90),
+  );
+
+  const outsiderSubmit = await rpc(p.designer.token, 'submit_task_for_review', {
+    p_task: taskId,
+    p_url: 'https://example.test/not-mine',
+  });
+  check('only the assignee can submit it', !outsiderSubmit.ok);
+
+  const submit1 = await rpc(p.dmember.token, 'submit_task_for_review', {
+    p_task: taskId,
+    p_url: 'https://example.test/poster-v1',
+  });
+  check('the assignee submits with a link', submit1.ok, JSON.stringify(submit1.body)?.slice(0, 90));
+
+  const { rows: afterSubmit } = await db.query(
+    `select status from requests where id = $1`,
+    [requestId],
+  );
+  check(
+    'submitting the task moves the REQUEST to review — no separate submit step',
+    afterSubmit[0]?.status === 'in_review',
+    `request is ${afterSubmit[0]?.status}`,
+  );
+
+  // --- §2 checkpoint 2: either side can ask to talk first --------------------
+
+  const talkFirst = await rpc(p.media.token, 'transition_request', {
+    p_request: requestId,
+    p_to_status: 'awaiting_meeting',
+    p_patch: {
+      meeting_title: 'About the delivered poster',
+      meeting_type: 'online',
+      proposed_start: at(15),
+    },
+  });
+  check(
+    'the SUBMITTER can require a meeting about the delivered work (§2)',
+    talkFirst.ok,
+    JSON.stringify(talkFirst.body)?.slice(0, 90),
+  );
+
+  const { rows: secondMeeting } = await db.query(
+    `select request_id from meeting_details where origin_request_id = $1
+      order by created_at desc limit 1`,
+    [requestId],
+  );
+  await rest(p.designer.token, `requests?id=eq.${secondMeeting[0]?.request_id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'approved' }),
+  });
+  const { rows: resumedTwo } = await db.query(`select status from requests where id = $1`, [
+    requestId,
+  ]);
+  check(
+    'and confirming it returns the request to the review it left',
+    resumedTwo[0]?.status === 'in_review',
+    `request is ${resumedTwo[0]?.status}`,
+  );
+
+  // --- §1: rejecting sends it back with NEW dates ---------------------------
+
+  const rejectNoDates = await rpc(p.designer.token, 'reject_task', {
+    p_task: taskId,
+    p_note: 'Logo too small',
+  });
+  check(
+    'rejecting without new dates is refused (§1)',
+    !rejectNoDates.ok && JSON.stringify(rejectNoDates.body).includes('date'),
+    JSON.stringify(rejectNoDates.body)?.slice(0, 90),
+  );
+
+  const reject = await rpc(p.designer.token, 'reject_task', {
+    p_task: taskId,
+    p_note: 'Logo too small',
+    p_start: dateOnly(12),
+    p_due: dateOnly(20),
+  });
+  check('rejecting with new dates works', reject.ok, JSON.stringify(reject.body)?.slice(0, 90));
+
+  const { rows: afterReject } = await db.query(
+    `select t.due_date, (t.assigned_at at time zone 'Asia/Riyadh')::date as start_date,
+            r.status as request_status
+       from tasks t join requests r on r.id = t.source_request_id
+      where t.id = $1`,
+    [taskId],
+  );
+  check(
+    'the old dates do not carry over — both are replaced',
+    day10(afterReject[0]?.due_date) === dateOnly(20) &&
+      day10(afterReject[0]?.start_date) === dateOnly(12),
+    JSON.stringify(afterReject[0]),
+  );
+  check(
+    'and the request follows the task back to In Progress',
+    afterReject[0]?.request_status === 'in_progress',
+    `request is ${afterReject[0]?.request_status}`,
+  );
+
+  // --- §1: confirming the task IS approving the request ---------------------
+
+  await rpc(p.dmember.token, 'submit_task_for_review', {
+    p_task: taskId,
+    p_url: 'https://example.test/poster-v2',
+  });
+
+  const selfConfirm = await rpc(p.dmember.token, 'confirm_task', {
+    p_task: taskId,
+    p_quality: 'excellent',
+  });
+  check('the person who did the work cannot confirm it (§8)', !selfConfirm.ok);
+
+  const confirm = await rpc(p.designer.token, 'confirm_task', {
+    p_task: taskId,
+    p_quality: 'excellent',
+  });
+  check('the Director confirms', confirm.ok, JSON.stringify(confirm.body)?.slice(0, 90));
+
+  const { rows: done } = await db.query(
+    `select r.status, r.data ->> 'required_date' as required, t.due_date,
+            k.counts_toward_kpi, k.completion_score
+       from requests r
+       join tasks t on t.source_request_id = r.id
+       join public.task_kpi k on k.id = t.id
+      where r.id = $1`,
+    [requestId],
+  );
+  check(
+    'confirming the task approves the request — no second review step (§1)',
+    done[0]?.status === 'approved',
+    `request is ${done[0]?.status}`,
+  );
+  check(
+    'the work counts toward KPI like any other task (§1)',
+    done[0]?.counts_toward_kpi === true && done[0]?.completion_score !== null,
+    JSON.stringify(done[0]),
+  );
+  check(
+    'Required Date and the task Due Date stayed two different things (§3)',
+    done[0]?.required === dateOnly(21) && day10(done[0]?.due_date) === dateOnly(20),
+    JSON.stringify(done[0]),
+  );
+
+  // --- §1: leaving it unclaimed for the team --------------------------------
+
+  const second = await submit(p.pm.token, p.pm.id);
+  const secondId = second.body?.[0]?.id;
   await rpc(p.designer.token, 'transition_request', {
-    p_request: requestId,
+    p_request: secondId,
     p_to_status: 'in_progress',
-    p_patch: { starting_date: dateOnly(1), delivery_date: dateOnly(10) },
+    p_patch: { starting_date: dateOnly(1), delivery_date: dateOnly(9) },
   });
-
-  const deliver = await rpc(p.designer.token, 'transition_request', {
-    p_request: requestId,
-    p_to_status: 'delivered',
-    p_patch: { design_url: 'https://example.test/poster.pdf' },
-  });
-  check('Design can submit the deliverable', deliver.ok, JSON.stringify(deliver.body)?.slice(0, 90));
-
-  const designerApproves = await rpc(p.designer.token, 'transition_request', {
-    p_request: requestId,
-    p_to_status: 'approved',
-  });
-  check(
-    'Design cannot approve their own delivery — that is the submitter’s call',
-    !designerApproves.ok,
-    JSON.stringify(designerApproves.body)?.slice(0, 90),
+  const { rows: unclaimed } = await db.query(
+    `select id from tasks where source_request_id = $1`,
+    [secondId],
   );
 
-  const revision = await rpc(p.media.token, 'transition_request', {
-    p_request: requestId,
-    p_to_status: 'revision_required',
-    p_patch: { revision_comments: 'The logo is too small.' },
+  const claimByOutsider = await rpc(p.mmember.token, 'claim_task', {
+    p_task: unclaimed[0]?.id,
   });
-  check('the submitter can ask for changes', revision.ok, JSON.stringify(revision.body)?.slice(0, 90));
+  check('somebody outside the team cannot claim it', !claimByOutsider.ok);
 
-  // The commitment Design made is void the moment the work comes back (0036),
-  // so the dates from the first acceptance must be GONE — otherwise
-  // "still present" would satisfy the requirement without anyone re-committing.
-  const { rows: cleared } = await db.query(
-    `select data ? 'starting_date' as has_start, data ? 'delivery_date' as has_delivery
-       from requests where id = $1`,
-    [requestId],
+  const claim = await rpc(p.dmember.token, 'claim_task', { p_task: unclaimed[0]?.id });
+  check(
+    'a member of the team can claim work the Director left unassigned (§1)',
+    claim.ok,
+    JSON.stringify(claim.body)?.slice(0, 90),
+  );
+
+  const { rows: claimed } = await db.query(
+    `select (assigned_at at time zone 'Asia/Riyadh')::date as start_date
+       from tasks where id = $1`,
+    [unclaimed[0]?.id],
   );
   check(
-    'asking for changes voids the dates Design had committed to',
-    cleared[0]?.has_start === false && cleared[0]?.has_delivery === false,
-    JSON.stringify(cleared[0]),
+    'claiming does not overwrite the Starting Date the Director set',
+    day10(claimed[0]?.start_date) === dateOnly(1),
+    JSON.stringify(claimed[0]),
   );
 
-  const restartNoDates = await rpc(p.designer.token, 'transition_request', {
-    p_request: requestId,
+  // --- §4: Media, both flavours ---------------------------------------------
+
+  const media = (extra) =>
+    rest(p.pm.token, 'requests', {
+      method: 'POST',
+      body: JSON.stringify({
+        request_type_id: p.mediaTypeId,
+        submitted_by: p.pm.id,
+        status: 'pending_review',
+        target_kind: 'team',
+        target_team_id: p.mediaTeamId,
+        data: {
+          title: 'Career Fair coverage',
+          priority: 'high',
+          required_date: dateOnly(30),
+          details: 'Photos and a highlight reel.',
+          ...extra,
+        },
+      }),
+    });
+
+  const memberMedia = await rest(p.member.token, 'requests', {
+    method: 'POST',
+    body: JSON.stringify({
+      request_type_id: p.mediaTypeId,
+      submitted_by: p.member.id,
+      status: 'pending_review',
+      target_kind: 'team',
+      target_team_id: p.mediaTeamId,
+      data: { title: 'x', priority: 'low', required_date: dateOnly(30), details: 'x' },
+    }),
+  });
+  check('a plain Member cannot submit a Media Request either', !allowed(memberMedia));
+
+  const coverage = await media({ event_date: dateOnly(14) });
+  check('event coverage can be submitted', allowed(coverage),
+    JSON.stringify(coverage.body)?.slice(0, 90));
+  const coverageId = coverage.body?.[0]?.id;
+
+  const beforeEvent = await rpc(p.media.token, 'transition_request', {
+    p_request: coverageId,
     p_to_status: 'in_progress',
+    p_patch: { starting_date: dateOnly(10), delivery_date: dateOnly(12) },
   });
   check(
-    'restarting after a revision needs NEW dates too, not just the first time',
-    !restartNoDates.ok && JSON.stringify(restartNoDates.body).includes('delivery_date'),
-    JSON.stringify(restartNoDates.body)?.slice(0, 90),
+    'coverage cannot be due BEFORE the event it covers (§4)',
+    !beforeEvent.ok,
+    JSON.stringify(beforeEvent.body)?.slice(0, 100),
   );
 
-  // Round the loop a second time, to show there is no cap (§7).
-  for (let round = 0; round < 2; round += 1) {
-    await rpc(p.designer.token, 'transition_request', {
-      p_request: requestId,
-      p_to_status: 'in_progress',
-      p_patch: { starting_date: dateOnly(2), delivery_date: dateOnly(12) },
-    });
-    await rpc(p.designer.token, 'transition_request', {
-      p_request: requestId,
-      p_to_status: 'delivered',
-      p_patch: { design_url: `https://example.test/poster-v${round + 2}.pdf` },
-    });
-    if (round === 0) {
-      await rpc(p.media.token, 'transition_request', {
-        p_request: requestId,
-        p_to_status: 'revision_required',
-        p_patch: { revision_comments: 'Once more.' },
-      });
-    }
-  }
-
-  const finalApprove = await rpc(p.media.token, 'transition_request', {
-    p_request: requestId,
-    p_to_status: 'approved',
+  const afterEvent = await rpc(p.media.token, 'transition_request', {
+    p_request: coverageId,
+    p_to_status: 'in_progress',
+    p_patch: {
+      starting_date: dateOnly(10),
+      delivery_date: dateOnly(21),
+      assignee_id: p.mmember.id,
+    },
   });
-  check('the loop runs as many times as needed, then approves', finalApprove.ok,
-    JSON.stringify(finalApprove.body)?.slice(0, 90));
+  check('…but may be delivered after it, with editing time (§4)', afterEvent.ok,
+    JSON.stringify(afterEvent.body)?.slice(0, 100));
 
-  const { rows: final } = await db.query(
-    `select r.status, r.data ->> 'required_date' as required, r.data ->> 'delivery_date' as delivery
-       from requests r where r.id = $1`,
-    [requestId],
+  const { rows: coverTask } = await db.query(
+    `select due_date, team_id from tasks where source_request_id = $1`,
+    [coverageId],
   );
   check(
-    'Required Date and Delivery Date are still two different things at the end',
-    final[0]?.status === 'approved' &&
-      final[0]?.required === dateOnly(21) &&
-      final[0]?.delivery === dateOnly(12),
-    JSON.stringify(final[0]),
+    'the coverage task is due on the agreed delivery date, not the event date',
+    day10(coverTask[0]?.due_date) === dateOnly(21),
+    JSON.stringify(coverTask[0]),
+  );
+  check('and belongs to Media', coverTask[0]?.team_id === p.mediaTeamId);
+
+  const standalone = await media({ title: 'Instagram reel' });
+  const standaloneId = standalone.body?.[0]?.id;
+  const standaloneAccept = await rpc(p.media.token, 'transition_request', {
+    p_request: standaloneId,
+    p_to_status: 'in_progress',
+    p_patch: { starting_date: dateOnly(1), delivery_date: dateOnly(5) },
+  });
+  check(
+    'standalone content has a freely chosen timeline (§4)',
+    standaloneAccept.ok,
+    JSON.stringify(standaloneAccept.body)?.slice(0, 90),
   );
 
-  const { rows: history } = await db.query(
-    `select count(*)::int n from request_status_history where request_id = $1`,
-    [requestId],
+  // --- the capability is opt-in: nothing else changed -----------------------
+
+  const { rows: others } = await db.query(
+    `select array_agg(key order by key) as keys from request_types where not creates_task`,
   );
   check(
-    'every step was recorded, including the ones the system made',
-    history[0].n >= 9,
-    `${history[0].n} history rows`,
+    'every other request type is untouched by all this',
+    (others[0].keys ?? []).sort().join(',') ===
+      ['asset_request', 'it_ticket', 'meeting_request', 'money_request'].join(','),
+    JSON.stringify(others[0].keys),
   );
+
+  const { rows: noTask } = await db.query(
+    `select count(*)::int n from tasks t
+       join requests r on r.id = t.source_request_id
+       join request_types rt on rt.id = r.request_type_id
+      where not rt.creates_task`,
+  );
+  check('and none of them ever produced a task', noTask[0].n === 0);
 }
 
 await db.connect();

@@ -103,6 +103,10 @@ export async function submitTaskAction(
 
   const { error } = await supabase.rpc('submit_task_for_review', {
     p_task: requiredText(formData, 'task_id'),
+    // Work that came from a Design or Media request is delivered as a link.
+    // Whether one is REQUIRED is the database's call — the request type says
+    // so, not this action.
+    p_url: text(formData, 'submission_url'),
   });
 
   if (error) return fail(error.message);
@@ -134,7 +138,13 @@ export async function confirmTaskAction(
   return ok('confirmed');
 }
 
-/** §2.4: back to In Progress, with no scores recorded. */
+/**
+ * §2.4: back to In Progress, with no scores recorded.
+ *
+ * For work that came from a request, the Director also supplies a new starting
+ * and delivery date here — the old ones stopped being a commitment the moment
+ * the work came back.
+ */
 export async function rejectTaskAction(
   _previous: ActionResult,
   formData: FormData,
@@ -145,6 +155,10 @@ export async function rejectTaskAction(
   const { error } = await supabase.rpc('reject_task', {
     p_task: requiredText(formData, 'task_id'),
     p_note: text(formData, 'note'),
+    // Sending request-created work back needs fresh dates: the old ones are no
+    // longer a commitment anybody made. Ordinary tasks ignore these.
+    p_start: text(formData, 'new_start'),
+    p_due: text(formData, 'new_due'),
   });
 
   if (error) return fail(error.message);

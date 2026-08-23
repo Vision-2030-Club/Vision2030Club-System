@@ -97,6 +97,21 @@ export async function TaskCard({
         </div>
       </div>
 
+      {/* The delivered work, once there is any. */}
+      {task.submission_url ? (
+        <div className="mt-2 text-sm">
+          <a
+            href={task.submission_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            dir="ltr"
+            className="break-all text-brand-700 underline"
+          >
+            {task.submission_url}
+          </a>
+        </div>
+      ) : null}
+
       {/* §4 scores. Null means the viewer is barred (§8), not zero. */}
       {task.counts_toward_kpi ? (
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-line pt-3 text-xs">
@@ -152,9 +167,25 @@ export async function TaskCard({
             <ActionForm
               action={submitTaskAction}
               submitLabel={t('submitForReview')}
-              className="space-y-0"
+              className={task.requires_link ? 'flex items-end gap-2 space-y-0' : 'space-y-0'}
             >
               {hidden}
+              {/* Work that came from a request is delivered as a link — no
+                  upload. The database refuses a blank one; this asks for it. */}
+              {task.requires_link ? (
+                <div>
+                  <Label htmlFor={`url-${task.id}`}>{t('submissionUrl')}</Label>
+                  <Input
+                    id={`url-${task.id}`}
+                    name="submission_url"
+                    type="url"
+                    dir="ltr"
+                    placeholder="https://"
+                    defaultValue={task.submission_url ?? ''}
+                    required
+                  />
+                </div>
+              ) : null}
             </ActionForm>
           ) : null}
 
@@ -187,13 +218,27 @@ export async function TaskCard({
                 action={rejectTaskAction}
                 submitLabel={t('reject')}
                 variant="secondary"
-                className="flex items-end gap-2 space-y-0"
+                className="flex flex-wrap items-end gap-2 space-y-0"
               >
                 {hidden}
                 <div>
                   <Label htmlFor={`note-${task.id}`}>{t('rejectNote')}</Label>
                   <Input id={`note-${task.id}`} name="note" />
                 </div>
+                {/* Sending request work back sets a fresh commitment: the old
+                    dates stopped meaning anything the moment it came back. */}
+                {task.source_request_id ? (
+                  <>
+                    <div>
+                      <Label htmlFor={`start-${task.id}`}>{t('newStartingDate')}</Label>
+                      <Input id={`start-${task.id}`} name="new_start" type="date" required />
+                    </div>
+                    <div>
+                      <Label htmlFor={`due-${task.id}`}>{t('newDeliveryDate')}</Label>
+                      <Input id={`due-${task.id}`} name="new_due" type="date" required />
+                    </div>
+                  </>
+                ) : null}
               </ActionForm>
             </>
           ) : null}

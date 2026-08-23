@@ -250,7 +250,10 @@
     "leaveUnassigned": "Leave open to claim",
     "filterAll": "All",
     "filterOpen": "Open",
-    "filterReview": "To review"
+    "filterReview": "To review",
+    "submissionUrl": "Link to the work",
+    "newStartingDate": "New starting date",
+    "newDeliveryDate": "New delivery date"
   },
   "requests": {
     "title": "Requests",
