@@ -47,7 +47,7 @@ export function Disclosure({
           aria-label={t('close')}
           className="rounded-lg border border-line px-2.5 py-1 text-xs text-ink-muted hover:bg-surface-muted"
         >
-          ✕
+          <span aria-hidden>✕</span>
         </button>
       </div>
       {children}

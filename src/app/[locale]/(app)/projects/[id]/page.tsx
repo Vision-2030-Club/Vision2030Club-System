@@ -78,8 +78,16 @@ export default async function ProjectPage({
       .order('due_date', { ascending: true, nullsFirst: false }),
     supabase.from('members').select('id, name_en, name_ar').eq('status', 'active').order('name_en'),
     supabase.from('project_splits').select('id, name').eq('project_id', id).order('name'),
-    supabase.from('project_split_managers').select('split_id, member_id'),
-    supabase.from('project_split_members').select('split_id, member_id'),
+    // Filtered through the embedded split: these used to fetch the WHOLE
+    // club's split membership and narrow it in JS.
+    supabase
+      .from('project_split_managers')
+      .select('split_id, member_id, project_splits!inner(project_id)')
+      .eq('project_splits.project_id', id),
+    supabase
+      .from('project_split_members')
+      .select('split_id, member_id, project_splits!inner(project_id)')
+      .eq('project_splits.project_id', id),
     // Empty unless the caller holds kpi.view for this project (§8).
     supabase.from('project_kpi').select('*').eq('project_id', id).maybeSingle(),
     supabase.from('project_split_kpi').select('*').eq('project_id', id),

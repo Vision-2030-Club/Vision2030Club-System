@@ -230,11 +230,15 @@ export async function transitionRequestAction(
    * confirm your meeting"), so it happens here, after the transition has
    * committed.
    *
-   * Deliberately not awaited into the result: the meeting IS agreed and IS on
-   * the club's own calendar whatever Google says. A failure is recorded on the
-   * row, shown on this page, and retried later.
+   * Deliberately NOT awaited: the meeting IS agreed and IS on the club's own
+   * calendar whatever Google says. Awaiting it made every approve button wait
+   * on an OAuth refresh plus a Calendar insert — two external round trips —
+   * before the page could update. A failure is recorded on the row, shown on
+   * this page, and retried from Admin → Google.
    */
-  await ensureMeetLink(requestId);
+  void ensureMeetLink(requestId).catch((error) => {
+    console.error('[meet] link creation failed for', requestId, error);
+  });
 
   revalidatePath(`/${locale}/requests`);
   revalidatePath(`/${locale}/requests/${requestId}`);

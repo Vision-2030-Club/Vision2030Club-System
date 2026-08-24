@@ -18,7 +18,6 @@ const COLUMNS = [
   'college',
   'academic_level',
   'graduation_term',
-  'join_date',
   'projects',
 ];
 

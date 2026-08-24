@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Image from 'next/image';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link, redirect } from '@/i18n/navigation';
@@ -16,6 +17,18 @@ import { signOutAction } from '../login/actions';
  * sections they can actually use. That is a convenience, not a security
  * measure — the pages themselves and the database enforce access again.
  */
+/** Streams in after the shell; see the Suspense boundary below. */
+async function HeaderAvatar({
+  avatarPath,
+  name,
+}: {
+  avatarPath: string | null;
+  name: string;
+}) {
+  const photoUrl = await signAvatar(await createClient(), avatarPath);
+  return <Avatar src={photoUrl} name={name} size={36} />;
+}
+
 export default async function AppLayout({
   children,
   params,
@@ -26,12 +39,18 @@ export default async function AppLayout({
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const member = await getMyMember();
+  /*
+   * These two are independent, and this layout runs before EVERY page — so
+   * awaiting them one after the other put two serial round trips in front of
+   * every single navigation. `cache()` in lib/auth/session.ts still dedupes
+   * them for the page itself.
+   */
+  const [member, permissions] = await Promise.all([getMyMember(), getMyPermissions()]);
+
   if (!member) {
     redirect({ href: '/login', locale });
   }
 
-  const permissions = await getMyPermissions();
   const can = (key: string) => (permissions.get(key) ?? 'none') !== 'none';
   const t = await getTranslations('nav');
   const tApp = await getTranslations('app');
@@ -103,12 +122,23 @@ export default async function AppLayout({
 
   const isArabic = locale === 'ar';
   const displayName = isArabic ? member!.name_ar : member!.name_en;
-  const photoUrl = await signAvatar(await createClient(), member!.avatar_path);
   const roleName = isArabic ? member!.role_name_ar : member!.role_name_en;
   const teamName = isArabic ? member!.team_name_ar : member!.team_name_en;
 
   return (
     <div className="min-h-dvh">
+      {/*
+        Every page here puts a logo, a profile link, a language switch and a
+        dozen nav links before the content. Without this a keyboard user tabs
+        through all of it on every single page. Hidden until focused.
+      */}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-3 focus:rounded-lg focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+      >
+        {t('skipToContent')}
+      </a>
+
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-3">
           <Image
@@ -127,7 +157,15 @@ export default async function AppLayout({
               href={`/members/${member!.id}`}
               className="flex items-center gap-3 rounded-lg px-1 py-0.5 hover:bg-surface-muted"
             >
-              <Avatar src={photoUrl} name={displayName} size={36} />
+              {/*
+                Signing a photo URL is a Storage round trip, and it used to
+                block the whole shell on every page load to mint a URL that is
+                never reused. Behind Suspense the initials paint immediately
+                and the photo swaps in when it arrives.
+              */}
+              <Suspense fallback={<Avatar name={displayName} size={36} />}>
+                <HeaderAvatar avatarPath={member!.avatar_path} name={displayName} />
+              </Suspense>
               <span className="text-end">
                 <span className="block text-sm font-medium text-ink">{displayName}</span>
                 <span className="block text-xs text-ink-muted">
@@ -167,7 +205,9 @@ export default async function AppLayout({
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1">{children}</main>
+        <main id="main" className="min-w-0 flex-1">
+          {children}
+        </main>
       </div>
     </div>
   );

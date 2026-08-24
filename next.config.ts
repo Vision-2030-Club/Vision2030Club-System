@@ -9,6 +9,20 @@ const nextConfig: NextConfig = {
   turbopack: { root: import.meta.dirname },
 
   experimental: {
+    /*
+     * The client Router Cache keeps dynamic pages for 0 seconds by default, so
+     * pressing Back re-ran every query from scratch. Every page here is
+     * user-scoped and dynamic, so that default meant no reuse at all.
+     *
+     * 30s is short enough that a stale list is a non-event — anything a person
+     * just changed is revalidated explicitly by its server action — and long
+     * enough that moving between two screens feels instant.
+     */
+    staleTimes: {
+      dynamic: 30,
+      static: 180,
+    },
+
     serverActions: {
       /*
        * Uploads go through server actions: profile photos (2 MB bucket limit)

@@ -18,7 +18,8 @@
     "menu": "القائمة",
     "signOut": "تسجيل الخروج",
     "kpi": "المؤشرات",
-    "rooms": "القاعات"
+    "rooms": "القاعات",
+    "skipToContent": "تخطَّ إلى المحتوى"
   },
   "common": {
     "save": "حفظ",
@@ -94,7 +95,6 @@
     "college": "الكلية",
     "academicLevel": "المستوى الدراسي",
     "graduationTerm": "فصل التخرج",
-    "joinDate": "تاريخ الانضمام",
     "status": "الحالة",
     "profile": "الملف الشخصي",
     "sensitive": "البيانات الحسّاسة",
@@ -392,7 +392,7 @@
     "import": "استيراد الأعضاء",
     "importHint": "عبر ملف CSV فقط — لا يوجد تسجيل ذاتي. يُفحص كل سطر قبل الكتابة؛ وإن فشل سطر واحد لا يُستورد شيء.",
     "importFile": "ملف CSV",
-    "importColumns": "الأعمدة المتوقعة: email, name_en, name_ar, student_id, national_id, team, role، واختيارياً phone, college, academic_level, graduation_term, join_date, projects.",
+    "importColumns": "الأعمدة المتوقعة: email, name_en, name_ar, student_id, national_id, team, role، واختيارياً phone, college, academic_level, graduation_term, projects.",
     "importRun": "فحص واستيراد",
     "importResult": "أُنشئ {created}، حُدّث {updated}، روابط مشاريع {links}.",
     "importFailed": "لم يُستورد شيء. صحّح هذه المشاكل ثم أعد المحاولة:",

@@ -1,7 +1,7 @@
 # Handoff — Vision 2030 Club System
 
 Build is green (`npm run build`, 43 routes) and `npx eslint` is clean.
-**All 45 migrations are applied** to a live Supabase project. Everything is
+**All 46 migrations are applied** to a live Supabase project. Everything is
 verified end to end against the real database over the REST API rather than
 through the UI: `db:test` 32/32 · `db:rooms` 27/27 · `db:meetings` 38/38 ·
 `db:design` 48/48 · `db:kpi` 72/72 · `db:prove` 12/12.
@@ -21,6 +21,86 @@ The spec being implemented is `vision2030_system_logic_prompt.md`. Section
 references below (§2, §3, …) point into it.
 
 ---
+
+## Performance — what was done, and what is next
+
+Every page is user-scoped and therefore fully dynamic; that part is correct and
+cannot change. What was wrong is that nothing *streamed*:
+
+- `loading.tsx` now exists beside every heavy route (`src/components/Skeleton.tsx`
+  supplies the shapes). A `loading.tsx` covers its child segments too, so the
+  detail pages — which have the deepest waterfalls — are covered by their
+  parent's.
+- The shared layout used to make three serial round trips before any page could
+  start. `getMyMember` and `getMyPermissions` now run together, and the avatar's
+  signed URL streams in behind `<Suspense>` instead of blocking the shell.
+- `/kpi` is no longer revalidated on every task button press. It issues five
+  unfiltered aggregates over every task in the club; the cheapest buttons were
+  paying for the most expensive page.
+- `ensureMeetLink` is no longer awaited — approving a meeting used to wait on an
+  OAuth refresh and a Calendar insert first.
+- `experimental.staleTimes` gives the client router 30s on dynamic pages, so
+  Back stops re-running everything.
+
+**The next performance item, not yet done:** `task_kpi` runs roughly eight
+non-inlinable `SECURITY DEFINER` calls PER ROW — `0042` lines 43-45 plus `0016`
+lines 62-68 — and several of them re-read the same task row. At 300 tasks that
+is thousands of nested calls, and it is the real ceiling on `/tasks` and `/kpi`.
+Fixing it means reworking those policies and the capability flags together,
+with the suites as the safety net.
+
+Also unverified: the deployed function served from `bom1` (Mumbai). Check the
+Supabase project's region and match them — every round trip pays that distance.
+
+## Interface guidelines
+
+`npx skills add vercel-labs/agent-skills -s web-design-guidelines --full-depth`
+installs Vercel's checklist; the audit found and fixed:
+
+- **No button in the app had a visible focus ring.** `Button` in
+  `src/components/ui.tsx` now has `focus-visible:outline-*`, and named
+  transition properties instead of `transition` on everything.
+- `touch-manipulation` on buttons and fields (removes the 300ms double-tap delay).
+- `font-variant-numeric: tabular-nums` folded into `.ltr-nums` in `globals.css` —
+  every ID, phone, time and score already carries that class, so digits line up
+  everywhere from one change.
+- `color-scheme: light` declared, so native controls stop rendering dark.
+- A skip link in the app layout; `width`/`height` on the avatar `<img>` to stop
+  the header jumping.
+
+Design advice deliberately NOT taken, because it would break this app:
+
+- *"Swap the font to Geist/Satoshi/Outfit"* — none carry Arabic glyphs.
+  `src/lib/fonts.ts` pairs IBM Plex Sans Arabic with Gilroy on purpose.
+- *"Dashboards should not have a left sidebar"* — `NavLinks.tsx` is built on
+  logical properties precisely so it flips for RTL.
+- *"Add background imagery and noise"* — external images, in an app being fixed
+  because it is slow.
+
+## Importing the real member list
+
+`node scripts/build-member-csv.mjs` turns `Database club.xlsx` into
+`members-import.csv`. It reads the spreadsheet directly (an .xlsx is a zip of
+XML — no dependency) and prints a pre-flight report before writing anything,
+because `import_members` is all-or-nothing and one bad row rejects all hundred.
+
+Three things that spreadsheet does which the script handles, and which will
+catch out anyone editing it:
+
+1. **Two column layouts.** The club-management block has a project in column H
+   and the student ID in I; every other block has the student ID in H. The
+   script decides by which column looks like a student ID.
+2. **The Arabic does not match the seeds.** `مدير مشروع` vs `مدير المشروع`,
+   and one row missing its hamza in `ادارة النادي`. `import_members` matches
+   Arabic byte-exactly, so the CSV emits English keys instead.
+3. **The Super Admin is in the file** (row 131, student ID `445106843`) as
+   `قائد فريق`. The importer matches on student ID and overwrites role, so
+   importing it as written would demote the club's only admin with no way back
+   from inside the app. `KEEP_ROLE` in the script pins that row to
+   `super_admin`.
+
+`--skip-invalid` writes the CSV without rows that cannot import, naming each.
+One member currently has `-` for a national ID.
 
 ## Deploying
 

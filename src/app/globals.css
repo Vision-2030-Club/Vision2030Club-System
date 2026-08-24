@@ -35,6 +35,9 @@
 
 html {
   font-family: var(--font-sans);
+  /* The app is light-only. Saying so stops the browser rendering native
+     controls and scrollbars in dark colours when the OS is in dark mode. */
+  color-scheme: light;
 }
 
 html[lang="en"] {
@@ -51,4 +54,8 @@ body {
   direction: ltr;
   unicode-bidi: embed;
   display: inline-block;
+  /* Every ID, phone number, time and score in the app already carries this
+     class, so lining the digits up here does it everywhere at once — columns
+     of numbers stop jittering as their values change. */
+  font-variant-numeric: tabular-nums;
 }

@@ -59,7 +59,7 @@ export default async function MemberPage({
   const { data: member } = await supabase
     .from('members')
     .select(
-      'id, name_en, name_ar, email, phone, student_id, status, college, academic_level, graduation_term, join_date, team_id, role_id, auth_user_id, avatar_path, teams(name_en, name_ar), roles(key, name_en, name_ar)',
+      'id, name_en, name_ar, email, phone, student_id, status, college, academic_level, graduation_term, team_id, role_id, auth_user_id, avatar_path, teams(name_en, name_ar), roles(key, name_en, name_ar)',
     )
     .eq('id', id)
     .maybeSingle();
@@ -329,8 +329,6 @@ export default async function MemberPage({
             <dd>{member.academic_level ?? '—'}</dd>
             <dt className="text-ink-muted">{t('graduationTerm')}</dt>
             <dd>{member.graduation_term ?? '—'}</dd>
-            <dt className="text-ink-muted">{t('joinDate')}</dt>
-            <dd>{formatDate(member.join_date, locale)}</dd>
             <dt className="text-ink-muted">{t('status')}</dt>
             <dd>
               <Badge tone={member.status === 'active' ? 'ok' : 'neutral'}>

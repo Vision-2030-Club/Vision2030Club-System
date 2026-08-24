@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Agent skills, installed per-developer rather than shared
+/.agents/
+/.claude/
+/skills-lock.json
+
+# Real member data — national IDs, phones, emails for ~100 people.
+# Kept out of git deliberately: a private repo is not a controlled store for
+# personal data, history is permanent, and members-import.csv is regenerated
+# from the spreadsheet by scripts/build-member-csv.mjs whenever it is needed.
+*.xlsx
+members-import.csv

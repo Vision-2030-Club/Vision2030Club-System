@@ -18,7 +18,8 @@
     "menu": "Menu",
     "signOut": "Sign out",
     "kpi": "KPI",
-    "rooms": "Rooms"
+    "rooms": "Rooms",
+    "skipToContent": "Skip to content"
   },
   "common": {
     "save": "Save",
@@ -94,7 +95,6 @@
     "college": "College",
     "academicLevel": "Academic level",
     "graduationTerm": "Graduation term",
-    "joinDate": "Joined",
     "status": "Status",
     "profile": "Profile",
     "sensitive": "Sensitive data",
@@ -392,7 +392,7 @@
     "import": "Import members",
     "importHint": "CSV only — there is no public registration. Every row is checked before anything is written; if one row fails, nothing is imported.",
     "importFile": "CSV file",
-    "importColumns": "Expected columns: email, name_en, name_ar, student_id, national_id, team, role, and optionally phone, college, academic_level, graduation_term, join_date, projects.",
+    "importColumns": "Expected columns: email, name_en, name_ar, student_id, national_id, team, role, and optionally phone, college, academic_level, graduation_term, projects.",
     "importRun": "Validate and import",
     "importResult": "Created {created}, updated {updated}, project links {links}.",
     "importFailed": "Nothing was imported. Fix these problems and try again:",

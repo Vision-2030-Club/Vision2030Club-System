@@ -15,8 +15,14 @@ import { fail, ok, requiredText, text, type ActionResult } from '@/lib/actions';
  * actions are thin wrappers that surface the database's own message.
  */
 
+/*
+ * `/kpi` is deliberately NOT here. It issues five unfiltered aggregate reads
+ * over every task in the club, and revalidating it on every claim, submit and
+ * confirm made the cheapest buttons in the system pay for the most expensive
+ * page. It is a report; it can be a few seconds stale.
+ */
 function paths(locale: string, projectId?: string | null) {
-  const list = [`/${locale}/tasks`, `/${locale}/dashboard`, `/${locale}/kpi`];
+  const list = [`/${locale}/tasks`, `/${locale}/dashboard`];
   if (projectId) list.push(`/${locale}/projects/${projectId}`);
   return list;
 }

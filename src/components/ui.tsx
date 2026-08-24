@@ -41,7 +41,9 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-semibold text-ink">{title}</h1>
+        <h1 className="text-balance text-2xl font-semibold tracking-tight text-ink">
+          {title}
+        </h1>
         {description ? (
           <p className="mt-1 text-sm text-ink-muted">{description}</p>
         ) : null}
@@ -71,7 +73,17 @@ export function Button({
     <button
       {...props}
       className={cx(
-        'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition',
+        'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium',
+        // Named properties, not `transition` on everything: only these two are
+        // compositor-friendly, and animating layout properties is what makes a
+        // button feel sluggish on a mid-range phone.
+        'transition-[background-color,color,opacity] duration-150',
+        // Every interactive element needs a focus ring somebody can see. Only
+        // `focus-visible`, so it appears for keyboard users without ringing on
+        // every mouse click.
+        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
+        // Removes the 300ms double-tap-zoom delay on touch.
+        'touch-manipulation',
         'disabled:cursor-not-allowed disabled:opacity-50',
         styles,
         className,
@@ -90,8 +102,10 @@ export function Label({ children, htmlFor }: { children: ReactNode; htmlFor?: st
 
 const fieldStyles =
   'w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink ' +
+  // `focus:` rather than `focus-visible:` is deliberate here: clicking into a
+  // text field SHOULD show the ring, unlike clicking a button.
   'outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200 ' +
-  'disabled:bg-surface-muted';
+  'touch-manipulation disabled:bg-surface-muted';
 
 export function Input({ className, ...props }: ComponentProps<'input'>) {
   return <input {...props} className={cx(fieldStyles, className)} />;

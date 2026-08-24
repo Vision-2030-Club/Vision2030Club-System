@@ -27,6 +27,10 @@ export function Avatar({
     <img
       src={src}
       alt=""
+      // Explicit attributes as well as the style: the browser reserves the box
+      // before the image arrives, so the header does not jump.
+      width={size}
+      height={size}
       style={style}
       className={cx('shrink-0 rounded-full object-cover', className)}
     />
