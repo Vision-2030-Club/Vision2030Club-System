@@ -51,3 +51,9 @@ next-env.d.ts
 # from the spreadsheet by scripts/build-member-csv.mjs whenever it is needed.
 *.xlsx
 members-import.csv
+
+# Source video masters. The .mov is a 21 MB QuickTime/ProRes editing file no
+# browser can play; keep masters in Drive. A web-encoded copy belongs in
+# public/ and is committed deliberately, not dragged in from the repo root.
+/*.mp4
+/*.mov

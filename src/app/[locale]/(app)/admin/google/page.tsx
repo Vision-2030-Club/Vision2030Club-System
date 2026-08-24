@@ -4,7 +4,13 @@ import { hasPermission } from '@/lib/auth/session';
 import { ActionForm } from '@/components/ActionForm';
 import { Alert, Badge, Card, EmptyState, PageHeader } from '@/components/ui';
 import { formatDateTime } from '@/lib/format';
-import { getCredentials, isGoogleConfigured, redirectUri } from '@/lib/google/auth';
+import { headers } from 'next/headers';
+import {
+  expectedRedirectUri,
+  getCredentials,
+  isGoogleConfigured,
+  redirectUri,
+} from '@/lib/google/auth';
 import {
   connectGoogleAction,
   disconnectGoogleAction,
@@ -51,11 +57,19 @@ export default async function AdminGooglePage({
     .select('request_id', { count: 'exact', head: true })
     .in('meet_state', ['pending', 'failed']);
 
-  let callbackUrl = '—';
+  /*
+   * Show the URL even when nothing is configured. It used to render as "—"
+   * exactly when somebody needed to paste it into the Cloud console, because
+   * `redirectUri()` throws on a missing setting.
+   */
+  let callbackUrl: string;
   try {
     callbackUrl = redirectUri();
   } catch {
-    callbackUrl = '—';
+    const requestHeaders = await headers();
+    const host = requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host') ?? '';
+    const proto = requestHeaders.get('x-forwarded-proto') ?? 'https';
+    callbackUrl = host ? expectedRedirectUri(`${proto}://${host}`) : '—';
   }
 
   return (
@@ -87,7 +101,10 @@ export default async function AdminGooglePage({
                 </ol>
                 <p className="pt-2">
                   {t('redirectLabel')}:{' '}
-                  <code className="rounded bg-surface-muted px-1.5 py-0.5 text-xs" dir="ltr">
+                  <code
+                    className="select-all rounded bg-surface-muted px-1.5 py-0.5 text-xs"
+                    dir="ltr"
+                  >
                     {callbackUrl}
                   </code>
                 </p>

@@ -68,6 +68,27 @@ export function redirectUri(): string {
   return requireEnv('GOOGLE_REDIRECT_URI');
 }
 
+/**
+ * The path Google must be told to send people back to.
+ *
+ * Kept next to `redirectUri()` so the two cannot drift: the route lives at
+ * src/app/api/google/callback/route.ts, and changing one without the other is
+ * a setup that fails with Google's unhelpful "redirect_uri_mismatch".
+ */
+export const CALLBACK_PATH = '/api/google/callback';
+
+/**
+ * What to register in the Cloud console, whether or not it is configured yet.
+ *
+ * `redirectUri()` throws when GOOGLE_REDIRECT_URI is unset — which is exactly
+ * when somebody is standing in the Cloud console needing to know the value. So
+ * the admin page falls back to building it from the host it is being served
+ * on, which is the right answer in every deployment we have.
+ */
+export function expectedRedirectUri(origin: string): string {
+  return `${origin.replace(/\/$/, '')}${CALLBACK_PATH}`;
+}
+
 /** Where to send a Super Admin to grant access. */
 export function consentUrl(state: string): string {
   const params = new URLSearchParams({

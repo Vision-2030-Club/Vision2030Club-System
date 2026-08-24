@@ -83,24 +83,43 @@ const KEEP_ROLE = {
 function readZip(path) {
   const buf = readFileSync(path);
   const files = {};
-  // Walk local file headers (PK\x03\x04) rather than the central directory —
-  // enough for the handful of parts we want.
-  for (let i = 0; i < buf.length - 3; i += 1) {
-    if (buf[i] !== 0x50 || buf[i + 1] !== 0x4b || buf[i + 2] !== 0x03 || buf[i + 3] !== 0x04) continue;
-    const method = buf.readUInt16LE(i + 8);
-    const compressed = buf.readUInt32LE(i + 18);
-    const uncompressed = buf.readUInt32LE(i + 22);
-    const nameLen = buf.readUInt16LE(i + 26);
-    const extraLen = buf.readUInt16LE(i + 28);
-    const name = buf.subarray(i + 30, i + 30 + nameLen).toString('utf8');
-    const start = i + 30 + nameLen + extraLen;
-    if (compressed === 0 && uncompressed === 0) continue; // streamed entry
+
+  /*
+   * Read the CENTRAL DIRECTORY rather than the local file headers. A zip entry
+   * written in streaming mode carries zero sizes in its local header and puts
+   * the real ones in a trailing data descriptor — the central directory always
+   * has them, so this reads every part rather than silently skipping some.
+   */
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= 0; i -= 1) {
+    if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd === -1) throw new Error(`${path} is not a readable zip`);
+
+  const count = buf.readUInt16LE(eocd + 10);
+  let p = buf.readUInt32LE(eocd + 16);
+
+  for (let n = 0; n < count; n += 1) {
+    if (buf.readUInt32LE(p) !== 0x02014b50) break;
+    const method = buf.readUInt16LE(p + 10);
+    const compressed = buf.readUInt32LE(p + 20);
+    const nameLen = buf.readUInt16LE(p + 28);
+    const extraLen = buf.readUInt16LE(p + 30);
+    const commentLen = buf.readUInt16LE(p + 32);
+    const localOffset = buf.readUInt32LE(p + 42);
+    const name = buf.subarray(p + 46, p + 46 + nameLen).toString('utf8');
+
+    // The local header repeats the name/extra with its own lengths.
+    const lNameLen = buf.readUInt16LE(localOffset + 26);
+    const lExtraLen = buf.readUInt16LE(localOffset + 28);
+    const start = localOffset + 30 + lNameLen + lExtraLen;
     const raw = buf.subarray(start, start + compressed);
+
     try {
       files[name] = method === 0 ? raw.toString('utf8') : inflateRawSync(raw).toString('utf8');
-    } catch {
-      /* not one of the parts we need */
-    }
+    } catch { /* binary part we do not need */ }
+
+    p += 46 + nameLen + extraLen + commentLen;
   }
   return files;
 }
