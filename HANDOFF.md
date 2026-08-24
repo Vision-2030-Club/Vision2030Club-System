@@ -22,6 +22,32 @@ references below (§2, §3, …) point into it.
 
 ---
 
+## Deploying
+
+The app needs exactly three environment variables at runtime:
+
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+```
+
+`SUPABASE_DB_URL` is deliberately NOT among them — it is a direct Postgres
+connection used only by `npm run db:push` from a laptop, and a web host has no
+business holding one. The `GOOGLE_*` three are optional; without them the Google
+admin page says so and everything else works.
+
+**`NEXT_PUBLIC_*` values are baked in at BUILD time.** Adding them to a host
+and restarting does nothing — you have to redeploy.
+
+The first Vercel deploy had none of them set, and the whole site answered
+`500 Internal Server Error` with an empty body, because `src/proxy.ts` runs
+before every page and was the first thing to touch them. `src/lib/supabase/env.ts`
+now names the missing variable in the log instead. If a deployment is ever blank
+like that again, the fastest check is a static file: `/brand/logo-horizontal.png`
+returning 200 while every page returns 500 means the proxy is throwing, not the
+pages.
+
 ## Connecting Google
 
 Everything is written; it needs a Google application and one authorisation.

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import createIntlMiddleware from 'next-intl/middleware';
 import { routing } from '@/i18n/routing';
+import { supabaseEnv } from '@/lib/supabase/env';
 
 const handleLocale = createIntlMiddleware(routing);
 
@@ -22,22 +23,24 @@ export async function proxy(request: NextRequest) {
   // whatever response it produced (a rewrite, a redirect, or a pass-through).
   const response = handleLocale(request);
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          for (const { name, value, options } of cookiesToSet) {
-            response.cookies.set(name, value, options);
-          }
-        },
+  // Throws with a readable message naming the missing variable. This runs
+  // before every page, so a misconfigured deployment fails here first — better
+  // that the log says which setting is missing than that the whole site
+  // answers 500 with nothing to go on.
+  const { url: supabaseUrl, anonKey } = supabaseEnv();
+
+  const supabase = createServerClient(supabaseUrl, anonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        for (const { name, value, options } of cookiesToSet) {
+          response.cookies.set(name, value, options);
+        }
       },
     },
-  );
+  });
 
   // getUser() revalidates the token with Supabase and refreshes it if needed.
   const {
