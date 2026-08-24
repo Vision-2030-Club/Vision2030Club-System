@@ -26,10 +26,18 @@ export default async function RequestPage({
   const supabase = await createClient();
   const me = await getMyMember();
 
+  /*
+   * Two embeds here name the foreign key explicitly, and both have to: as of
+   * 0029 `requests` has two FKs to `members` (the submitter and a meeting's
+   * individual target), and `meeting_details` has two back to `requests` (its
+   * own row, and the request that spawned it). PostgREST refuses an ambiguous
+   * embed by failing the WHOLE query with a 300, so leaving either bare takes
+   * the entire page down rather than dropping one field.
+   */
   const { data: request } = await supabase
     .from('requests')
     .select(
-      'id, status, data, created_at, request_type_id, submitted_by, target_kind, target_team_id, target_project_id, target_member_id, request_types(key, name_en, name_ar, field_schema), members:submitted_by(name_en, name_ar), target_member:target_member_id(name_en, name_ar), teams(name_en, name_ar), projects(name_en, name_ar), meeting_details(booking_id, meet_link, meet_state)',
+      'id, status, data, created_at, request_type_id, submitted_by, target_kind, target_team_id, target_project_id, target_member_id, request_types(key, name_en, name_ar, field_schema), members:submitted_by(name_en, name_ar), target_member:target_member_id(name_en, name_ar), teams(name_en, name_ar), projects(name_en, name_ar), meeting_details!request_id(booking_id, meet_link, meet_state)',
     )
     .eq('id', id)
     .maybeSingle();

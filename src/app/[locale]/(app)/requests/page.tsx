@@ -24,8 +24,18 @@ export default async function RequestsPage({
 
   let query = supabase
     .from('requests')
+    /*
+     * `members:submitted_by` is spelled out because `requests` has TWO foreign
+     * keys to members now — the submitter, and the person a meeting is aimed at
+     * (migration 0029). A bare `members(...)` is ambiguous, and PostgREST
+     * answers an ambiguous embed by refusing the WHOLE query — so this page
+     * showed nothing at all, for every request type, rather than showing rows
+     * with one name missing.
+     *
+     * It has to stay one string literal: supabase-js reads it to type the row.
+     */
     .select(
-      'id, status, created_at, request_type_id, submitted_by, target_kind, request_types(name_en, name_ar), members(name_en, name_ar), teams(name_en, name_ar), projects(name_en, name_ar)',
+      'id, status, created_at, request_type_id, submitted_by, target_kind, request_types(name_en, name_ar), members:submitted_by(name_en, name_ar), teams(name_en, name_ar), projects(name_en, name_ar)',
     )
     .order('created_at', { ascending: false })
     .limit(200);

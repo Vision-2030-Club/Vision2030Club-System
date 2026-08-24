@@ -240,6 +240,18 @@ Things in there that are easy to break by accident:
   whatever that type registered. Nothing in the Meetings component names a
   design request — `db:design` asserts that by grepping the function
   definitions.
+- **A new foreign key can silently break a page.** PostgREST resolves an embed
+  like `members(...)` by finding THE foreign key between the two tables. Add a
+  second one and the embed becomes ambiguous — and PostgREST answers ambiguity
+  by failing the whole query with a 300, so the page renders nothing at all
+  rather than dropping one field.
+  It has happened twice, from the same migration: `requests` gained
+  `target_member_id` (a second FK to `members`) and `meeting_details` gained
+  `origin_request_id` (a second FK back to `requests`). Both took a request
+  page down completely and neither was caught by the suites, which talk to the
+  API without embeds. **When you add a FK to a table something already embeds,
+  grep for that embed and name the column: `members:submitted_by(...)`,
+  `meeting_details!request_id(...)`.**
 - **"Becomes a task" is a capability, not a type.** `request_types.creates_task`
   turns it on; `task_due_date_keys` is an ordered list of data keys so one type
   can carry two flavours without a branch in code. Nothing names Design or
