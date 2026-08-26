@@ -743,12 +743,28 @@ async function run(p) {
     body: JSON.stringify({ p_request: meetingId }),
   });
   const attendees = payloadAsService.body?.attendees ?? [];
+  /*
+   * Compare against the recipient list itself rather than against the
+   * `meettest-` prefix. The prefix only worked while the club was empty. The
+   * target team now has real elected Directors, and `app.meeting_recipients`
+   * deliberately includes every Director of the target team — so a real
+   * address appearing here is the rule working, not a leak.
+   *
+   * Set-equality is what this check always meant, and it keeps meaning it as
+   * the club fills up.
+   */
+  const { rows: recipientRows } = await db.query(
+    `select email from app.meeting_recipients($1)`,
+    [meetingId],
+  );
+  const expectedEmails = [...new Set(recipientRows.map((r) => r.email))].sort();
+  const gotEmails = [...new Set(attendees.map(String))].sort();
   check(
     'the server can build an invitation, and its attendees ARE the recipients',
     payloadAsService.ok &&
-      attendees.length === names.length &&
-      attendees.every((email) => String(email).startsWith(PREFIX)),
-    JSON.stringify(payloadAsService.body)?.slice(0, 120),
+      gotEmails.length === expectedEmails.length &&
+      gotEmails.every((email, i) => email === expectedEmails[i]),
+    `attendees ${JSON.stringify(gotEmails)} vs recipients ${JSON.stringify(expectedEmails)}`,
   );
 
   const { rows: integrationScopes } = await db.query(
