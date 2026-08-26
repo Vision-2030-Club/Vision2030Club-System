@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
+import { MemberLink } from '@/components/MemberLink';
 import { createClient } from '@/lib/supabase/server';
 import { getMyMember, hasPermission } from '@/lib/auth/session';
 import { BarList, StatTile, type BarRow } from '@/components/charts/BarList';
@@ -53,6 +54,10 @@ export default async function KpiPage({
       </>
     );
   }
+
+  // Whose name is a link and whose is plain text. The profile page enforces
+  // this itself; this only avoids offering a link that leads to a refusal.
+  const canOpenProfiles = await hasPermission('members.directory');
 
   const [
     { data: memberRows },
@@ -127,9 +132,13 @@ export default async function KpiPage({
       display: formatScore(m.performance),
       color: CHART_BRAND,
       labelWrapper: (label) => (
-        <Link href={`/members/${m.member_id}`} className="text-brand-700 hover:underline">
+        <MemberLink
+                    id={m.member_id as string}
+                    viewerId={me?.id}
+                    canOpenAny={canOpenProfiles}
+                  >
           {label}
-        </Link>
+        </MemberLink>
       ),
     }));
 
@@ -250,12 +259,14 @@ export default async function KpiPage({
           <ul className="divide-y divide-line text-sm">
             {behindMembers.map((m) => (
               <li key={m.member_id} className="flex flex-wrap items-center gap-3 py-2">
-                <Link
-                  href={`/members/${m.member_id}`}
-                  className="font-medium text-brand-700 hover:underline"
+                <MemberLink
+                  id={m.member_id as string}
+                  viewerId={me?.id}
+                  canOpenAny={canOpenProfiles}
+                  className="font-medium"
                 >
                   {memberName.get(m.member_id) ?? m.member_id}
-                </Link>
+                </MemberLink>
                 <span className="text-xs text-ink-muted">
                   {t('delayed')}: {m.delayed_tasks} · {t('overdue')}: {m.overdue_tasks} ·{' '}
                   {t('completed')}: {m.completed_tasks}
@@ -306,12 +317,14 @@ export default async function KpiPage({
             {memberKpis.map((m) => (
               <tr key={m.member_id} className="hover:bg-surface-muted">
                 <td className="px-4 py-2.5">
-                  <Link
-                    href={`/members/${m.member_id}`}
-                    className="font-medium text-brand-700 hover:underline"
+                  <MemberLink
+                    id={m.member_id as string}
+                    viewerId={me?.id}
+                    canOpenAny={canOpenProfiles}
+                    className="font-medium"
                   >
                     {memberName.get(m.member_id) ?? m.member_id}
-                  </Link>
+                  </MemberLink>
                 </td>
                 <td className="px-4 py-2.5">
                   {teamName.get(memberTeam.get(m.member_id) ?? '') ?? '—'}

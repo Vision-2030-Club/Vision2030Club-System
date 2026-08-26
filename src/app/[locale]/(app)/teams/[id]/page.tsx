@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { Link } from '@/i18n/navigation';
+import { MemberLink } from '@/components/MemberLink';
+import { getMyMember, hasPermission } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { scopeFor } from '@/lib/auth/session';
 import { ActionForm } from '@/components/ActionForm';
@@ -19,6 +20,10 @@ export default async function TeamPage({
   const t = await getTranslations('teams');
   const tCommon = await getTranslations('common');
   const supabase = await createClient();
+  const me = await getMyMember();
+  // Whose name is a link and whose is plain text. The profile page enforces
+  // this itself; this only avoids offering a link that leads to a refusal.
+  const canOpenProfiles = await hasPermission('members.directory');
 
   const { data: team } = await supabase
     .from('teams')
@@ -58,12 +63,14 @@ export default async function TeamPage({
             <ul className="divide-y divide-line text-sm">
               {members.map((member) => (
                 <li key={member.id} className="flex items-center justify-between py-2">
-                  <Link
-                    href={`/members/${member.id}`}
-                    className="font-medium text-brand-700 hover:underline"
+                  <MemberLink
+                    id={member.id as string}
+                    viewerId={me?.id}
+                    canOpenAny={canOpenProfiles}
+                    className="font-medium"
                   >
                     {locale === 'ar' ? member.name_ar : member.name_en}
-                  </Link>
+                  </MemberLink>
                   <span className="text-xs text-ink-muted">
                     {localized(
                       member.roles as unknown as Record<string, string>,

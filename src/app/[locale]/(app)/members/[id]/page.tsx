@@ -56,6 +56,26 @@ export default async function MemberPage({
   const supabase = await createClient();
   const me = await getMyMember();
 
+  /*
+   * A profile shows someone's email, phone, student ID and college, so it is
+   * the directory by another route — and it is reached by clicking a name on a
+   * team page, a project, or the KPI table. It follows the same permission the
+   * directory does (0048).
+   *
+   * Your own profile is always yours: this is where Edit Profile and Reset
+   * Password live, and the header avatar links straight here. Checked before
+   * any query runs, so a refusal costs nothing.
+   */
+  const isSelf = me?.id === id;
+  if (!isSelf && !(await hasPermission('members.directory'))) {
+    return (
+      <>
+        <PageHeader title={t('profile')} />
+        <EmptyState>{t('restricted')}</EmptyState>
+      </>
+    );
+  }
+
   const { data: member } = await supabase
     .from('members')
     .select(
@@ -95,7 +115,6 @@ export default async function MemberPage({
   const canManage = await hasPermission('members.manage');
   const canConfigureRoles = await hasPermission('roles.configure');
   const canSeeSensitive = await hasPermission('members.view_sensitive');
-  const isSelf = me?.id === member.id;
   const canEdit = canManage || isSelf;
 
   const [{ data: teams }, { data: roles }] = await Promise.all([

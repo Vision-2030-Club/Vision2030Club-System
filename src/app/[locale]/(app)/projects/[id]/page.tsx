@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { Link } from '@/i18n/navigation';
+import { MemberLink } from '@/components/MemberLink';
 import { createClient } from '@/lib/supabase/server';
-import { getMyMember, scopeFor } from '@/lib/auth/session';
+import { getMyMember, hasPermission, scopeFor } from '@/lib/auth/session';
 import { ActionForm } from '@/components/ActionForm';
 import { ConfirmForm } from '@/components/ConfirmForm';
 import { TaskCard } from '@/components/TaskCard';
@@ -41,6 +41,9 @@ export default async function ProjectPage({
   const tCommon = await getTranslations('common');
   const supabase = await createClient();
   const me = await getMyMember();
+  // Whose name is a link and whose is plain text. The profile page enforces
+  // this itself; this only avoids offering a link that leads to a refusal.
+  const canOpenProfiles = await hasPermission('members.directory');
 
   const { data: project } = await supabase
     .from('projects')
@@ -194,12 +197,13 @@ export default async function ProjectPage({
                     key={row.member_id as string}
                     className="flex items-center justify-between"
                   >
-                    <Link
-                      href={`/members/${person.id}`}
-                      className="text-brand-700 hover:underline"
+                    <MemberLink
+                      id={person.id as string}
+                      viewerId={me?.id}
+                      canOpenAny={canOpenProfiles}
                     >
                       {localized(person, 'name', locale)}
-                    </Link>
+                    </MemberLink>
                     {canManage ? (
                       <ActionForm
                         action={removeProjectPersonAction}
@@ -251,12 +255,13 @@ export default async function ProjectPage({
                     key={row.member_id as string}
                     className="flex items-center justify-between"
                   >
-                    <Link
-                      href={`/members/${person.id}`}
-                      className="text-brand-700 hover:underline"
+                    <MemberLink
+                      id={person.id as string}
+                      viewerId={me?.id}
+                      canOpenAny={canOpenProfiles}
                     >
                       {localized(person, 'name', locale)}
-                    </Link>
+                    </MemberLink>
                     {canManage ? (
                       <ActionForm
                         action={removeProjectPersonAction}
