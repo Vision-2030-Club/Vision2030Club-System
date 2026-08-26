@@ -21,6 +21,22 @@ export default async function MembersPage({
 
   const t = await getTranslations('members');
   const tCommon = await getTranslations('common');
+
+  /*
+   * The directory is the Presidency's and HR's screen (0048). This guard is
+   * only for a readable message — RLS is what actually protects the rows, and
+   * `members.view` deliberately still lets other roles read members through
+   * the task, project and meeting pickers.
+   */
+  if (!(await hasPermission('members.directory'))) {
+    return (
+      <>
+        <PageHeader title={t('title')} description={t('subtitle')} />
+        <EmptyState>{t('restricted')}</EmptyState>
+      </>
+    );
+  }
+
   const supabase = await createClient();
 
   let query = supabase

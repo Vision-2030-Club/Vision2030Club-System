@@ -108,6 +108,7 @@
     "passwordReset": "Password updated.",
     "noPasswordYet": "No password set yet — this member has not signed in.",
     "empty": "No members match that search.",
+    "restricted": "The member directory is kept by HR and the Presidency. You can still find the people you work with on your team page and in your projects.",
     "statusActive": "Active",
     "statusInactive": "Inactive",
     "statusAlumni": "Alumni",

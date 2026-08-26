@@ -74,7 +74,9 @@ export default async function AppLayout({
         href: '/members',
         label: t('members'),
         icon: 'members',
-        show: can('members.view'),
+        // The directory screen, not the right to read a member row. 0048
+        // explains why those are two different permissions.
+        show: can('members.directory'),
       },
       // Teams is where a team's posts live, so it follows the posts permission
       // rather than the directory one — a Guest holds neither.
