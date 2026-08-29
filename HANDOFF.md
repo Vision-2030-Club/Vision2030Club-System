@@ -1,21 +1,28 @@
 # Handoff — Vision 2030 Club System
 
-Build is green (`npm run build`, 43 routes) and `npx eslint` is clean.
-**All 46 migrations are applied** to a live Supabase project. Everything is
-verified end to end against the real database over the REST API rather than
-through the UI: `db:test` 32/32 · `db:rooms` 27/27 · `db:meetings` 38/38 ·
-`db:design` 48/48 · `db:kpi` 72/72 · `db:prove` 12/12.
+Build is green (`npm run build`) and `npx eslint` is clean. **All 48
+migrations are applied** to a live Supabase project. Everything is verified end
+to end against the real database over the REST API rather than through the UI:
+`db:test` 32/32 · `db:rooms` 27/27 · `db:meetings` 38/38 · `db:design` 48/48 ·
+`db:kpi` 72/72 · `db:prove` 12/12 — **229 checks**.
 
-The Meetings / Rooms / Design Request build is underway — **steps 1–5 of 6 are
-done**: rooms and the booking window with the double-booking guarantee, the
-shared room schedule (§4's booking flow and §6's all-rooms view on one screen),
-the Meetings component (individual targets, the room hold across the
-negotiation, §5's recipients, the confirm hook), the Google connection, and per-transition fields.
+The Meetings / Rooms / Design Request build is **complete**, all six steps. So
+is the KPI module, the generic request engine, and requests-that-become-a-task
+(Design and Media).
 
-**The Google half is built but not switched on** — see "Connecting Google"
-below. Nothing else waits on it: in-person meetings work today, and an online
-meeting is confirmed and on the club's own calendar whether or not Google is
-reachable. Next is step 6, the Design Request itself.
+**The club's real membership is loaded: 98 active members**, 19 Project
+Managers with authority over their own projects, and the first-semester
+timeline on the calendar. The system is no longer a demo with one account in
+it, which changes how you should read the rest of this document — see
+"Suites written against an empty club" below.
+
+**The Google half is built but not switched on** — see "Connecting Google".
+Nothing waits on it: in-person meetings work today, and an online meeting is
+confirmed and on the club's own calendar whether or not Google is reachable.
+
+**Nobody has clicked through the UI yet.** Every guarantee below was proved
+against the database, not the interface. The management team has been asked to
+test; expect their findings to be about screens, not rules.
 
 The spec being implemented is `vision2030_system_logic_prompt.md`. Section
 references below (§2, §3, …) point into it.
@@ -49,8 +56,11 @@ is thousands of nested calls, and it is the real ceiling on `/tasks` and `/kpi`.
 Fixing it means reworking those policies and the capability flags together,
 with the suites as the safety net.
 
-Also unverified: the deployed function served from `bom1` (Mumbai). Check the
-Supabase project's region and match them — every round trip pays that distance.
+**Region mismatch, now confirmed and still unfixed.** The Supabase project is
+in `ap-southeast-2` (Sydney); the Vercel function answers from `bom1` (Mumbai).
+Every round trip pays that distance twice, and the layout alone makes several.
+This is a settings change rather than a code one, and is probably the largest
+single win left on perceived speed.
 
 ## Interface guidelines
 
@@ -77,14 +87,17 @@ Design advice deliberately NOT taken, because it would break this app:
 - *"Add background imagery and noise"* — external images, in an app being fixed
   because it is slow.
 
-## Importing the real member list
+## The member list — imported
+
+**This has been done.** 98 active members are in the live database. What
+follows is how to do it again, and the traps that bit the first time.
 
 `node scripts/build-member-csv.mjs` turns `Database club.xlsx` into
 `members-import.csv`. It reads the spreadsheet directly (an .xlsx is a zip of
 XML — no dependency) and prints a pre-flight report before writing anything,
 because `import_members` is all-or-nothing and one bad row rejects all hundred.
 
-Three things that spreadsheet does which the script handles, and which will
+Four things that spreadsheet does which the script handles, and which will
 catch out anyone editing it:
 
 1. **Two column layouts.** The club-management block has a project in column H
@@ -92,15 +105,103 @@ catch out anyone editing it:
    script decides by which column looks like a student ID.
 2. **The Arabic does not match the seeds.** `مدير مشروع` vs `مدير المشروع`,
    and one row missing its hamza in `ادارة النادي`. `import_members` matches
-   Arabic byte-exactly, so the CSV emits English keys instead.
+   Arabic byte-exactly, so the CSV emits English keys instead. (0047 renamed
+   the roles to `قائد فريق` and `مدير مشروع`, so the sheet's Arabic now
+   matches for those two — but the CSV still emits keys, which is safer.)
 3. **The Super Admin is in the file** (row 131, student ID `445106843`) as
    `قائد فريق`. The importer matches on student ID and overwrites role, so
    importing it as written would demote the club's only admin with no way back
    from inside the app. `KEEP_ROLE` in the script pins that row to
-   `super_admin`.
+   `super_admin`. **Always re-check that the admin still holds `super_admin`
+   immediately after an import.**
+4. **Being in a project is not running it.** `import_members` originally wrote
+   only `project_members`, but authority comes from `project_managers` — which
+   is what `app.is_project_manager` reads and what the `own_projects` scope
+   resolves through. So the first import left all 19 Project Managers as
+   ordinary members of the projects they run, unable to assign work or act on
+   requests. 0047 fixes the importer and backfills. If you ever add a path that
+   makes somebody a Project Manager, write both rows.
 
 `--skip-invalid` writes the CSV without rows that cannot import, naming each.
-One member currently has `-` for a national ID.
+**One member is still missing: Nawaf Zaid Alzaid** (row 42), whose national ID
+is `-`. Fix the spreadsheet and re-run to add him.
+
+### A dry run is available and worth doing
+
+The whole import can be rehearsed inside a transaction that rolls back, by
+impersonating the Super Admin with
+`set_config('request.jwt.claims', …)`. That is how the demotion trap above was
+caught before it happened rather than after. Do this before any future import.
+
+## Who can see the member directory
+
+`/members` and each profile page are limited to the Presidency and HR's
+Directors — six people today. This is `members.directory`, added by 0048.
+
+The obvious implementation would have been to take `members.view` away from
+everyone else, and it would have been quietly damaging. `members.view` decides
+who can read a member ROW, and the assignee dropdown on `/tasks`, the people
+picker for staffing a project split, the target of an individual meeting
+request, every team roster and the calendar audience picker are all plain
+selects against `members`. Revoking it leaves a Team Director looking at a
+dropdown holding only their own name.
+
+So the directory screen has its own narrower permission and `members.view` is
+untouched. `MemberLink` (`src/components/MemberLink.tsx`) renders a name as a
+link only when the viewer can follow it, so nobody is offered a link into a
+refusal — and the "you can always open your own profile" rule lives inside that
+component rather than at each call site.
+
+**Be clear about what this is not: a data boundary.** `members_select` still
+resolves `members.view`, which every role holds at `all`, so a signed-in member
+can read email, phone, student ID and college through the API directly. This
+stops the UI handing them out; it does not stop the database. Making that a
+real boundary means moving those columns behind a view, or narrowing
+`members.view` and giving the pickers a name-only source — a deliberate piece
+of work, not a patch.
+
+National IDs are the exception and were never part of this: `member_sensitive`
+is a separate table with its own policy, Presidency and HR only.
+
+## The semester timeline
+
+`node --env-file=.env.local scripts/import-timeline.mjs [--sheet 1] [--dry]`
+reads `First Semester Timeline- 26_48 (1).xlsx` and writes its dated events as
+`kind = 'club'` calendar entries — 12 of them, currently live, spanning
+2026-08-08 to 2026-11-21.
+
+`kind = 'club'` is the point: 0007's select policy lets any signed-in person
+read a club entry, so the plan reaches all 98 members without an audience row
+each. Idempotent by title + date, so re-running is safe.
+
+The workbook has ten sheets, one per team; sheet 1 is the club-wide one. Its
+layout alternates a row of dates with a row of labels, matched by column
+letter, and column B is anchored to the week's first day because it has no date
+of its own. **Cells holding a bare number are skipped and listed rather than
+guessed at** — twelve of them. If any are real events, put a name in the cell
+and re-run.
+
+### Reading .xlsx without a dependency
+
+Both scripts share a hand-rolled zip reader, and it must walk the **central
+directory**, not the local file headers. An entry written in streaming mode
+carries zero sizes in its local header and puts the real ones in a trailing
+data descriptor, so a reader that trusts local headers silently skips parts —
+which is why the timeline file first appeared to have no sheets at all.
+
+## Brand assets
+
+`Assets/` holds the originals; `public/brand/` holds what the app actually
+loads (`layout.tsx` and the login page). They are separate on purpose — copy
+into `public/brand/` under the app's own names rather than pointing the app at
+`Assets/`.
+
+Two logo animations were supplied. `Logo2 Variation-.mp4` is 604 KB, H.264 +
+AAC, 6 seconds, and is web-usable — it is committed but **not yet referenced by
+any page**; the natural home is the login screen, muted and looping, with a
+still fallback under `prefers-reduced-motion`. The `.mov` is 21 MB QuickTime
+with no browser-playable codec (ProRes family): it is an editing master, is
+gitignored at the repo root, and should stay in Drive.
 
 ## Deploying
 
@@ -140,7 +241,12 @@ A Super Admin does this once:
 1. Google Cloud console → new project → enable the **Google Calendar API**.
 2. Create an OAuth client, type **Web application**.
 3. Add the redirect URL shown on `/admin/google` to its Authorised redirect
-   URIs. It must match character for character.
+   URIs. It must match character for character. That page now always shows the
+   value — it used to render `—` whenever `GOOGLE_REDIRECT_URI` was unset,
+   which is precisely when somebody is standing in the Cloud console needing
+   it, so it falls back to deriving the URL from the host it is served on. On
+   the current deployment it is
+   `https://vision2030club-system.vercel.app/api/google/callback`.
 4. Put these in `.env.local` and restart:
    `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`.
 5. Sign in as Super Admin, open **Admin → Google**, press Connect, and approve
@@ -175,13 +281,32 @@ Nothing is blocked. To get running from a fresh clone:
 
 ### State as of this commit
 
-- All 27 migrations applied to the live Supabase project.
+- **48 migrations** applied to the live Supabase project.
 - `db:test` 32/32 · `db:rooms` 27/27 · `db:meetings` 38/38 · `db:design` 48/48 ·
-  `db:kpi` 72/72 · `db:prove` 12/12.
-- One member exists: the Super Admin bootstrap account, password already set.
+  `db:kpi` 72/72 · `db:prove` 12/12 — 229 checks, all green.
+- **98 active members**, 19 Project Managers, 12 semester calendar entries.
+- Six people can open the member directory: Super Admin, President, two Vice
+  Presidents, two HR Directors.
+- Deployed at `vision2030club-system.vercel.app`; `/ar/login` returns 200.
 - Public sign-ups should be **off** in the dashboard (Authentication → Sign In /
   Providers). §4 forbids self-registration; the app never calls `signUp`, but
   the setting closes the door properly. Verify this is still off.
+
+### Port 5432 is blocked on some networks
+
+`npm run db:push`, and every `db:*` suite, open a direct Postgres connection.
+Campus wifi and some ISPs block 5432 and 6543 outright, and the failure looks
+like `ETIMEDOUT` against an AWS address, which reads as "the database is down".
+It is not. The way to tell them apart: the REST API on 443 still answers, and
+the deployed site still works, because those go over HTTPS. Tether to a phone,
+or apply SQL through the Supabase dashboard's SQL Editor — and if you do the
+latter, add the tracking row yourself, or `db:push` will think the migration is
+still pending:
+
+```sql
+insert into schema_migrations (name) values ('00NN_your_migration.sql')
+on conflict (name) do nothing;
+```
 
 ### Adding the first account on a NEW project
 
@@ -285,6 +410,9 @@ Two consequences worth remembering before changing anything:
 | `0035_design_request.sql` | **The Design Request (§7).** Its statuses, transitions, the `open_meeting` / `resume_after_meeting` hooks, and the private `design-files` bucket |
 | `0036_status_clears_data.sql` | `request_statuses.clears_data_keys` — a status can void data that arriving there makes untrue |
 | `0038`–`0045` | **Requests that become one real Task.** `request_types.creates_task` and friends; `tasks.source_request_id` / `submission_url`; the `either` actor rule; Design and Media rebuilt on it; and four fixes the suites caught — see below |
+| `0046_remove_join_date.sql` | Drops `members.join_date` and regenerates `import_members` without it. Nothing derived from it — no ordering, filter, KPI, policy or view |
+| `0047_project_managers_and_role_names.sql` | `import_members` now writes `project_managers` too, plus a backfill for the 19 already imported; `مدير الفريق` → `قائد فريق`, `مدير المشروع` → `مدير مشروع` (`name_ar` only — the keys are what policies use) |
+| `0048_member_directory_permission.sql` | `members.directory`: the directory screen gets its own permission so `members.view` can stay `all` and the people-pickers keep working. Presidency by role, HR's Directors by team override |
 | `0037_derive_booking_identity.sql` | `app.default_booking_identity()` — the meeting form stops asking which group books the room; Money Request renamed to Fund Request / أمر صرف |
 
 Things in there that are easy to break by accident:
@@ -480,18 +608,18 @@ Things in there that are easy to break by accident:
 
 ### Verification
 
-- `npm run db:test` — `scripts/permission-tests.mjs`, 28 checks. Seeds five
+- `npm run db:test` — `scripts/permission-tests.mjs`, 32 checks. Seeds five
   people (`permtest-…`), signs each in, and hits the REST API **directly**
   rather than through the UI, then deletes them again. Covers every scenario
   §10 asks for: the non-HR-Director rollback, Guest visibility, the illegal
   status jump, the five-counter meeting request, the all-or-nothing CSV
   import, and two concurrent checkouts of one asset.
-- `npm run db:prove` — `scripts/extensibility-proof.mjs`, 10 checks. Adds a
+- `npm run db:prove` — `scripts/extensibility-proof.mjs`, 12 checks. Adds a
   Sponsorship Request type with nothing but INSERTs and drives a request
   through it end to end, then flips one `role_permissions` row and shows the
   same token's access change and revert. Both without a rebuild or restart.
 
-- `npm run db:meetings` — `scripts/meeting-tests.mjs`, 28 checks. Seeds six
+- `npm run db:meetings` — `scripts/meeting-tests.mjs`, 38 checks. Seeds six
   people — including TWO Directors of one team, so §5's "every Director,
   whichever one negotiated" has something to prove — and drives real meetings
   through the engine: an individual target, the hold appearing on submission
@@ -518,19 +646,75 @@ Things in there that are easy to break by accident:
   %Performance, and that nobody — Development and Presidency included — can
   read their own figures.
 
-All three scripts are idempotent and only ever touch rows they created.
+All six scripts are idempotent and only ever touch rows they created.
+
+### Suites written against an empty club
+
+Two have now had to be corrected because they assumed the club had nobody in
+it, and more will:
+
+- `db:rooms` hardcoded a noon-to-midnight booking window, and broke the moment
+  somebody changed the closing hour through the admin screen. It now pins
+  `booking_settings` and restores it.
+- `db:meetings` asserted that every attendee on a built invitation carried the
+  `meettest-` prefix. Once the real 98 arrived, DESIGN's two elected Directors
+  became legitimate recipients — `app.meeting_recipients` includes every
+  Director of the target team — and a correct system started failing the check.
+  It now compares set-equality against `app.meeting_recipients` itself.
+
+The lesson for the next one: **assert against the rule, not against a naming
+convention that only holds while the database is empty.** A suite failing after
+real data arrives is more likely stale than a regression — check which before
+you 'fix' the system.
 
 ---
 
 ## What is left
 
-### 1. Request type *editing*
+Ordered by what would hurt most to leave undone.
+
+### 0. Nobody has used it
+
+Every guarantee in this document was proved against the database over the REST
+API. **No human has clicked through the interface.** The management team has
+been sent instructions to test; the most valuable thing they can report is
+anything they can see that they should not — that is the one check the suites
+cannot run, because it depends on who is holding the account.
+
+### 1. The member data question, still open
+
+Two things have been raised repeatedly and never decided:
+
+- **National IDs.** `member_sensitive` holds one for ~98 real people. Nothing
+  in the system uses it — no report, no export, no KPI. Under Saudi PDPL it is
+  sensitive personal data, and dropping the column removes the compliance
+  question entirely rather than defending it. It is a one-line migration.
+- **`members.view` is `all` for everybody.** The directory UI is now
+  restricted, but the columns behind it are not (see "Who can see the member
+  directory"). If the club wants phone and email genuinely private, that is a
+  view or a narrowed scope plus a name-only source for the pickers.
+
+`Database club.xlsx` and `members-import.csv` are gitignored because they carry
+national IDs, phones and emails for a hundred people. The repo is private, but
+private is a setting and git history is forever — keep them out.
+
+### 2. `task_kpi` is the real performance ceiling
+
+Roughly eight non-inlinable `SECURITY DEFINER` calls PER ROW — `0042` lines
+43-45 plus `0016` lines 62-68 — several re-reading the same task. At 300 tasks
+that is thousands of nested calls, and it is what makes `/tasks` and `/kpi`
+slow. Fixing it means reworking those policies and the capability flags
+together, with the suites as the safety net. Do the region move first: it is
+free and may buy enough.
+
+### 3. Request type *editing*
+
 `/admin/request-types` is a viewer — it renders each type's statuses,
 transitions and field schema, which is what makes "configuration over code"
 legible. Creating and editing types through the UI is not built; today that is
 SQL, as `db:prove` does it.
 
-### 2. Timezone handling
+### 4. Timezone handling
 **Resolved for a single-campus club.** `src/lib/time.ts` holds
 `CLUB_TIME_ZONE` and every formatter in `src/lib/format.ts` is pinned to it, so
 a time reads the same on a laptop in Riyadh and on a UTC host. Writes send the
@@ -549,7 +733,7 @@ What is still local-clock: the month grid's `dayNumber()` in
 on a UTC host and on a Riyadh laptop — which is every deployment that exists —
 but it is the one piece not yet expressed in club time.
 
-### 3. KPI follow-ups the addendum defers
+### 5. KPI follow-ups the addendum defers
 Per-split/per-PM breakdown **on a member's own profile** (§9 defers it; the
 data model already carries `split_id` on every task, so it needs no schema
 change). No rolling or per-semester KPI window — all-time only. No automatic
