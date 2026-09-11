@@ -297,7 +297,8 @@
     "meet_failed": "Could not be created. It will be retried.",
     "targetTeams": "Teams",
     "targetProjects": "Projects",
-    "request": "Request"
+    "request": "Request",
+    "anyReceiver": "You choose who it goes to"
   },
   "calendar": {
     "title": "Calendar",

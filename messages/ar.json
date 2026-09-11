@@ -297,7 +297,8 @@
     "meet_failed": "تعذّر الإنشاء، وستتم إعادة المحاولة.",
     "targetTeams": "الفرق",
     "targetProjects": "المشاريع",
-    "request": "الطلب"
+    "request": "الطلب",
+    "anyReceiver": "توجّهه إلى من تختار"
   },
   "calendar": {
     "title": "التقويم",

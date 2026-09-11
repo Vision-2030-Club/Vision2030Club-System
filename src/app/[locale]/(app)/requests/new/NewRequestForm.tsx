@@ -84,6 +84,9 @@ export function NewRequestForm({
 
         <div>
           <Label htmlFor="request_type_id">{t('type')}</Label>
+          {/* Grouped by who receives it, so the list reads receiver first —
+              the same order every request is shown in afterwards. Types with
+              no owning team (meetings) go last, under their own heading. */}
           <Select
             id="request_type_id"
             name="request_type_id"
@@ -91,11 +94,32 @@ export function NewRequestForm({
             onChange={(event) => setTypeId(event.target.value)}
             required
           >
-            {types.map((option) => (
-              <option key={option.id} value={option.id}>
-                {name(option)}
-              </option>
-            ))}
+            {teams
+              .map((team) => ({
+                team,
+                options: types.filter((option) => option.owning_team_id === team.id),
+              }))
+              .filter(({ options }) => options.length > 0)
+              .map(({ team, options }) => (
+                <optgroup key={team.id} label={name(team)}>
+                  {options.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {name(option)}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            {types.some((option) => !option.owning_team_id) ? (
+              <optgroup label={t('anyReceiver')}>
+                {types
+                  .filter((option) => !option.owning_team_id)
+                  .map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {name(option)}
+                    </option>
+                  ))}
+              </optgroup>
+            ) : null}
           </Select>
           {type ? (
             <p className="mt-1 text-xs text-ink-muted">
