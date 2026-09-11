@@ -14,7 +14,7 @@ import {
   type TaskRisk,
 } from '@/lib/kpi';
 import { formatDate, formatDateTime, localized } from '@/lib/format';
-import { findStatus, loadStatusLookup } from '@/lib/requests';
+import { describeTarget, findStatus, loadStatusLookup } from '@/lib/requests';
 
 type ManagedProject = {
   id: string;
@@ -37,6 +37,7 @@ export default async function DashboardPage({
   const tTasks = await getTranslations('tasks');
   const tProjects = await getTranslations('projects');
   const tKpi = await getTranslations('kpi');
+  const tRequests = await getTranslations('requests');
   const member = await getMyMember();
   const supabase = await createClient();
 
@@ -61,7 +62,9 @@ export default async function DashboardPage({
         .limit(6),
       supabase
         .from('requests')
-        .select('id, status, created_at, request_type_id, request_types(name_en, name_ar)')
+        .select(
+          'id, status, created_at, request_type_id, target_kind, request_types(name_en, name_ar), target_member:target_member_id(name_en, name_ar), teams(name_en, name_ar), projects(name_en, name_ar)',
+        )
         .eq('submitted_by', member!.id)
         .order('created_at', { ascending: false })
         .limit(6),
@@ -258,9 +261,14 @@ export default async function DashboardPage({
                   <li key={request.id} className="flex items-center gap-3 py-2.5">
                     <Link
                       href={`/requests/${request.id}`}
-                      className="min-w-0 flex-1 text-sm font-medium hover:underline"
+                      className="min-w-0 flex-1 text-sm hover:underline"
                     >
-                      {localized(type, 'name', locale)}
+                      <span className="block truncate font-medium">
+                        {describeTarget(request, locale, tRequests('targetPresidency'))}
+                      </span>
+                      <span className="block truncate text-xs text-ink-muted">
+                        {localized(type, 'name', locale)}
+                      </span>
                     </Link>
                     <span className="text-xs text-ink-muted">
                       {formatDateTime(request.created_at, locale)}

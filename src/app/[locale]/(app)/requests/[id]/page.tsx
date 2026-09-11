@@ -173,8 +173,9 @@ export default async function RequestPage({
   return (
     <>
       <PageHeader
-        title={localized(type, 'name', locale)}
-        description={`${t('target')}: ${target}`}
+        // Same order as the list: who it is for, then what kind of request.
+        title={target}
+        description={localized(type, 'name', locale)}
         action={
           <Badge tone={status?.is_approved ? 'ok' : status?.is_terminal ? 'neutral' : 'warn'}>
             {localized(status, 'name', locale) || String(request.status)}

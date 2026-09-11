@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getMyMember, hasPermission } from '@/lib/auth/session';
 import { Badge, Card, EmptyState, PageHeader } from '@/components/ui';
 import { formatDateTime, localized } from '@/lib/format';
-import { findStatus, loadStatusLookup } from '@/lib/requests';
+import { describeTarget, findStatus, loadStatusLookup } from '@/lib/requests';
 
 export default async function RequestsPage({
   params,
@@ -35,7 +35,7 @@ export default async function RequestsPage({
      * It has to stay one string literal: supabase-js reads it to type the row.
      */
     .select(
-      'id, status, created_at, request_type_id, submitted_by, target_kind, request_types(name_en, name_ar), members:submitted_by(name_en, name_ar), teams(name_en, name_ar), projects(name_en, name_ar)',
+      'id, status, created_at, request_type_id, submitted_by, target_kind, request_types(name_en, name_ar), members:submitted_by(name_en, name_ar), target_member:target_member_id(name_en, name_ar), teams(name_en, name_ar), projects(name_en, name_ar)',
     )
     .order('created_at', { ascending: false })
     .limit(200);
@@ -106,8 +106,7 @@ export default async function RequestsPage({
           <table className="w-full text-sm">
             <thead className="border-b border-line bg-surface-muted">
               <tr>
-                <th className="px-4 py-2.5 text-start font-medium">{t('type')}</th>
-                <th className="px-4 py-2.5 text-start font-medium">{t('target')}</th>
+                <th className="px-4 py-2.5 text-start font-medium">{t('request')}</th>
                 <th className="px-4 py-2.5 text-start font-medium">{t('submittedBy')}</th>
                 <th className="px-4 py-2.5 text-start font-medium">{t('submittedAt')}</th>
                 <th className="px-4 py-2.5 text-start font-medium">{t('status')}</th>
@@ -120,32 +119,25 @@ export default async function RequestsPage({
                   request.request_type_id as string,
                   request.status as string,
                 );
-                const target =
-                  request.target_kind === 'team'
-                    ? localized(request.teams as unknown as Record<string, string>, 'name', locale)
-                    : request.target_kind === 'project'
-                      ? localized(
-                          request.projects as unknown as Record<string, string>,
-                          'name',
-                          locale,
-                        )
-                      : t('targetPresidency');
+                // Where it went is the title; what kind of form it was, the
+                // subtitle. A reader scanning the list is looking for "the
+                // one to Design", not "the Media Request".
+                const target = describeTarget(request, locale, t('targetPresidency'));
 
                 return (
                   <tr key={request.id} className="hover:bg-surface-muted">
                     <td className="px-4 py-2.5">
-                      <Link
-                        href={`/requests/${request.id}`}
-                        className="font-medium text-brand-700 hover:underline"
-                      >
-                        {localized(
-                          request.request_types as unknown as Record<string, string>,
-                          'name',
-                          locale,
-                        )}
+                      <Link href={`/requests/${request.id}`} className="block hover:underline">
+                        <span className="block font-medium text-brand-700">{target}</span>
+                        <span className="block text-xs text-ink-muted">
+                          {localized(
+                            request.request_types as unknown as Record<string, string>,
+                            'name',
+                            locale,
+                          )}
+                        </span>
                       </Link>
                     </td>
-                    <td className="px-4 py-2.5">{target}</td>
                     <td className="px-4 py-2.5">
                       {localized(
                         request.members as unknown as Record<string, string>,

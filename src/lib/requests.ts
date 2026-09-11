@@ -1,3 +1,4 @@
+import { localized } from '@/lib/format';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
@@ -72,6 +73,38 @@ export type RequestField = {
    */
   show_when?: { key: string; value: string | string[] };
 };
+
+/**
+ * Who a request is for, as a name — the team, the project, the person, or the
+ * Presidency. Lists show this as the title and the type underneath: "Design ·
+ * Media Request" reads as what the person wants to know first, which is where
+ * it went, not what kind of form it was.
+ *
+ * Takes the embedded rows as the pages already fetch them; `presidency` is
+ * passed in so this stays free of translations.
+ */
+export function describeTarget(
+  request: {
+    target_kind: string;
+    teams?: unknown;
+    projects?: unknown;
+    target_member?: unknown;
+  },
+  locale: string,
+  presidency: string,
+): string {
+  const row = (value: unknown) => value as Record<string, string> | null | undefined;
+  switch (request.target_kind) {
+    case 'team':
+      return localized(row(request.teams), 'name', locale);
+    case 'project':
+      return localized(row(request.projects), 'name', locale);
+    case 'individual':
+      return localized(row(request.target_member), 'name', locale);
+    default:
+      return presidency;
+  }
+}
 
 /** Whether a field is asked at all, given what the other fields hold. */
 export function fieldApplies(

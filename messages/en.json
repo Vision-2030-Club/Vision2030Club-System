@@ -296,7 +296,8 @@
     "meet_ready": "Ready",
     "meet_failed": "Could not be created. It will be retried.",
     "targetTeams": "Teams",
-    "targetProjects": "Projects"
+    "targetProjects": "Projects",
+    "request": "Request"
   },
   "calendar": {
     "title": "Calendar",
