@@ -112,6 +112,8 @@ const PEOPLE = {
   // Holds `all` on requests.approve — and must NOT be told about a team-level
   // request, because the team's own Directors are the nearer authority.
   pres: { role: 'president', team: 'CLUB_MGMT', student: '493000005', national: '1930000005' },
+  // Holds `all` too — but sits IN the target team, so is told (0053).
+  admin: { role: 'super_admin', team: 'MEDIA', student: '493000007', national: '1930000007' },
   // Runs the project below. Only a PM's scope (own_projects) can post a
   // project task — a Director's own_team cannot.
   pm: { role: 'project_manager', team: 'DESIGN', student: '493000006', national: '1930000006' },
@@ -274,6 +276,11 @@ async function run(p) {
     'the title reads once, not "Meeting Request request"',
     media1[0]?.title_en === 'New request: Meeting Request',
     media1[0]?.title_en,
+  );
+  check(
+    'a Super Admin who sits in the target team is told as well',
+    kinds(await outboxFor(p.admin.id)).includes('request_submitted'),
+    JSON.stringify(kinds(await outboxFor(p.admin.id))),
   );
   check(
     'the requester is not told about their own request',
