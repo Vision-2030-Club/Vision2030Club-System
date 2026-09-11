@@ -7,6 +7,7 @@ import { fail, ok, requiredText, text, type ActionResult } from '@/lib/actions';
 import {
   MAX_REQUEST_FILE_BYTES,
   REQUEST_FILE_BUCKET,
+  fieldApplies,
   type RequestField,
 } from '@/lib/requests';
 import { fromClubWallClock } from '@/lib/time';
@@ -56,8 +57,15 @@ export async function createRequestAction(
   if (!initial) return fail('This request type has no initial status configured.');
 
   const data: Record<string, string | number> = {};
-  for (const field of (type.field_schema ?? []) as RequestField[]) {
-    const raw = text(formData, `field_${field.key}`);
+  const fields = (type.field_schema ?? []) as RequestField[];
+  // What was answered, before typing: `show_when` reads it to decide which
+  // questions were asked at all, so a hidden required field is not demanded.
+  const answered = Object.fromEntries(fields.map((f) => [f.key, text(formData, `field_${f.key}`)]));
+
+  for (const field of fields) {
+    if (!fieldApplies(field, answered)) continue;
+
+    const raw = answered[field.key];
     if (raw === null) {
       if (field.required) {
         return fail(`Missing required field: ${field.label_en}`);
@@ -171,8 +179,14 @@ export async function transitionRequestAction(
     .maybeSingle();
 
   const patch: Record<string, string | number> = {};
+  const fields = (transition?.field_schema ?? []) as RequestField[];
+  // Same rule as the create path: a question that was not asked (its
+  // `show_when` did not hold) is neither read nor required.
+  const answered = Object.fromEntries(fields.map((f) => [f.key, text(formData, `field_${f.key}`)]));
 
-  for (const field of ((transition?.field_schema ?? []) as RequestField[])) {
+  for (const field of fields) {
+    if (!fieldApplies(field, answered)) continue;
+
     /*
      * A `file` answer is an upload, not a value. It goes to the private
      * `design-files` bucket under the request's own id — which is the same

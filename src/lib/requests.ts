@@ -64,7 +64,28 @@ export type RequestField = {
    * adding one later stays additive.
    */
   options_source?: keyof typeof OPTION_SOURCES;
+  /**
+   * Only ask this when another field holds one of these values — "if other,
+   * what?" after a select, the room only for an in-person meeting. A hidden
+   * field is not rendered, not submitted, and not required, on the client
+   * and the server alike (`fieldApplies`).
+   */
+  show_when?: { key: string; value: string | string[] };
 };
+
+/** Whether a field is asked at all, given what the other fields hold. */
+export function fieldApplies(
+  field: Pick<RequestField, 'show_when'>,
+  values: Record<string, unknown>,
+): boolean {
+  if (!field.show_when) return true;
+  const current = values[field.show_when.key];
+  if (current === undefined || current === null || current === '') return false;
+  const wanted = Array.isArray(field.show_when.value)
+    ? field.show_when.value
+    : [field.show_when.value];
+  return wanted.includes(String(current));
+}
 
 /**
  * Where a live-sourced select gets its rows.

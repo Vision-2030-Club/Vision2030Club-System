@@ -294,7 +294,9 @@
     "meet_not_needed": "—",
     "meet_pending": "جارٍ الإنشاء…",
     "meet_ready": "جاهز",
-    "meet_failed": "تعذّر الإنشاء، وستتم إعادة المحاولة."
+    "meet_failed": "تعذّر الإنشاء، وستتم إعادة المحاولة.",
+    "targetTeams": "الفرق",
+    "targetProjects": "المشاريع"
   },
   "calendar": {
     "title": "التقويم",

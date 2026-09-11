@@ -294,7 +294,9 @@
     "meet_not_needed": "—",
     "meet_pending": "Being created…",
     "meet_ready": "Ready",
-    "meet_failed": "Could not be created. It will be retried."
+    "meet_failed": "Could not be created. It will be retried.",
+    "targetTeams": "Teams",
+    "targetProjects": "Projects"
   },
   "calendar": {
     "title": "Calendar",

@@ -21,6 +21,30 @@ export type RequestTypeOption = {
 
 type Named = { id: string; name_en: string; name_ar: string };
 
+/**
+ * One "Send to" list instead of a kind picker plus a list per kind: the teams
+ * under a Teams heading, the projects under Projects, then the Presidency and
+ * "a specific person". Only that last choice opens a second field. The value
+ * encodes kind and id together; hidden inputs hand the action the columns it
+ * already reads, so the routing rules did not move.
+ */
+type Target =
+  | { kind: 'team'; id: string }
+  | { kind: 'project'; id: string }
+  | { kind: 'presidency' }
+  | { kind: 'individual' };
+
+function encode(target: Target): string {
+  return 'id' in target ? `${target.kind}:${target.id}` : target.kind;
+}
+
+function decode(value: string): Target {
+  const [kind, id] = value.split(':');
+  if ((kind === 'team' || kind === 'project') && id) return { kind, id };
+  if (kind === 'individual') return { kind };
+  return { kind: 'presidency' };
+}
+
 export function NewRequestForm({
   types,
   teams,
@@ -39,8 +63,9 @@ export function NewRequestForm({
   const t = useTranslations('requests');
   const tCommon = useTranslations('common');
   const [typeId, setTypeId] = useState(types[0]?.id ?? '');
-  const [targetKind, setTargetKind] =
-    useState<'team' | 'project' | 'presidency' | 'individual'>('team');
+  const [target, setTarget] = useState<Target>(
+    teams[0] ? { kind: 'team', id: teams[0].id } : { kind: 'presidency' },
+  );
   const [state, formAction, pending] = useActionState<ActionResult, FormData>(
     createRequestAction,
     { ok: false },
@@ -90,54 +115,49 @@ export function NewRequestForm({
           </div>
         ) : (
           <>
+            <input type="hidden" name="target_kind" value={target.kind} />
+            {target.kind === 'team' ? (
+              <input type="hidden" name="target_team_id" value={target.id} />
+            ) : null}
+            {target.kind === 'project' ? (
+              <input type="hidden" name="target_project_id" value={target.id} />
+            ) : null}
+
             <div>
-              <Label htmlFor="target_kind">{t('target')}</Label>
+              <Label htmlFor="target">{t('target')}</Label>
               <Select
-                id="target_kind"
-                name="target_kind"
-                value={targetKind}
-                onChange={(event) =>
-                  setTargetKind(event.target.value as typeof targetKind)
-                }
+                id="target"
+                value={encode(target)}
+                onChange={(event) => setTarget(decode(event.target.value))}
               >
-                <option value="team">{t('targetTeam')}</option>
-                <option value="project">{t('targetProject')}</option>
+                <optgroup label={t('targetTeams')}>
+                  {teams.map((team) => (
+                    <option key={team.id} value={`team:${team.id}`}>
+                      {name(team)}
+                    </option>
+                  ))}
+                </optgroup>
+                {projects.length ? (
+                  <optgroup label={t('targetProjects')}>
+                    {projects.map((project) => (
+                      <option key={project.id} value={`project:${project.id}`}>
+                        {name(project)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
                 <option value="presidency">{t('targetPresidency')}</option>
                 <option value="individual">{t('targetIndividual')}</option>
               </Select>
             </div>
 
-            {targetKind === 'team' ? (
-              <div>
-                <Label htmlFor="target_team_id">{t('targetTeam')}</Label>
-                <Select id="target_team_id" name="target_team_id" required>
-                  {teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {name(team)}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            ) : null}
-
-            {targetKind === 'project' ? (
-              <div>
-                <Label htmlFor="target_project_id">{t('targetProject')}</Label>
-                <Select id="target_project_id" name="target_project_id" required>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {name(project)}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            ) : null}
-
-            {/* §2: a meeting's target can be one specific person. */}
-            {targetKind === 'individual' ? (
+            {/* §2: a meeting's target can be one specific person — the one
+                choice that needs a second question. */}
+            {target.kind === 'individual' ? (
               <div>
                 <Label htmlFor="target_member_id">{t('targetIndividual')}</Label>
                 <Select id="target_member_id" name="target_member_id" required>
+                  <option value="">—</option>
                   {members.map((member) => (
                     <option key={member.id} value={member.id}>
                       {name(member)}
@@ -149,8 +169,9 @@ export function NewRequestForm({
           </>
         )}
 
+        {/* Keyed by type so answers (and what they reveal) reset with it. */}
         {type ? (
-          <RequestFields fields={type.field_schema ?? []} options={fieldOptions} />
+          <RequestFields key={type.id} fields={type.field_schema ?? []} options={fieldOptions} />
         ) : null}
 
         {state.error ? <Alert tone="danger">{state.error}</Alert> : null}

@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Input, Label, Select, Textarea } from '@/components/ui';
-import type { FieldOptions, RequestField } from '@/lib/requests';
+import { fieldApplies, type FieldOptions, type RequestField } from '@/lib/requests';
 
 /**
  * Renders a request type's custom form straight from its `field_schema`.
@@ -10,6 +11,11 @@ import type { FieldOptions, RequestField } from '@/lib/requests';
  * This component is the reason adding a request type needs no new code: the
  * shape of the form is data, and every type — existing or future — is drawn by
  * the same six branches below.
+ *
+ * A field with `show_when` appears only once the field it depends on holds
+ * the right value, and is not in the DOM otherwise — so it is neither
+ * submitted nor `required` while hidden. The server applies the same rule
+ * (`fieldApplies`), so a required-but-hidden field is never demanded.
  */
 export function RequestFields({
   fields,
@@ -23,9 +29,17 @@ export function RequestFields({
   const label = (field: RequestField) =>
     locale === 'ar' ? field.label_ar : field.label_en;
 
+  // Only what other fields depend on is tracked: the selects. Text answers
+  // never decide whether another question is asked.
+  const [values, setValues] = useState<Record<string, string>>({});
+  const remember = (key: string, value: string) =>
+    setValues((current) => (current[key] === value ? current : { ...current, [key]: value }));
+
   return (
     <>
       {fields.map((field) => {
+        if (!fieldApplies(field, values)) return null;
+
         const name = `field_${field.key}`;
         const common = { id: name, name, required: field.required };
 
@@ -36,7 +50,11 @@ export function RequestFields({
             {field.type === 'textarea' ? (
               <Textarea {...common} rows={3} />
             ) : field.type === 'select' ? (
-              <Select {...common}>
+              <Select
+                {...common}
+                value={values[field.key] ?? ''}
+                onChange={(event) => remember(field.key, event.target.value)}
+              >
                 <option value="">—</option>
                 {(field.options_source
                   ? (options[field.options_source] ?? [])
