@@ -3,15 +3,18 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { deliverPendingNotifications, pruneOutbox } from '@/lib/push';
 
 /**
- * The scheduled sweep (vercel.json). Three jobs, in order:
+ * The scheduled sweep. Three jobs, in order:
  *
  *   1. queue a reminder for anything on the calendar starting soon
  *   2. send whatever is queued — reminders, plus any row an earlier inline
  *      delivery could not send
  *   3. forget rows that were sent a week ago
  *
- * Vercel calls it with `Authorization: Bearer $CRON_SECRET`; anyone else gets
- * 401. The proxy matcher already excludes /api, so no session is involved.
+ * Called every five minutes by pg_cron inside Supabase (scripts/push-cron-
+ * setup.mjs), not by Vercel: the Hobby plan allows one cron a day, which is
+ * useless for "your meeting starts in an hour". Whoever calls it sends
+ * `Authorization: Bearer $CRON_SECRET`; anyone else gets 401. The proxy
+ * matcher already excludes /api, so no session is involved.
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
