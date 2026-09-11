@@ -16,7 +16,8 @@
     "db:design": "node --env-file=.env.local scripts/design-tests.mjs",
     "db:prove": "node --env-file=.env.local scripts/extensibility-proof.mjs",
     "db:notify": "node --env-file=.env.local scripts/push-tests.mjs",
-    "push:cron": "node --env-file=.env.local scripts/push-cron-setup.mjs"
+    "push:cron": "node --env-file=.env.local scripts/push-cron-setup.mjs",
+    "db:reset-for-testing": "node --env-file=.env.local scripts/reset-for-testing.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

@@ -57,3 +57,6 @@ members-import.csv
 # public/ and is committed deliberately, not dragged in from the repo root.
 /*.mp4
 /*.mov
+
+# Database backups taken by scripts/reset-for-testing.mjs — real national IDs.
+/backups/
