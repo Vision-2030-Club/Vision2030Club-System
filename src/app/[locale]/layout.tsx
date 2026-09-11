@@ -14,7 +14,8 @@ export const metadata: Metadata = {
   // a Safari tab, and a Safari tab cannot receive push — see app/manifest.ts.
   appleWebApp: {
     capable: true,
-    title: 'Vision 2030',
+    // The name iOS pre-fills in "Add to Home Screen".
+    title: 'Vision 2030 Club',
     statusBarStyle: 'default',
   },
   icons: {

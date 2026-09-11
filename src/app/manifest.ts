@@ -12,8 +12,10 @@ import type { MetadataRoute } from 'next';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Vision Club 2030',
-    short_name: 'Vision 2030',
+    // What "Add to Home Screen" pre-fills. Keep the two the same so the icon
+    // reads identically on iOS (which uses the meta tag) and Android.
+    name: 'Vision 2030 Club',
+    short_name: 'Vision 2030 Club',
     description: 'Vision 2030 Club management system',
     // No locale prefix: the proxy resolves it from the NEXT_LOCALE cookie, so
     // the app opens in whichever language the person last used.
