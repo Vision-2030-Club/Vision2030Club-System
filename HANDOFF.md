@@ -296,8 +296,8 @@ Sending is split the same way the Meet link is:
   deletes any subscription the push service reports gone (404/410 — that is
   what removing the icon from the Home Screen looks like). It is kicked at
   the end of the request and task actions, so a phone hears about an approval
-  at once, and swept by `/api/push/cron` (`vercel.json`, every five
-  minutes), which also queues reminders for anything on the calendar starting
+  at once, and swept by `/api/push/cron` every five minutes, which also queues
+  reminders for anything on the calendar starting
   within the hour (`push_enqueue_reminders`, keyed so a second sweep writes
   nothing) and prunes rows sent a week ago.
 
@@ -317,10 +317,15 @@ Setting it up once:
    every device's subscription is bound to the public key, so a new pair logs
    every phone out of notifications. The `.env.local` on the laptop that
    built this has a pair already; use the same one.
-2. Set `CRON_SECRET` to any long random string. Vercel sends it as a bearer
-   token to the cron route; the route answers 401 to anything else. Check the
-   plan's cron limits — Hobby runs a schedule far less often than every five
-   minutes, which only delays reminders and retries, never the inline sends.
+2. Set `CRON_SECRET` to any long random string, in Vercel AND in `.env.local`,
+   then run `npm run push:cron`. That schedules the sweep with **pg_cron inside
+   Supabase** (every five minutes, calling the deployed route with the secret
+   as a bearer token, kept in Supabase Vault). Not a Vercel cron: the Hobby plan
+   allows one a day, and the build is refused outright for anything more — that
+   is exactly how the first deploy of this failed. `npm run push:cron -- --status`
+   shows the last runs and the HTTP status the site answered; `-- --off` removes
+   it. If it is ever not scheduled, only reminders and retries stop — the
+   inline sends after each action still happen.
 3. Redeploy (the public key is `NEXT_PUBLIC_*`, so it is baked in at build).
 
 iOS things that will come up:

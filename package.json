@@ -15,7 +15,8 @@
     "db:meetings": "node --env-file=.env.local scripts/meeting-tests.mjs",
     "db:design": "node --env-file=.env.local scripts/design-tests.mjs",
     "db:prove": "node --env-file=.env.local scripts/extensibility-proof.mjs",
-    "db:notify": "node --env-file=.env.local scripts/push-tests.mjs"
+    "db:notify": "node --env-file=.env.local scripts/push-tests.mjs",
+    "push:cron": "node --env-file=.env.local scripts/push-cron-setup.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
