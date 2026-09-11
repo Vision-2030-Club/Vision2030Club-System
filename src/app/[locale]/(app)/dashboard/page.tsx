@@ -3,6 +3,7 @@ import { Link } from '@/i18n/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getMyMember } from '@/lib/auth/session';
 import { Badge, Card, EmptyState, PageHeader, cx } from '@/components/ui';
+import { PushNudge } from '@/components/PushNudge';
 import {
   HEALTH_TONES,
   RISK_CLASSES,
@@ -122,6 +123,8 @@ export default async function DashboardPage({
         })}
         description={t('subtitle')}
       />
+
+      <PushNudge profileHref={`/members/${member!.id}`} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* The projects this person runs, in place of a menu entry they would

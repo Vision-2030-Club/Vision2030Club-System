@@ -205,13 +205,21 @@ gitignored at the repo root, and should stay in Drive.
 
 ## Deploying
 
-The app needs exactly three environment variables at runtime:
+The app needs three environment variables at runtime, plus three for push:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
+
+NEXT_PUBLIC_VAPID_PUBLIC_KEY
+VAPID_PRIVATE_KEY
+CRON_SECRET
 ```
+
+Without the push three, everything still works and nobody is notified — the
+profile card says push is not set up on the server when the test button is
+pressed. See "Push notifications" below for where they come from.
 
 `SUPABASE_DB_URL` is deliberately NOT among them — it is a direct Postgres
 connection used only by `npm run db:push` from a laptop, and a web host has no
@@ -261,6 +269,74 @@ Note what has NOT been exercised: the calls to Google themselves. Everything up
 to the API call is covered by `db:meetings`, but nobody has watched a real Meet
 link come back, because that needs an account this repo does not have. Expect
 to iterate on that first connection.
+
+## Push notifications
+
+Every member is on an iPhone, and on iOS a website can only receive push when
+it has been **added to the Home Screen** (iOS 16.4+). So the feature is in two
+halves: the site is installable (`src/app/manifest.ts`, the `appleWebApp`
+metadata in the root layout, `public/icons/`), and once installed a card on
+the person's own profile turns notifications on for that device
+(`src/components/PushSettings.tsx`). The dashboard nudges anyone who has not.
+No Apple Developer account, certificate or App Store is involved: standard Web
+Push with VAPID keys, which Apple routes through APNs itself.
+
+Sending is split the same way the Meet link is:
+
+- **The database decides who.** `0049` writes a row per person to
+  `notification_outbox` from triggers on `requests`, `tasks` and
+  `task_assignees` (`0050` adds tasks posted for claiming). The recipient rules are the permission map run backwards
+  (`app.members_who_can`, `app.request_actors`, `app.task_reviewers`), with
+  the narrowest authority preferred — the target team's Directors, not the
+  President, are told about a team-level request. Nothing is written for a
+  person with no device, and a bug in a trigger is caught and logged rather
+  than blocking the write it is about.
+- **The server sends.** `src/lib/push.ts` leases rows (`push_claim_outbox`),
+  renders each in the language of the device, sends with `web-push`, and
+  deletes any subscription the push service reports gone (404/410 — that is
+  what removing the icon from the Home Screen looks like). It is kicked at
+  the end of the request and task actions, so a phone hears about an approval
+  at once, and swept by `/api/push/cron` (`vercel.json`, every five
+  minutes), which also queues reminders for anything on the calendar starting
+  within the hour (`push_enqueue_reminders`, keyed so a second sweep writes
+  nothing) and prunes rows sent a week ago.
+
+What gets sent today: request submitted (to whoever can act), request moved
+(to the requester) and awaiting (to whoever is next), meeting confirmed (to
+everyone in it), task assigned / ready for review / confirmed / returned / not
+done, a project task posted for claiming (to the split's members when it is
+scoped to a split, otherwise the project's — `0050`), a claim (to whoever
+posted it), and a reminder before a calendar entry. Adding one is an
+`app.push_enqueue(...)` call in a trigger; there is no code path outside the
+database that decides a recipient.
+
+Setting it up once:
+
+1. `npx web-push generate-vapid-keys`, put the pair in Vercel as
+   `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`, and **keep it** —
+   every device's subscription is bound to the public key, so a new pair logs
+   every phone out of notifications. The `.env.local` on the laptop that
+   built this has a pair already; use the same one.
+2. Set `CRON_SECRET` to any long random string. Vercel sends it as a bearer
+   token to the cron route; the route answers 401 to anything else. Check the
+   plan's cron limits — Hobby runs a schedule far less often than every five
+   minutes, which only delays reminders and retries, never the inline sends.
+3. Redeploy (the public key is `NEXT_PUBLIC_*`, so it is baked in at build).
+
+iOS things that will come up:
+
+- The installed app has its **own cookie jar** — everyone signs in once more
+  inside the icon. Email + password makes that a non-event.
+- The permission prompt appears only inside the installed app and only from a
+  tap, which is why the card's states are what they are. "Don't Allow" is
+  final for that install; the fix is to remove and re-add the icon.
+- Testing needs HTTPS: the deployed site, or `ngrok` in front of `next dev`.
+  Nothing about push can be exercised over http://localhost from a phone.
+
+`npm run db:notify` proves the database half: who is and is not told, per
+event, plus that the outbox and the two service-role functions are unreachable
+through the API. What it cannot prove is Apple delivering — that is the test
+button on the profile card, pressed on a real iPhone.
 
 ## Picking this up again
 
@@ -775,6 +851,6 @@ being able to delete the Director's own tasks.
 
 Per the spec: Events module with QR check-in, Finance ledger, club-wide
 announcements, Documents, MediaPlans, HR/WhatsApp integration, certificates,
-push/email notifications, reporting dashboards, dark mode, file attachments on
+email notifications, reporting dashboards, dark mode, file attachments on
 requests, self-service password reset, public registration. The marketing site
 at vision2030club.com is not touched or merged.

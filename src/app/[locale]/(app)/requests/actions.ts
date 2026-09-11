@@ -11,6 +11,7 @@ import {
 } from '@/lib/requests';
 import { fromClubWallClock } from '@/lib/time';
 import { ensureMeetLink } from '@/lib/google/meetings';
+import { kickPushDelivery } from '@/lib/push';
 
 /**
  * Creating a request of ANY type goes through this one action. It reads the
@@ -118,6 +119,9 @@ export async function createRequestAction(
     .single();
 
   if (error) return fail(error.message);
+
+  // The insert trigger queued a push for whoever can act on it (0049).
+  kickPushDelivery();
 
   revalidatePath(`/${locale}/requests`);
   revalidatePath(`/${locale}/requests/${created.id}`);
@@ -239,6 +243,10 @@ export async function transitionRequestAction(
   void ensureMeetLink(requestId).catch((error) => {
     console.error('[meet] link creation failed for', requestId, error);
   });
+
+  // Same shape, same reason: the transition trigger queued the pushes, and
+  // the page should not wait on Apple to send them.
+  kickPushDelivery();
 
   revalidatePath(`/${locale}/requests`);
   revalidatePath(`/${locale}/requests/${requestId}`);

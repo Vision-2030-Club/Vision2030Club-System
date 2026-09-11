@@ -14,7 +14,8 @@
     "db:rooms": "node --env-file=.env.local scripts/room-tests.mjs",
     "db:meetings": "node --env-file=.env.local scripts/meeting-tests.mjs",
     "db:design": "node --env-file=.env.local scripts/design-tests.mjs",
-    "db:prove": "node --env-file=.env.local scripts/extensibility-proof.mjs"
+    "db:prove": "node --env-file=.env.local scripts/extensibility-proof.mjs",
+    "db:notify": "node --env-file=.env.local scripts/push-tests.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
@@ -25,7 +26,8 @@
     "papaparse": "^5.5.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -34,6 +36,7 @@
     "@types/pg": "^8.21.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "pg": "^8.23.0",

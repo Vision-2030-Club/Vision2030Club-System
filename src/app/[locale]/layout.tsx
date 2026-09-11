@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
@@ -9,6 +9,21 @@ import '../globals.css';
 export const metadata: Metadata = {
   title: 'Vision Club 2030',
   description: 'Vision 2030 Club management system',
+  manifest: '/manifest.webmanifest',
+  // What "Add to Home Screen" on iOS reads. Without `capable` the icon opens
+  // a Safari tab, and a Safari tab cannot receive push — see app/manifest.ts.
+  appleWebApp: {
+    capable: true,
+    title: 'Vision 2030',
+    statusBarStyle: 'default',
+  },
+  icons: {
+    apple: '/icons/apple-touch-icon.png',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#007a8f',
 };
 
 export function generateStaticParams() {

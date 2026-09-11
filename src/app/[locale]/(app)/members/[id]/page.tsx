@@ -7,6 +7,7 @@ import { ActionsMenu, type MenuPanel } from '@/components/ActionsMenu';
 import { Avatar } from '@/components/Avatar';
 import { ConfirmForm } from '@/components/ConfirmForm';
 import { Disclosure } from '@/components/Disclosure';
+import { PushSettings } from '@/components/PushSettings';
 import {
   Alert,
   Badge,
@@ -53,6 +54,7 @@ export default async function MemberPage({
   const t = await getTranslations('members');
   const tCommon = await getTranslations('common');
   const tKpi = await getTranslations('kpi');
+  const tPush = await getTranslations('push');
   const supabase = await createClient();
   const me = await getMyMember();
 
@@ -362,6 +364,15 @@ export default async function MemberPage({
             </div>
           ) : null}
         </Card>
+
+        {/* Push is per DEVICE, so it lives on the profile of the person
+            holding the phone and nowhere else. */}
+        {isSelf ? (
+          <Card>
+            <h2 className="mb-3 font-semibold">{tPush('title')}</h2>
+            <PushSettings />
+          </Card>
+        ) : null}
 
         {/* §9: a member's profile shows their Team-internal and Project-wide
             KPI to anyone holding View KPI who is looking at SOMEONE ELSE. */}

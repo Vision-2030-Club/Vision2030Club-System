@@ -534,5 +534,25 @@
     "pending": "Waiting for a link",
     "pendingHint": "Confirmed online meetings whose Meet link could not be created yet — usually because Google was unreachable at the time.",
     "retry": "Try these again"
+  },
+  "push": {
+    "title": "Notifications",
+    "intro": "Get told on your phone when a request needs you, a task is assigned to you, or a meeting is about to start.",
+    "checking": "Checking…",
+    "unsupported": "This browser cannot receive push notifications.",
+    "installTitle": "First, add the app to your Home Screen",
+    "installSteps": "In Safari, tap Share, then \"Add to Home Screen\". Open Vision 2030 from the new icon and come back to this page.",
+    "deniedText": "Notifications are blocked for this app. On iPhone: remove the icon from the Home Screen, add it again, and allow notifications when asked.",
+    "enable": "Turn on notifications",
+    "enabling": "Turning on…",
+    "enabledOn": "Notifications are on for this device.",
+    "disable": "Turn off on this device",
+    "sendTest": "Send a test",
+    "testSent": "Sent to {count, plural, =0 {no devices} =1 {one device} other {# devices}}.",
+    "failed": "Could not turn on notifications: {error}",
+    "unexpected": "Something went wrong.",
+    "nudge": "Turn on notifications to hear about requests, tasks and meetings.",
+    "nudgeLink": "Set up",
+    "nudgeDismiss": "Not now"
   }
 }

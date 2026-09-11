@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { kickPushDelivery } from '@/lib/push';
 import { createClient } from '@/lib/supabase/server';
 import { getMyMember } from '@/lib/auth/session';
 import { fail, ok, requiredText, text, type ActionResult } from '@/lib/actions';
@@ -73,6 +74,7 @@ export async function createTaskAction(
     if (assignError) return fail(assignError.message);
   }
 
+  kickPushDelivery();
   revalidate(locale, task.project_id);
   return ok();
 }
@@ -91,6 +93,7 @@ export async function claimTaskAction(
 
   if (error) return fail(error.message);
 
+  kickPushDelivery();
   revalidate(locale, text(formData, 'project_id'));
   return ok('claimed');
 }
@@ -117,6 +120,7 @@ export async function submitTaskAction(
 
   if (error) return fail(error.message);
 
+  kickPushDelivery();
   revalidate(locale, text(formData, 'project_id'));
   return ok('submitted');
 }
@@ -140,6 +144,7 @@ export async function confirmTaskAction(
 
   if (error) return fail(error.message);
 
+  kickPushDelivery();
   revalidate(locale, text(formData, 'project_id'));
   return ok('confirmed');
 }
@@ -169,6 +174,7 @@ export async function rejectTaskAction(
 
   if (error) return fail(error.message);
 
+  kickPushDelivery();
   revalidate(locale, text(formData, 'project_id'));
   return ok('rejected');
 }
@@ -191,6 +197,7 @@ export async function markNotDoneAction(
 
   if (error) return fail(error.message);
 
+  kickPushDelivery();
   revalidate(locale, text(formData, 'project_id'));
   return ok('markedNotDone');
 }
@@ -213,6 +220,7 @@ export async function deleteTaskAction(
 
   if (error) return fail(error.message);
 
+  kickPushDelivery();
   revalidate(locale, text(formData, 'project_id'));
   return ok('deleted');
 }

@@ -9,6 +9,8 @@ import { serviceRoleKey, supabaseEnv } from './env';
  *
  *   1. creating the auth account on a member's first login (§5)
  *   2. a Super Admin resetting someone's password (§5 — no self-service reset)
+ *   3. the two outbound integrations — Google Meet links (lib/google) and push
+ *      delivery (lib/push) — whose tables have no user-facing policies at all
  *
  * Never use it for ordinary data access: doing so would silently skip every
  * permission rule the database enforces. Use `lib/supabase/server.ts` instead.

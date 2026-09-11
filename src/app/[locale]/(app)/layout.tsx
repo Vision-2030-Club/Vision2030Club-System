@@ -8,6 +8,7 @@ import { signAvatar } from '@/lib/avatars';
 import { Avatar } from '@/components/Avatar';
 import { LocaleSwitch } from '@/components/LocaleSwitch';
 import { NavLinks, type NavItem } from '@/components/NavLinks';
+import { RegisterServiceWorker } from '@/components/RegisterServiceWorker';
 import { signOutAction } from '../login/actions';
 
 /**
@@ -129,6 +130,7 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-dvh">
+      <RegisterServiceWorker />
       {/*
         Every page here puts a logo, a profile link, a language switch and a
         dozen nav links before the content. Without this a keyboard user tabs
