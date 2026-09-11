@@ -586,6 +586,32 @@ async function run(p) {
   const claimByUser = await rpc(p.pres.token, 'push_claim_outbox', { p_limit: 10 });
   check('the outbox claim is not callable by a signed-in person', !claimByUser.ok);
 
+  // --- A PM can request a meeting (0051) ---------------------------------------
+  // Not a push rule, but this suite is the one with a PM who runs exactly one
+  // project, which is the branch 0037 broke.
+
+  const byPm = await rest(p.pm.token, 'requests', {
+    method: 'POST',
+    body: JSON.stringify({
+      request_type_id: p.typeId,
+      submitted_by: p.pm.id,
+      status: 'pending',
+      target_kind: 'team',
+      target_team_id: p.teams.MEDIA,
+      data: { title: 'PM sync', meeting_type: 'online', proposed_start: at(16) },
+    }),
+  });
+  check('a Project Manager can propose a meeting', allowed(byPm), JSON.stringify(byPm.body));
+  const { rows: pmParty } = await db.query(
+    `select proposer_party from meeting_details where request_id = $1`,
+    [byPm.body?.[0]?.id],
+  );
+  check(
+    'and is booked as their one project',
+    pmParty[0]?.proposer_party === `project:${p.projectId}`,
+    JSON.stringify(pmParty),
+  );
+
   // --- Nothing is queued for a person with no device --------------------------
 
   await db.query(`delete from push_subscriptions where member_id = $1`, [p.media2.id]);
