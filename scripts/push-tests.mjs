@@ -118,6 +118,15 @@ const PEOPLE = {
 };
 
 async function cleanUp() {
+  // Reminder rows for test entries, before the entries go — a real person's
+  // row would otherwise survive the cascade and be sent for a deleted entry.
+  await db.query(
+    `delete from notification_outbox
+      where dedupe_key like 'reminder:%'
+        and split_part(dedupe_key, ':', 2)::uuid in
+            (select id from calendar_entries where title like $1)`,
+    [`${ENTRY_TAG}%`],
+  );
   await db.query(
     `delete from calendar_entries
       where title like $1
@@ -491,25 +500,45 @@ async function run(p) {
 
   // --- Reminders ---------------------------------------------------------------
 
+  // A MEETING with an individual audience of the test people — never a club
+  // entry. This runs against the live database, and a club entry would remind
+  // every real person with a phone about "pushtest entry soon". It did, once.
+  const ours = [p.media1.id, p.media2.id, p.design.id, p.member.id, p.pres.id];
+  async function testEntry(title, startsAt, endsAt) {
+    const { rows } = await db.query(
+      `insert into calendar_entries
+         (kind, title, starts_at, ends_at, created_by, meeting_scope_kind)
+       values ('meeting', $1, $2, $3, $4, 'presidency') returning id`,
+      [title, startsAt, endsAt, p.pres.id],
+    );
+    for (const memberId of ours) {
+      await db.query(
+        `insert into calendar_entry_audiences (entry_id, audience_kind, member_id)
+         values ($1, 'individual', $2)`,
+        [rows[0].id, memberId],
+      );
+    }
+    return rows[0].id;
+  }
+
   const soon = new Date(Date.now() + 30 * 60 * 1000).toISOString();
   const later = new Date(Date.now() + 90 * 60 * 1000).toISOString();
-  const { rows: entry } = await db.query(
-    `insert into calendar_entries (kind, title, starts_at, ends_at, created_by)
-     values ('club', $1, $2, $3, $4) returning id`,
-    [`${ENTRY_TAG} soon`, soon, later, p.pres.id],
-  );
-  const entryId = entry[0].id;
+  const entryId = await testEntry(`${ENTRY_TAG} soon`, soon, later);
 
   const { rows: swept } = await db.query(`select public.push_enqueue_reminders(60) as n`);
   const { rows: reminded } = await db.query(
     `select member_id from notification_outbox where dedupe_key like $1`,
     [`reminder:${entryId}:%`],
   );
-  const ours = new Set([p.media1.id, p.media2.id, p.design.id, p.member.id, p.pres.id]);
   check(
-    'a club entry starting within the hour reminds every subscribed member',
-    swept[0].n >= 5 && [...ours].every((id) => reminded.some((r) => r.member_id === id)),
+    'an entry starting within the hour reminds everyone in its audience',
+    swept[0].n >= ours.length && ours.every((id) => reminded.some((r) => r.member_id === id)),
     `swept ${swept[0].n}, reminded ${reminded.length}`,
+  );
+  check(
+    'and nobody outside it',
+    reminded.every((r) => ours.includes(r.member_id)),
+    `${reminded.length} reminded`,
   );
 
   const { rows: sweptAgain } = await db.query(`select public.push_enqueue_reminders(60) as n`);
@@ -523,23 +552,22 @@ async function run(p) {
     `swept ${sweptAgain[0].n}, rows ${remindedAgain[0].n}`,
   );
 
-  const { rows: farEntry } = await db.query(
-    `insert into calendar_entries (kind, title, starts_at, ends_at, created_by)
-     values ('club', $1, now() + interval '3 hours', now() + interval '4 hours', $2) returning id`,
-    [`${ENTRY_TAG} far`, p.pres.id],
+  const farId = await testEntry(
+    `${ENTRY_TAG} far`,
+    new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+    new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
   );
   await db.query(`select public.push_enqueue_reminders(60)`);
   const { rows: farRows } = await db.query(
     `select count(*)::int as n from notification_outbox where dedupe_key like $1`,
-    [`reminder:${farEntry[0].id}:%`],
+    [`reminder:${farId}:%`],
   );
   check('an entry outside the window is not reminded yet', farRows[0].n === 0);
 
   // --- Leasing -----------------------------------------------------------------
 
   const { rows: claimedRows } = await db.query(
-    `select id, attempts, claimed_at from public.push_claim_outbox(1000)
-      where member_id = $1`,
+    `select id, attempts, claimed_at from public.push_claim_outbox(1000, $1)`,
     [p.member.id],
   );
   check(
