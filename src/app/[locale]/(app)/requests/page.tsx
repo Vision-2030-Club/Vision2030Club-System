@@ -1,10 +1,17 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getMyMember, hasPermission } from '@/lib/auth/session';
+import { getMyMember, hasPermission, scopeFor } from '@/lib/auth/session';
 import { Badge, Card, EmptyState, PageHeader } from '@/components/ui';
 import { formatDateTime, localized } from '@/lib/format';
-import { describeTarget, findStatus, loadStatusLookup } from '@/lib/requests';
+import {
+  canActOnRequest,
+  describeTarget,
+  findStatus,
+  isRequestApprover,
+  loadStatusLookup,
+  type ActorRule,
+} from '@/lib/requests';
 
 export default async function RequestsPage({
   params,
@@ -35,7 +42,7 @@ export default async function RequestsPage({
      * It has to stay one string literal: supabase-js reads it to type the row.
      */
     .select(
-      'id, status, created_at, request_type_id, submitted_by, target_kind, request_types(name_en, name_ar), members:submitted_by(name_en, name_ar), target_member:target_member_id(name_en, name_ar), teams(name_en, name_ar), projects(name_en, name_ar)',
+      'id, status, created_at, request_type_id, submitted_by, target_kind, target_team_id, target_project_id, target_member_id, request_types(name_en, name_ar), members:submitted_by(name_en, name_ar), target_member:target_member_id(name_en, name_ar), teams(name_en, name_ar), projects(name_en, name_ar)',
     )
     .order('created_at', { ascending: false })
     .limit(200);
@@ -45,18 +52,46 @@ export default async function RequestsPage({
   if (filter === 'mine') query = query.eq('submitted_by', me!.id);
 
   const { data: requests } = await query;
+  const typeIds = [...new Set((requests ?? []).map((r) => r.request_type_id as string))];
 
-  const statuses = await loadStatusLookup(
-    supabase,
-    (requests ?? []).map((r) => r.request_type_id as string),
-  );
+  const [statuses, approveScope, { data: managed }, { data: moves }] = await Promise.all([
+    loadStatusLookup(supabase, typeIds),
+    scopeFor('requests.approve'),
+    supabase.from('project_managers').select('project_id').eq('member_id', me!.id),
+    // Which actor may move from each (type, status): the "awaiting my
+    // decision" tab is only honest if it knows whose turn it is.
+    typeIds.length
+      ? supabase
+          .from('request_transitions')
+          .select('request_type_id, from_status, actor_rule')
+          .in('request_type_id', typeIds)
+      : Promise.resolve({ data: [] as { request_type_id: string; from_status: string; actor_rule: string }[] }),
+  ]);
+
+  const viewer = {
+    approveScope,
+    id: me!.id,
+    teamId: me!.team_id,
+    managedProjectIds: new Set((managed ?? []).map((p) => p.project_id as string)),
+  };
+
+  const rulesFrom = new Map<string, Set<ActorRule>>();
+  for (const move of moves ?? []) {
+    const key = `${move.request_type_id}:${move.from_status}`;
+    (rulesFrom.get(key) ?? rulesFrom.set(key, new Set()).get(key)!).add(move.actor_rule as ActorRule);
+  }
 
   const visible = (requests ?? []).filter((request) => {
     if (filter !== 'decide') return true;
-    // Anything not yet finished and not submitted by me is something I was
-    // shown because I can act on it.
     const status = findStatus(statuses, request.request_type_id as string, request.status as string);
-    return !status?.is_terminal && request.submitted_by !== me!.id;
+    if (status?.is_terminal) return false;
+    // Whose move it is, not merely "unfinished and not mine": a request I
+    // countered belongs to the other side until they answer.
+    return canActOnRequest(
+      rulesFrom.get(`${request.request_type_id}:${request.status}`),
+      isRequestApprover(request, viewer),
+      request.submitted_by === me!.id,
+    );
   });
 
   const canSubmit = await hasPermission('requests.submit');

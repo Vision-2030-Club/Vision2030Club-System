@@ -503,7 +503,10 @@ async function main() {
     method: 'POST',
     body: JSON.stringify({ task_id: splitTask, member_id: sara.id }),
   });
-  check('a task cannot take a second assignee', !secondAssignee.ok, `status ${secondAssignee.status}`);
+  // 0057: a task may be held by several people. The rest of this suite was
+  // written around one, so the second is removed again once proven.
+  check('a task can take a second assignee (0057)', secondAssignee.ok, `status ${secondAssignee.status}`);
+  await db.query(`delete from task_assignees where task_id = $1 and member_id = $2`, [splitTask, sara.id]);
 
   await rpc(rami.token, 'submit_task_for_review', { p_task: splitTask });
   const otherSplitPm = await rpc(quinn.token, 'confirm_task', {

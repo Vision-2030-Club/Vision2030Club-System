@@ -72,6 +72,13 @@ export type RequestField = {
    * and the server alike (`fieldApplies`).
    */
   show_when?: { key: string; value: string | string[] };
+  /**
+   * A `date` or `datetime` that may not be in the past — a meeting's
+   * proposed start. The form sets the input's `min` from the club's clock
+   * (src/lib/time.ts) and the action checks again on submit: a browser's
+   * clock is a hint, never the authority, since it is trivial to move.
+   */
+  no_past?: boolean;
 };
 
 /**
@@ -118,6 +125,63 @@ export function fieldApplies(
     ? field.show_when.value
     : [field.show_when.value];
   return wanted.includes(String(current));
+}
+
+/**
+ * Who may act as "the target" of a request — the mirror of
+ * `app.can_act_on_request` (0029), in one place so the request list and the
+ * request page cannot disagree.
+ *
+ * A request aimed at one PERSON is answered by that person, whatever their
+ * role's `requests.approve` scope says. The request page used to check scope
+ * first and never look at `target_member_id`, so anyone without `all` —
+ * every Director, every PM — saw no actions at all on a meeting aimed at
+ * them: their scope is `own_team` / `own_projects`, and the request has no
+ * team or project to match. That was the first round's "the receiver
+ * doesn't see available actions".
+ */
+export function isRequestApprover(
+  request: {
+    target_member_id?: string | null;
+    target_team_id?: string | null;
+    target_project_id?: string | null;
+  },
+  viewer: {
+    approveScope: string;
+    id: string;
+    teamId: string | null;
+    managedProjectIds: ReadonlySet<string>;
+  },
+): boolean {
+  if (request.target_member_id) return request.target_member_id === viewer.id;
+  if (viewer.approveScope === 'all') return true;
+  if (viewer.approveScope === 'own_team') {
+    return Boolean(request.target_team_id) && request.target_team_id === viewer.teamId;
+  }
+  if (viewer.approveScope === 'own_projects') {
+    return Boolean(request.target_project_id) && viewer.managedProjectIds.has(request.target_project_id!);
+  }
+  return false;
+}
+
+export type ActorRule = 'requester' | 'target_approver' | 'permission' | 'either';
+
+/**
+ * Whether the viewer may make ANY move from a request's current status —
+ * "is it my turn", not "is it unfinished and not mine". The "awaiting my
+ * decision" tab used to be the latter, so a request stayed in it after its
+ * approver had countered and the next move belonged to the requester.
+ */
+export function canActOnRequest(
+  rules: ReadonlySet<ActorRule> | undefined,
+  isApprover: boolean,
+  isRequester: boolean,
+): boolean {
+  if (!rules) return false;
+  if (rules.has('requester') && isRequester) return true;
+  if (rules.has('target_approver') && isApprover) return true;
+  if (rules.has('either') && (isApprover || isRequester)) return true;
+  return false;
 }
 
 /**

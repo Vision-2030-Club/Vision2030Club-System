@@ -69,6 +69,7 @@ export async function createBookingAction(
   });
 
   revalidatePath(`/${locale}/rooms`);
+  revalidatePath(`/${locale}/dashboard`);
   return ok('created');
 }
 
@@ -98,5 +99,6 @@ export async function cancelBookingAction(
   }
 
   revalidatePath(`/${locale}/rooms`);
+  revalidatePath(`/${locale}/dashboard`);
   return ok();
 }

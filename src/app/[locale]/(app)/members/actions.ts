@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { hasPermission } from '@/lib/auth/session';
 import { fail, fromPostgrest, ok, requiredText, text, type ActionResult } from '@/lib/actions';
 import { AVATAR_BUCKET } from '@/lib/avatars';
+import { toDateInput } from '@/lib/time';
 
 /** Mirrors the bucket's own `allowed_mime_types` and size cap (migration 0024). */
 const AVATAR_TYPES = {
@@ -163,6 +164,15 @@ export async function addExperienceAction(
 ): Promise<ActionResult> {
   const id = requiredText(formData, 'id');
   const locale = requiredText(formData, 'locale');
+  const startedOn = requiredText(formData, 'started_on');
+  const endedOn = text(formData, 'ended_on');
+
+  // The database refuses this too (member_experience_not_future, 0057), but
+  // its answer is a constraint name; this one is a sentence.
+  const today = toDateInput(new Date());
+  if (startedOn > today || (endedOn && endedOn > today)) {
+    return fail('Experience cannot start or end in the future.');
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.from('member_experience').insert({
@@ -170,8 +180,8 @@ export async function addExperienceAction(
     title: requiredText(formData, 'title'),
     organization: requiredText(formData, 'organization'),
     description: text(formData, 'description'),
-    started_on: requiredText(formData, 'started_on'),
-    ended_on: text(formData, 'ended_on'),
+    started_on: startedOn,
+    ended_on: endedOn,
   });
 
   if (error) return fromPostgrest(error);

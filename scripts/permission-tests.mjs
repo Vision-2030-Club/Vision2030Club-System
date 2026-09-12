@@ -349,22 +349,22 @@ async function run(people) {
 
   const startAt = new Date(Date.now() + 86_400_000).toISOString();
 
-  const created = await rest(alice.token, 'requests', {
-    method: 'POST',
-    body: JSON.stringify({
+  const meetingBody = (who) =>
+    JSON.stringify({
       request_type_id: meetingType,
-      submitted_by: alice.id,
+      submitted_by: who.id,
       target_kind: 'team',
       target_team_id: designTeam,
       status: 'pending',
-      data: {
-        title: `${PREFIX}meeting`,
-        proposed_start: startAt,
-        proposed_end: new Date(Date.now() + 90_000_000).toISOString(),
-      },
-    }),
-  });
-  check('a Member can submit a Meeting Request', allowed(created));
+      data: { title: `${PREFIX}meeting`, proposed_start: startAt, duration_minutes: '60' },
+    });
+
+  // 0057: meetings are asked for by Club Management, not Members.
+  const byMember = await rest(alice.token, 'requests', { method: 'POST', body: meetingBody(alice) });
+  check('a Member cannot submit a Meeting Request (0057)', !byMember.ok, JSON.stringify(byMember.body));
+
+  const created = await rest(huda.token, 'requests', { method: 'POST', body: meetingBody(huda) });
+  check('a Director can submit a Meeting Request', allowed(created), JSON.stringify(created.body));
 
   const requestId = Array.isArray(created.body) ? created.body[0]?.id : null;
 
@@ -392,9 +392,9 @@ async function run(people) {
     // Five counters, alternating sides. No calendar entry may appear yet.
     const counterSteps = [
       [dana, 'countered_by_target'],
-      [alice, 'countered_by_requester'],
+      [huda, 'countered_by_requester'],
       [dana, 'countered_by_target'],
-      [alice, 'countered_by_requester'],
+      [huda, 'countered_by_requester'],
       [dana, 'countered_by_target'],
     ];
 
@@ -424,7 +424,7 @@ async function run(people) {
     check('no calendar entry existed during the counter loop', !calendarLeaked);
 
     // Approval is the only thing that reaches the calendar.
-    const approve = await rpc(alice.token, 'transition_request', {
+    const approve = await rpc(huda.token, 'transition_request', {
       p_request: requestId,
       p_to_status: 'approved',
       p_note: 'agreed',

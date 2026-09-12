@@ -1,13 +1,13 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getMyMember, hasPermission } from '@/lib/auth/session';
+import { getMyMember, scopeFor } from '@/lib/auth/session';
 import { ActionForm } from '@/components/ActionForm';
 import { Disclosure } from '@/components/Disclosure';
 import { TaskCard } from '@/components/TaskCard';
 import { EmptyState, Input, Label, PageHeader, Select, Textarea, cx } from '@/components/ui';
 import { localized } from '@/lib/format';
-import type { TaskKpi } from '@/lib/kpi';
+import { groupTaskRows, type TaskKpi } from '@/lib/kpi';
 import { createTaskAction } from './actions';
 
 const FILTERS = ['all', 'mine', 'open', 'review'] as const;
@@ -55,10 +55,48 @@ export default async function TasksPage({
         .order('name_en'),
     ]);
 
-  const tasks = (rows ?? []) as TaskKpi[];
+  /*
+   * Who this person may create a task FOR — not merely whether tasks.manage
+   * exists for their role. A Director's scope is own_team: the database
+   * refuses a project task from them whichever project the form offered,
+   * and refuses another team's task the same way. The form used to list
+   * every project and every team (and default to "Project"), which is how
+   * "assign a task to someone" became a bare RLS error in the first round.
+   */
+  const taskScope = await scopeFor('tasks.manage');
 
-  const visible = tasks.filter((task) => {
-    if (filter === 'mine') return task.assignee_id === me?.id;
+  const creatableTeams =
+    taskScope === 'all'
+      ? (teams ?? [])
+      : taskScope === 'own_team'
+        ? (teams ?? []).filter((team) => team.id === me!.team_id)
+        : [];
+
+  let creatableProjects = taskScope === 'all' ? (projects ?? []) : [];
+  if (taskScope === 'own_projects') {
+    const { data: managed } = await supabase
+      .from('project_managers')
+      .select('project_id')
+      .eq('member_id', me!.id);
+    const managedIds = new Set((managed ?? []).map((p) => p.project_id as string));
+    creatableProjects = (projects ?? []).filter((p) => managedIds.has(p.id as string));
+  }
+
+  const canCreateTeamTask = creatableTeams.length > 0;
+  const canCreateProjectTask = creatableProjects.length > 0;
+  const canCreate = canCreateTeamTask || canCreateProjectTask;
+
+  // Scoped the way the database will accept: the view answers for the caller
+  // (0040, widened for Project Managers in 0057 F).
+  const { data: assignable } = canCreate
+    ? await supabase.from('assignable_members').select('id, name_en, name_ar').order('name_en')
+    : { data: [] as { id: string; name_en: string; name_ar: string }[] };
+
+  // task_kpi is one row per (task, assignee); the list wants each task once.
+  const tasks = groupTaskRows((rows ?? []) as TaskKpi[]);
+
+  const visible = tasks.filter(({ task, assigneeIds }) => {
+    if (filter === 'mine') return me !== null && assigneeIds.includes(me.id);
     if (filter === 'open') return task.state === 'in_progress' || task.state === 'not_started';
     // "To review" is everything actually waiting on this viewer.
     if (filter === 'review') return task.state === 'pending_confirmation' && task.can_confirm;
@@ -84,8 +122,6 @@ export default async function TasksPage({
     }
     return `${t('team')}: ${teamName.get(task.team_id ?? '') ?? ''}`;
   }
-
-  const canCreate = await hasPermission('tasks.manage');
 
   return (
     <>
@@ -131,86 +167,126 @@ export default async function TasksPage({
                 <Textarea id="description" name="description" rows={3} />
               </div>
 
-              <fieldset>
-                <legend className="mb-1 text-sm font-medium">{t('belongsTo')}</legend>
-                <div className="flex gap-4 text-sm">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="belongs_to"
-                      value="project"
-                      defaultChecked
-                      className="accent-brand-600"
-                    />
-                    {t('project')}
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="belongs_to"
-                      value="team"
-                      className="accent-brand-600"
-                    />
-                    {t('team')}
-                  </label>
-                </div>
-              </fieldset>
+              {/* A choice only where there is one. A Director can only ever
+                  make a team task, a Project Manager only a project one. */}
+              {canCreateTeamTask && canCreateProjectTask ? (
+                <fieldset>
+                  <legend className="mb-1 text-sm font-medium">{t('belongsTo')}</legend>
+                  <div className="flex gap-4 text-sm">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="belongs_to"
+                        value="project"
+                        defaultChecked
+                        className="accent-brand-600"
+                      />
+                      {t('project')}
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="belongs_to"
+                        value="team"
+                        className="accent-brand-600"
+                      />
+                      {t('team')}
+                    </label>
+                  </div>
+                </fieldset>
+              ) : (
+                <input
+                  type="hidden"
+                  name="belongs_to"
+                  value={canCreateProjectTask ? 'project' : 'team'}
+                />
+              )}
 
-              <div>
-                <Label htmlFor="project_id">{t('project')}</Label>
-                <Select id="project_id" name="project_id">
-                  <option value="">—</option>
-                  {(projects ?? []).map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {localized(project, 'name', locale)}
-                    </option>
-                  ))}
-                </Select>
-              </div>
+              {canCreateProjectTask ? (
+                <>
+                  <div>
+                    <Label htmlFor="project_id">{t('project')}</Label>
+                    <Select id="project_id" name="project_id">
+                      <option value="">—</option>
+                      {creatableProjects.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {localized(project, 'name', locale)}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
 
-              {/* §3: a project task sits in one split, or stays project-wide. */}
-              <div>
-                <Label htmlFor="split_id">{t('split')}</Label>
-                <Select id="split_id" name="split_id" defaultValue="">
-                  <option value="">{t('projectWide')}</option>
-                  {(splits ?? []).map((split) => (
-                    <option key={split.id} value={split.id}>
-                      {`${projectName.get(split.project_id as string) ?? ''} · ${split.name}`}
-                    </option>
-                  ))}
-                </Select>
-              </div>
+                  {/* §3: a project task sits in one split, or stays project-wide. */}
+                  <div>
+                    <Label htmlFor="split_id">{t('split')}</Label>
+                    <Select id="split_id" name="split_id" defaultValue="">
+                      <option value="">{t('projectWide')}</option>
+                      {(splits ?? [])
+                        .filter((split) => creatableProjects.some((p) => p.id === split.project_id))
+                        .map((split) => (
+                          <option key={split.id} value={split.id}>
+                            {`${projectName.get(split.project_id as string) ?? ''} · ${split.name}`}
+                          </option>
+                        ))}
+                    </Select>
+                  </div>
+                </>
+              ) : null}
 
-              <div>
-                <Label htmlFor="team_id">{t('team')}</Label>
-                <Select id="team_id" name="team_id">
-                  <option value="">—</option>
-                  {(teams ?? []).map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {localized(team, 'name', locale)}
-                    </option>
-                  ))}
-                </Select>
-              </div>
+              {canCreateTeamTask ? (
+                creatableTeams.length === 1 ? (
+                  // One team — fixed text, the way the request form shows a
+                  // type's owning team, rather than a dropdown of one.
+                  <div>
+                    <Label>{t('team')}</Label>
+                    <input type="hidden" name="team_id" value={creatableTeams[0].id} />
+                    <div className="rounded-lg bg-surface-muted px-3 py-2 text-sm">
+                      {localized(creatableTeams[0], 'name', locale)}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <Label htmlFor="team_id">{t('team')}</Label>
+                    <Select id="team_id" name="team_id">
+                      <option value="">—</option>
+                      {creatableTeams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {localized(team, 'name', locale)}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                )
+              ) : null}
 
               <div>
                 <Label htmlFor="due_date">{t('dueDate')}</Label>
                 <Input id="due_date" name="due_date" type="date" />
               </div>
 
-              {/* One assignee per task, so §5's per-person average is
-                  unambiguous. Leaving it empty posts the task for claiming. */}
-              <div>
-                <Label htmlFor="assignee_id">{t('assignee')}</Label>
-                <Select id="assignee_id" name="assignee_id" defaultValue="">
-                  <option value="">{t('leaveUnassigned')}</option>
-                  {(members ?? []).map((person) => (
-                    <option key={person.id} value={person.id}>
-                      {localized(person, 'name', locale)}
-                    </option>
-                  ))}
-                </Select>
-              </div>
+              {/* Several people may hold the same task (0057 E). Nobody
+                  ticked posts it for claiming. */}
+              <fieldset>
+                <legend className="mb-1 text-sm font-medium">{t('assignees')}</legend>
+                <p className="mb-2 text-xs text-ink-muted">{t('assigneesHint')}</p>
+                <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-line p-2 text-sm">
+                  {(assignable ?? []).length ? (
+                    (assignable ?? []).map((person) => (
+                      <label key={person.id} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          name="assignee_ids"
+                          value={person.id}
+                          className="accent-brand-600"
+                        />
+                        {localized(person, 'name', locale)}
+                      </label>
+                    ))
+                  ) : (
+                    <p className="text-ink-muted">{t('leaveUnassigned')}</p>
+                  )}
+                </div>
+              </fieldset>
             </ActionForm>
           </Disclosure>
         </div>
@@ -218,14 +294,14 @@ export default async function TasksPage({
 
       <div className="space-y-3">
         {visible.length ? (
-          visible.map((task) => (
+          visible.map(({ task, assigneeIds }) => (
             <TaskCard
               key={task.id}
               task={task}
               locale={locale}
-              meId={me?.id ?? null}
+              isMine={me !== null && assigneeIds.includes(me.id)}
               homeLabel={homeLabel(task)}
-              assigneeName={task.assignee_id ? (memberName.get(task.assignee_id) ?? null) : null}
+              assigneeNames={assigneeIds.map((id) => memberName.get(id) ?? '').filter(Boolean)}
             />
           ))
         ) : (

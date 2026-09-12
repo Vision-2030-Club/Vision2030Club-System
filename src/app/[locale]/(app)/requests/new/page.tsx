@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { createClient } from '@/lib/supabase/server';
+import { getMyPermissions } from '@/lib/auth/session';
 import { EmptyState, PageHeader } from '@/components/ui';
 import { loadFieldOptions } from '@/lib/requests';
 import { NewRequestForm, type RequestTypeOption } from './NewRequestForm';
@@ -21,7 +22,7 @@ export default async function NewRequestPage({
     await Promise.all([
     supabase
       .from('request_types')
-      .select('id, key, name_en, name_ar, description_en, description_ar, owning_team_id, field_schema')
+      .select('id, key, name_en, name_ar, description_en, description_ar, owning_team_id, submit_permission, field_schema')
       .eq('is_active', true)
       .order('name_en'),
     supabase.from('teams').select('id, name_en, name_ar').eq('is_active', true).order('name_en'),
@@ -33,20 +34,28 @@ export default async function NewRequestPage({
       .order('name_en'),
   ]);
 
+  // Only the types this person may actually submit. The database refuses the
+  // others anyway (requests_insert, 0034); offering them was how a Member
+  // met a permission error instead of simply not seeing "Meeting Request".
+  const permissions = await getMyPermissions();
+  const allowed = ((types ?? []) as unknown as (RequestTypeOption & {
+    submit_permission: string | null;
+  })[]).filter(
+    (type) =>
+      !type.submit_permission || (permissions.get(type.submit_permission) ?? 'none') !== 'none',
+  );
+
   // Selects that read their choices from a table — today the asset catalogue.
   // Only the sources the visible types actually name are fetched.
-  const fieldOptions = await loadFieldOptions(
-    supabase,
-    (types ?? []) as unknown as RequestTypeOption[],
-  );
+  const fieldOptions = await loadFieldOptions(supabase, allowed);
 
   return (
     <>
       <PageHeader title={t('newRequest')} description={t('subtitle')} />
 
-      {types?.length ? (
+      {allowed.length ? (
         <NewRequestForm
-          types={types as unknown as RequestTypeOption[]}
+          types={allowed}
           teams={(teams ?? []) as { id: string; name_en: string; name_ar: string }[]}
           projects={(projects ?? []) as { id: string; name_en: string; name_ar: string }[]}
           members={(members ?? []) as { id: string; name_en: string; name_ar: string }[]}

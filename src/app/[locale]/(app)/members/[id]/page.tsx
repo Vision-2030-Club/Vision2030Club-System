@@ -21,6 +21,7 @@ import {
   Textarea,
 } from '@/components/ui';
 import { formatDate, localized } from '@/lib/format';
+import { toDateInput } from '@/lib/time';
 import { signAvatar } from '@/lib/avatars';
 import { PHONE_PATTERN, PHONE_PLACEHOLDER } from '@/lib/phone';
 import { HEALTH_TONES, formatScore, healthKey, type MemberKpi } from '@/lib/kpi';
@@ -458,11 +459,17 @@ export default async function MemberPage({
                     </div>
                     <div>
                       <Label htmlFor="exp_start">{t('startedOn')}</Label>
-                      <Input id="exp_start" name="started_on" type="date" required />
+                      <Input
+                        id="exp_start"
+                        name="started_on"
+                        type="date"
+                        max={toDateInput(new Date())}
+                        required
+                      />
                     </div>
                     <div>
                       <Label htmlFor="exp_end">{t('endedOn')}</Label>
-                      <Input id="exp_end" name="ended_on" type="date" />
+                      <Input id="exp_end" name="ended_on" type="date" max={toDateInput(new Date())} />
                       <p className="mt-1 text-xs text-ink-muted">{t('endedOnHint')}</p>
                     </div>
                   </div>

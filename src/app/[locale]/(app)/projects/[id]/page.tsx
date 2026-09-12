@@ -10,6 +10,7 @@ import { StatTile } from '@/components/charts/BarList';
 import { Badge, Card, EmptyState, Input, Label, PageHeader, Select } from '@/components/ui';
 import { formatDate, localized } from '@/lib/format';
 import {
+  groupTaskRows,
   HEALTH_TONES,
   formatScore,
   healthKey,
@@ -103,7 +104,8 @@ export default async function ProjectPage({
     (projectScope === 'own_projects' && managerIds.has(me?.id ?? '')) ||
     (projectScope === 'own_team' && project.owning_team_id === me?.team_id);
 
-  const tasks = (taskRows ?? []) as TaskKpi[];
+  // task_kpi is one row per (task, assignee); the list wants each task once.
+  const tasks = groupTaskRows((taskRows ?? []) as TaskKpi[]);
   const kpi = kpiRow as ProjectKpi | null;
 
   const memberName = new Map(
@@ -491,16 +493,14 @@ export default async function ProjectPage({
         <div className="space-y-3 lg:col-span-3">
           <h2 className="font-semibold">{t('tasks')}</h2>
           {tasks.length ? (
-            tasks.map((task) => (
+            tasks.map(({ task, assigneeIds }) => (
               <TaskCard
                 key={task.id}
                 task={task}
                 locale={locale}
-                meId={me?.id ?? null}
+                isMine={Boolean(me && assigneeIds.includes(me.id))}
                 homeLabel={homeLabel(task)}
-                assigneeName={
-                  task.assignee_id ? (memberName.get(task.assignee_id) ?? null) : null
-                }
+                assigneeNames={assigneeIds.map((id) => memberName.get(id) ?? '').filter(Boolean)}
               />
             ))
           ) : (

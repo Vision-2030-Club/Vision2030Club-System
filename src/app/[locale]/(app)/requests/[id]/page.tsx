@@ -7,6 +7,7 @@ import { formatDateTime, localized } from '@/lib/format';
 import {
   REQUEST_FILE_BUCKET,
   findStatus,
+  isRequestApprover,
   loadFieldOptions,
   loadStatusLookup,
   optionLabel,
@@ -80,10 +81,21 @@ export default async function RequestPage({
     managesTargetProject = Boolean(data);
   }
 
-  const isApprover =
-    approveScope === 'all' ||
-    (approveScope === 'own_team' && request.target_team_id === me!.team_id) ||
-    (approveScope === 'own_projects' && managesTargetProject);
+  const isApprover = isRequestApprover(
+    {
+      target_member_id: request.target_member_id as string | null,
+      target_team_id: request.target_team_id as string | null,
+      target_project_id: request.target_project_id as string | null,
+    },
+    {
+      approveScope,
+      id: me!.id,
+      teamId: me!.team_id,
+      managedProjectIds: new Set(
+        managesTargetProject ? [request.target_project_id as string] : [],
+      ),
+    },
+  );
   const isRequester = request.submitted_by === me!.id;
 
   const available: AvailableTransition[] = (transitions ?? [])

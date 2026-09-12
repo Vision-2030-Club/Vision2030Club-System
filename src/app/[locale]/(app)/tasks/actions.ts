@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { kickPushDelivery } from '@/lib/push';
 import { createClient } from '@/lib/supabase/server';
 import { getMyMember } from '@/lib/auth/session';
-import { fail, ok, requiredText, text, type ActionResult } from '@/lib/actions';
+import { all, fail, ok, requiredText, text, type ActionResult } from '@/lib/actions';
 
 /**
  * Task actions.
@@ -36,6 +36,10 @@ function revalidate(locale: string, projectId?: string | null) {
  * A task belongs to a project OR to a team, never both. Project tasks may
  * additionally sit in one split (§3), and may be left unassigned so somebody
  * can claim them.
+ *
+ * A task can be handed to more than one person (0057 E): one
+ * `task_assignees` row each. The table always allowed it; the form used to
+ * offer one.
  */
 export async function createTaskAction(
   _previous: ActionResult,
@@ -44,7 +48,7 @@ export async function createTaskAction(
   const locale = requiredText(formData, 'locale');
   const belongsTo = requiredText(formData, 'belongs_to');
   const isProject = belongsTo === 'project';
-  const assignee = text(formData, 'assignee_id');
+  const assignees = all(formData, 'assignee_ids');
   const me = await getMyMember();
   const supabase = await createClient();
 
@@ -60,17 +64,17 @@ export async function createTaskAction(
       created_by: me?.id ?? null,
       // §3: the Assigned Date is when someone actually took the work on. A task
       // posted for claiming has none until it is claimed.
-      assigned_at: assignee ? new Date().toISOString() : null,
+      assigned_at: assignees.length ? new Date().toISOString() : null,
     })
     .select('id, project_id')
     .single();
 
   if (error) return fail(error.message);
 
-  if (assignee) {
+  if (assignees.length) {
     const { error: assignError } = await supabase
       .from('task_assignees')
-      .insert({ task_id: task.id, member_id: assignee });
+      .insert(assignees.map((member_id) => ({ task_id: task.id, member_id })));
     if (assignError) return fail(assignError.message);
   }
 

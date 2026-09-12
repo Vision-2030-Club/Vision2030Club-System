@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Input, Label, Select, Textarea } from '@/components/ui';
 import { fieldApplies, type FieldOptions, type RequestField } from '@/lib/requests';
+import { toDateInput, toDateTimeInput } from '@/lib/time';
 
 /**
  * Renders a request type's custom form straight from its `field_schema`.
@@ -16,6 +17,9 @@ import { fieldApplies, type FieldOptions, type RequestField } from '@/lib/reques
  * the right value, and is not in the DOM otherwise — so it is neither
  * submitted nor `required` while hidden. The server applies the same rule
  * (`fieldApplies`), so a required-but-hidden field is never demanded.
+ *
+ * A field with `no_past` gets a `min` on the club's clock. That is the
+ * browser's hint; the action is the check.
  */
 export function RequestFields({
   fields,
@@ -84,6 +88,13 @@ export function RequestFields({
                         : 'text'
                 }
                 step={field.type === 'number' ? 'any' : undefined}
+                min={
+                  field.no_past && field.type === 'date'
+                    ? toDateInput(new Date())
+                    : field.no_past && field.type === 'datetime'
+                      ? toDateTimeInput(new Date())
+                      : undefined
+                }
               />
             )}
           </div>

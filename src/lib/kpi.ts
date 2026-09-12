@@ -69,6 +69,35 @@ export type TaskKpi = {
   requires_link: boolean;
 };
 
+/**
+ * A task once, with everyone on it.
+ *
+ * `task_kpi` is one row per (task, assignee) — that is how each person is
+ * scored (0057 E). A LIST of tasks wants each once: this folds the rows,
+ * keeping the first row's figures (they are identical across assignees,
+ * apart from the viewer-specific score masking, which is the same for
+ * every row too) and collecting the assignee ids. `isMine` is any of them.
+ */
+export type TaskWithAssignees = {
+  task: TaskKpi;
+  assigneeIds: string[];
+};
+
+export function groupTaskRows(rows: TaskKpi[]): TaskWithAssignees[] {
+  const byId = new Map<string, TaskWithAssignees>();
+  for (const row of rows) {
+    const entry = byId.get(row.id);
+    if (entry) {
+      if (row.assignee_id && !entry.assigneeIds.includes(row.assignee_id)) {
+        entry.assigneeIds.push(row.assignee_id);
+      }
+    } else {
+      byId.set(row.id, { task: row, assigneeIds: row.assignee_id ? [row.assignee_id] : [] });
+    }
+  }
+  return [...byId.values()];
+}
+
 export type MemberKpi = {
   member_id: string;
   total_tasks: number;

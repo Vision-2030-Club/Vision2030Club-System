@@ -34,21 +34,25 @@ import {
 export async function TaskCard({
   task,
   locale,
-  meId,
+  isMine,
   homeLabel,
-  assigneeName,
+  assigneeNames,
 }: {
   task: TaskKpi;
   locale: string;
-  meId: string | null;
+  /** The viewer is one of the people holding it (0057 E: there can be several). */
+  isMine: boolean;
   /** "Project · Split" or "Team", already localised by the caller. */
   homeLabel: string;
-  assigneeName: string | null;
+  /** Everyone on it, localised — empty when it is posted for claiming. */
+  assigneeNames: string[];
 }) {
   const t = await getTranslations('tasks');
   const tCommon = await getTranslations('common');
 
-  const isMine = meId !== null && task.assignee_id === meId;
+  const assigneeName = assigneeNames.length
+    ? assigneeNames.join(locale === 'ar' ? '، ' : ', ')
+    : null;
   const isOpen = task.state === 'in_progress' || task.state === 'not_started';
 
   const canSubmit = isMine && task.state === 'in_progress';

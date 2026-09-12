@@ -343,6 +343,44 @@ event, plus that the outbox and the two service-role functions are unreachable
 through the API. What it cannot prove is Apple delivering — that is the test
 button on the profile card, pressed on a real iPhone.
 
+## The first testing round
+
+The IT team used the test club for an afternoon and sent fifteen comments.
+Every one was read against what the database showed had happened, and split
+into bugs with one right answer and questions with several; the questions
+were put to the club. Migration `0057` and `npm run db:round1` carry the
+result. What the club decided:
+
+- **A Director sees their own team's tasks**, plus project tasks where they
+  are on the project. `tasks.view` for team_director had been seeded as
+  `all` (0004) — a Finance Director had Design's tasks on their board.
+- **Directors do not run projects.** `projects.manage` is `none` for them.
+  Projects are created by the Presidency and run by their Project Managers;
+  a Director who needs to be in one is added as a member or manager.
+- **Members do not ask for meetings.** `meeting_requests.submit` is held by
+  Club Management (Presidency, Directors, PMs). A Member can still be the
+  person a meeting is aimed at.
+- **A meeting is a start and a length** — 30 minutes or 1 hour, the same
+  choice the Rooms page already offered — never an end typed by hand. The
+  start cannot be in the past (`no_past` on the field; RequestFields sets
+  the input's `min`, requests/actions.ts is the check, on the club's clock).
+- **A task can be held by several people**, each scored in their own KPI; a
+  project counts the task once. The unique index that said otherwise is gone;
+  the submit and confirm checks now ask "is the caller among the assignees".
+- **Experience cannot be in the future.**
+
+Bugs fixed on the way: the request page never checked `target_member_id`
+when deciding whose buttons to draw, so a meeting aimed at a person showed
+its receiver nothing (`isRequestApprover` in src/lib/requests.ts is now the
+one mirror of `app.can_act_on_request`); "awaiting my decision" never asked
+whose turn it was (`canActOnRequest`); the New Task form offered every
+project and team to everyone, so a Director's attempt was a bare RLS error
+(it now offers only what the caller may actually create for, and nothing at
+all to a Member); `assignable_members` returned nobody for a Project
+Manager; and the dashboard was never revalidated when the calendar, a
+booking or a request changed, which read as the "coming up" box changing
+for no reason.
+
 ## Picking this up again
 
 Nothing is blocked. To get running from a fresh clone:

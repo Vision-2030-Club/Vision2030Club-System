@@ -126,6 +126,7 @@ export async function createCalendarEntryAction(
   }
 
   revalidatePath(`/${locale}/calendar`);
+  revalidatePath(`/${locale}/dashboard`);
   return ok('created');
 }
 
@@ -224,6 +225,7 @@ export async function updateCalendarEntryAction(
   }
 
   revalidatePath(`/${locale}/calendar`);
+  revalidatePath(`/${locale}/dashboard`);
   revalidatePath(`/${locale}/calendar/${entryId}`);
   return ok();
 }
@@ -256,6 +258,7 @@ export async function deleteCalendarEntryAction(
   }
 
   revalidatePath(`/${locale}/calendar`);
+  revalidatePath(`/${locale}/dashboard`);
   redirect({ href: '/calendar', locale });
 
   // Unreachable: `redirect` throws NEXT_REDIRECT. next-intl's wrapper is not

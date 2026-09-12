@@ -722,8 +722,9 @@ async function run(p) {
   );
   check(
     'every other request type is untouched by all this',
+    // legal_review (0054) is a verdict, not work — it joins the no-task list.
     (others[0].keys ?? []).sort().join(',') ===
-      ['asset_request', 'it_ticket', 'meeting_request', 'money_request'].join(','),
+      ['asset_request', 'it_ticket', 'legal_review', 'meeting_request', 'money_request'].join(','),
     JSON.stringify(others[0].keys),
   );
 

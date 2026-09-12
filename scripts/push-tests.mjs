@@ -246,18 +246,18 @@ async function run(p) {
 
   // --- A request is submitted to a team --------------------------------------
 
-  const proposed = await rest(p.member.token, 'requests', {
+  const proposed = await rest(p.pm.token, 'requests', {
     method: 'POST',
     body: JSON.stringify({
       request_type_id: p.typeId,
-      submitted_by: p.member.id,
+      submitted_by: p.pm.id,
       status: 'pending',
       target_kind: 'team',
       target_team_id: p.teams.MEDIA,
-      data: { title: 'Push sync', meeting_type: 'online', proposed_start: at(13) },
+      data: { title: 'Push sync', meeting_type: 'online', proposed_start: at(13), duration_minutes: '60' },
     }),
   });
-  check('a member can propose a meeting to a team', allowed(proposed), JSON.stringify(proposed.body));
+  check('a PM can propose a meeting to a team', allowed(proposed), JSON.stringify(proposed.body));
   const requestId = proposed.body?.[0]?.id;
 
   const media1 = await outboxFor(p.media1.id);
@@ -284,7 +284,7 @@ async function run(p) {
   );
   check(
     'the requester is not told about their own request',
-    (await outboxFor(p.member.id)).length === 0,
+    (await outboxFor(p.pm.id)).length === 0,
   );
   check(
     'the President, whose scope is "all", is not told about a team-level request',
@@ -304,7 +304,7 @@ async function run(p) {
   });
   check('a target Director can start review', allowed(reviewed), JSON.stringify(reviewed.body));
 
-  const memberAfterReview = await outboxFor(p.member.id);
+  const memberAfterReview = await outboxFor(p.pm.id);
   check(
     'the requester is told the request moved',
     kinds(memberAfterReview).includes('request_moved'),
@@ -334,7 +334,7 @@ async function run(p) {
   });
   check('a target Director can approve', allowed(approved), JSON.stringify(approved.body));
 
-  const memberAfterApprove = await outboxFor(p.member.id);
+  const memberAfterApprove = await outboxFor(p.pm.id);
   check(
     'the requester is told the meeting is confirmed, not merely "moved"',
     memberAfterApprove[0]?.kind === 'meeting_confirmed',
@@ -651,11 +651,11 @@ async function run(p) {
 
   await db.query(`delete from push_subscriptions where member_id = $1`, [p.media2.id]);
   const countBefore = (await outboxFor(p.media2.id)).length;
-  await rest(p.member.token, 'requests', {
+  await rest(p.pm.token, 'requests', {
     method: 'POST',
     body: JSON.stringify({
       request_type_id: p.typeId,
-      submitted_by: p.member.id,
+      submitted_by: p.pm.id,
       status: 'pending',
       target_kind: 'team',
       target_team_id: p.teams.MEDIA,

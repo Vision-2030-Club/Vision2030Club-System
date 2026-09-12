@@ -10,9 +10,25 @@ import {
   fieldApplies,
   type RequestField,
 } from '@/lib/requests';
-import { fromClubWallClock } from '@/lib/time';
+import { fromClubWallClock, toDateInput } from '@/lib/time';
 import { ensureMeetLink } from '@/lib/google/meetings';
 import { kickPushDelivery } from '@/lib/push';
+
+/**
+ * The authority behind a field's `min` (RequestFields.tsx sets the hint).
+ * Checked on the club's clock: the testers proposed meetings in 2013, and a
+ * browser's clock is trivial to move back.
+ */
+function pastFieldError(field: RequestField, raw: string): string | null {
+  if (!field.no_past) return null;
+  if (field.type === 'datetime' && fromClubWallClock(raw).getTime() < Date.now()) {
+    return `${field.label_en} cannot be in the past.`;
+  }
+  if (field.type === 'date' && raw < toDateInput(new Date())) {
+    return `${field.label_en} cannot be in the past.`;
+  }
+  return null;
+}
 
 /**
  * Creating a request of ANY type goes through this one action. It reads the
@@ -72,6 +88,9 @@ export async function createRequestAction(
       }
       continue;
     }
+    const pastError = pastFieldError(field, raw);
+    if (pastError) return fail(pastError);
+
     if (field.type === 'number') {
       data[field.key] = Number(raw);
     } else if (field.type === 'datetime') {
@@ -133,6 +152,7 @@ export async function createRequestAction(
 
   revalidatePath(`/${locale}/requests`);
   revalidatePath(`/${locale}/requests/${created.id}`);
+  revalidatePath(`/${locale}/dashboard`);
   return ok('created');
 }
 
@@ -222,6 +242,9 @@ export async function transitionRequestAction(
       }
       continue;
     }
+    const pastError = pastFieldError(field, raw);
+    if (pastError) return fail(pastError);
+
     if (field.type === 'number') {
       patch[field.key] = Number(raw);
     } else if (field.type === 'datetime') {
@@ -266,5 +289,9 @@ export async function transitionRequestAction(
   revalidatePath(`/${locale}/requests/${requestId}`);
   revalidatePath(`/${locale}/calendar`);
   revalidatePath(`/${locale}/rooms`);
+  // A confirmed meeting changes "coming up"; any move changes "my requests".
+  // Without this the dashboard only caught up when its 30s cache expired,
+  // which read as the box changing for no reason.
+  revalidatePath(`/${locale}/dashboard`);
   return ok('transitioned');
 }
