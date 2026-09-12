@@ -14,6 +14,7 @@ export default async function NewRequestPage({
   setRequestLocale(locale);
 
   const t = await getTranslations('requests');
+  const tCommon = await getTranslations('common');
   const supabase = await createClient();
 
   // Types, their forms, and their routing all come from the database. Nothing
@@ -51,7 +52,11 @@ export default async function NewRequestPage({
 
   return (
     <>
-      <PageHeader title={t('newRequest')} description={t('subtitle')} />
+      <PageHeader
+        title={t('newRequest')}
+        description={t('subtitle')}
+        back={{ href: '/requests', label: tCommon('back') }}
+      />
 
       {allowed.length ? (
         <NewRequestForm

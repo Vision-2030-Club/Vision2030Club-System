@@ -133,7 +133,8 @@
     "present": "Present",
     "noExperience": "No experience recorded yet.",
     "deleteExperienceTitle": "Delete this entry?",
-    "deleteExperienceBody": "It will be removed from the profile. This cannot be undone."
+    "deleteExperienceBody": "It will be removed from the profile. This cannot be undone.",
+    "namesOnly": "Names only — profiles are for the Presidency and HR."
   },
   "teams": {
     "title": "Teams",
@@ -254,7 +255,14 @@
     "filterReview": "To review",
     "submissionUrl": "Link to the work",
     "newStartingDate": "New starting date",
-    "newDeliveryDate": "New delivery date"
+    "newDeliveryDate": "New delivery date",
+    "submissionNote": "Comment",
+    "reviewNote": "Reviewer's comment",
+    "editAssignees": "Change who holds it",
+    "details": "Details",
+    "createdBy": "Created by",
+    "assignedOn": "Assigned",
+    "confirmedOn": "Confirmed"
   },
   "requests": {
     "title": "Requests",

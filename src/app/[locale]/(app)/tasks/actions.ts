@@ -118,8 +118,9 @@ export async function submitTaskAction(
     p_task: requiredText(formData, 'task_id'),
     // Work that came from a Design or Media request is delivered as a link.
     // Whether one is REQUIRED is the database's call — the request type says
-    // so, not this action.
+    // so, not this action. Any task may carry one, and a comment (0058).
     p_url: text(formData, 'submission_url'),
+    p_note: text(formData, 'submission_note'),
   });
 
   if (error) return fail(error.message);
@@ -144,6 +145,7 @@ export async function confirmTaskAction(
   const { error } = await supabase.rpc('confirm_task', {
     p_task: requiredText(formData, 'task_id'),
     p_quality: requiredText(formData, 'quality'),
+    p_note: text(formData, 'note'),
   });
 
   if (error) return fail(error.message);
@@ -204,6 +206,62 @@ export async function markNotDoneAction(
   kickPushDelivery();
   revalidate(locale, text(formData, 'project_id'));
   return ok('markedNotDone');
+}
+
+/**
+ * Who holds the task, changed after the fact (0058). Whoever may administer
+ * it — the same authority that confirms it — ticks the new set; rows are
+ * added and removed to match, nothing else is touched. The database's
+ * `task_assignees_write` is what actually decides.
+ *
+ * The clock follows the people: a task that had nobody and now has someone
+ * starts (Assigned Date = now, §3); one that loses everyone is posted for
+ * claiming again.
+ */
+export async function setTaskAssigneesAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const locale = requiredText(formData, 'locale');
+  const taskId = requiredText(formData, 'task_id');
+  const wanted = new Set(all(formData, 'assignee_ids'));
+  const supabase = await createClient();
+
+  const { data: current, error: readError } = await supabase
+    .from('task_assignees')
+    .select('member_id')
+    .eq('task_id', taskId);
+  if (readError) return fail(readError.message);
+
+  const have = new Set((current ?? []).map((row) => row.member_id as string));
+  const remove = [...have].filter((id) => !wanted.has(id));
+  const add = [...wanted].filter((id) => !have.has(id));
+
+  if (remove.length) {
+    const { error } = await supabase
+      .from('task_assignees')
+      .delete()
+      .eq('task_id', taskId)
+      .in('member_id', remove);
+    if (error) return fail(error.message);
+  }
+  if (add.length) {
+    const { error } = await supabase
+      .from('task_assignees')
+      .insert(add.map((member_id) => ({ task_id: taskId, member_id })));
+    if (error) return fail(error.message);
+  }
+
+  if (have.size === 0 && wanted.size > 0) {
+    await supabase.from('tasks').update({ assigned_at: new Date().toISOString() }).eq('id', taskId);
+  } else if (have.size > 0 && wanted.size === 0) {
+    await supabase.from('tasks').update({ assigned_at: null }).eq('id', taskId);
+  }
+
+  kickPushDelivery();
+  revalidatePath(`/${locale}/tasks/${taskId}`);
+  revalidate(locale, text(formData, 'project_id'));
+  return ok();
 }
 
 /**

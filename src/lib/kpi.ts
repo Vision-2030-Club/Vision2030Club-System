@@ -67,6 +67,13 @@ export type TaskKpi = {
   submission_url: string | null;
   /** True when submitting requires that link. */
   requires_link: boolean;
+  /** The rest of the row the task page shows (0058). */
+  description: string | null;
+  /** What the person delivering it said. Set by submitting only. */
+  submission_note: string | null;
+  /** The reviewer's comment — on confirming, or on sending it back. */
+  review_note: string | null;
+  created_by: string | null;
 };
 
 /**

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { createClient } from '@/lib/supabase/server';
-import { getMyMember, hasPermission } from '@/lib/auth/session';
+import { getMyMember, hasPermission, scopeFor } from '@/lib/auth/session';
 import { ActionForm } from '@/components/ActionForm';
 import { ActionsMenu, type MenuPanel } from '@/components/ActionsMenu';
 import { Avatar } from '@/components/Avatar';
@@ -70,7 +70,10 @@ export default async function MemberPage({
    * any query runs, so a refusal costs nothing.
    */
   const isSelf = me?.id === id;
-  if (!isSelf && !(await hasPermission('members.directory'))) {
+  // Profiles are the Presidency's and HR's (scope `all`). Directors and
+  // Project Managers hold a narrower scope that lists NAMES (0058), which
+  // does not open a profile.
+  if (!isSelf && (await scopeFor('members.directory')) !== 'all') {
     return (
       <>
         <PageHeader title={t('profile')} />
@@ -320,6 +323,7 @@ export default async function MemberPage({
       <div className="mb-6 flex flex-wrap items-center gap-4">
         <Avatar src={photoUrl} name={displayName} size={72} />
         <PageHeader
+          back={isSelf ? undefined : { href: '/members', label: tCommon('back') }}
           title={displayName}
           description={
             role?.key === 'team_director'

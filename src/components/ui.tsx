@@ -1,3 +1,4 @@
+import { Link } from '@/i18n/navigation';
 import type { ComponentProps, ReactNode } from 'react';
 
 /**
@@ -33,14 +34,31 @@ export function PageHeader({
   title,
   description,
   action,
+  back,
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
+  /**
+   * Where "back" goes on an inner page — the list it belongs to, not the
+   * browser's history: a page opened from a push notification has none.
+   */
+  back?: { href: string; label: string };
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
       <div>
+        {back ? (
+          <Link
+            href={back.href}
+            className="mb-2 inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink"
+          >
+            <span aria-hidden="true" className="rtl:rotate-180">
+              ←
+            </span>
+            {back.label}
+          </Link>
+        ) : null}
         <h1 className="text-balance text-2xl font-semibold tracking-tight text-ink">
           {title}
         </h1>

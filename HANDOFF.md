@@ -381,6 +381,33 @@ Manager; and the dashboard was never revalidated when the calendar, a
 booking or a request changed, which read as the "coming up" box changing
 for no reason.
 
+### The second batch
+
+Nine more comments the same evening. Migration `0058`; the checks joined
+`npm run db:round1`.
+
+- **Submitting a request leaves the form** and lands on *My requests* with a
+  confirmation; an error stays on the form with the answers intact.
+- **Every inner page has a back link** to the list it belongs to
+  (`PageHeader`'s `back`) — the list, not browser history, because a page
+  opened from a push notification has none.
+- **Announcements**: the form only shows on a Director's own team's page (it
+  used to show on every team's, and the database refused); and the team is
+  now told when one is posted (`team_posts_push_notify`).
+- **A task has a page** (`/tasks/[id]`): the card, the description, dates,
+  everyone on it, the delivered link and both comments — and, for whoever
+  may administer it, changing who holds it (`setTaskAssigneesAction`).
+- **A link and a comment** when submitting any task (the link required only
+  where the request type demands it); a comment when confirming.
+  `tasks.submission_note` is new; `review_note` now holds the reviewer's
+  comment on confirming as well as on sending back.
+- **A calendar entry is deleted, or edited, by its creator or the Presidency.**
+  Directors no longer touch what others put on their team's calendar.
+- **Directors and Project Managers see the directory as names** — their
+  team's and their projects' members. Profiles stay with the Presidency and
+  HR: `members.directory` is `own_team` / `own_projects` for them, and
+  every "open a profile" link checks for scope `all`.
+
 ## Picking this up again
 
 Nothing is blocked. To get running from a fresh clone:

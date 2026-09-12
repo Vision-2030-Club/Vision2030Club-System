@@ -59,14 +59,10 @@ export default async function CalendarEntryPage({
    * this wrong only shows or hides a button — both actions re-check in the
    * database and report their own refusal.
    */
+  // 0058: the creator, or the Presidency. A Director no longer edits or
+  // removes what others put on their team's calendar.
   const scope = await scopeFor('calendar.manage');
-  const canEdit =
-    entry.created_by === me?.id ||
-    scope === 'all' ||
-    (scope === 'own_team' && entry.meeting_scope_team_id === me?.team_id) ||
-    (scope === 'own_projects' &&
-      Boolean(entry.meeting_scope_project_id) &&
-      options.scopeProjects.some((p) => p.id === entry.meeting_scope_project_id));
+  const canEdit = entry.created_by === me?.id || scope === 'all';
 
   const defaults: EntryDefaults = {
     id: entry.id,
@@ -126,6 +122,7 @@ export default async function CalendarEntryPage({
   return (
     <>
       <PageHeader
+        back={{ href: '/calendar', label: tCommon('back') }}
         title={entry.title}
         description={`${formatDateTime(entry.starts_at, locale)} – ${formatDateTime(
           entry.ends_at,

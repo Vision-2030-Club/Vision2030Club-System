@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from '@/i18n/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getMyMember, hasPermission } from '@/lib/auth/session';
 import { fail, ok, requiredText, text, type ActionResult } from '@/lib/actions';
@@ -153,7 +154,12 @@ export async function createRequestAction(
   revalidatePath(`/${locale}/requests`);
   revalidatePath(`/${locale}/requests/${created.id}`);
   revalidatePath(`/${locale}/dashboard`);
-  return ok('created');
+  // Done: leave the form. The list shows the confirmation; an error above
+  // stays here, with the answers still in the fields.
+  return redirect({
+    href: { pathname: '/requests', query: { filter: 'mine', created: '1' } },
+    locale,
+  });
 }
 
 /**

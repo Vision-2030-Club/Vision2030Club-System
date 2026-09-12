@@ -1,9 +1,8 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { MemberLink } from '@/components/MemberLink';
-import { getMyMember, hasPermission } from '@/lib/auth/session';
+import { getMyMember, scopeFor } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
-import { scopeFor } from '@/lib/auth/session';
 import { ActionForm } from '@/components/ActionForm';
 import { Card, EmptyState, Input, Label, PageHeader, Textarea } from '@/components/ui';
 import { formatDateTime, localized } from '@/lib/format';
@@ -21,9 +20,11 @@ export default async function TeamPage({
   const tCommon = await getTranslations('common');
   const supabase = await createClient();
   const me = await getMyMember();
-  // Whose name is a link and whose is plain text. The profile page enforces
-  // this itself; this only avoids offering a link that leads to a refusal.
-  const canOpenProfiles = await hasPermission('members.directory');
+  // Whose name is a link and whose is plain text. Profiles are the
+  // Presidency's and HR's (scope `all`); Directors and PMs see names (0058).
+  // The profile page enforces this itself; this only avoids offering a link
+  // that leads to a refusal.
+  const canOpenProfiles = (await scopeFor('members.directory')) === 'all';
 
   const { data: team } = await supabase
     .from('teams')
@@ -49,12 +50,19 @@ export default async function TeamPage({
       .limit(20),
   ]);
 
+  // Scoped to THIS team's page: a Director's own_team used to show the form
+  // on every team's page, and the database then refused with a bare error.
   const postScope = await scopeFor('team_posts.manage');
-  const canPost = postScope === 'all' || postScope === 'own_team';
+  const canPost =
+    postScope === 'all' || (postScope === 'own_team' && team.id === me?.team_id);
 
   return (
     <>
-      <PageHeader title={localized(team, 'name', locale)} description={t('subtitle')} />
+      <PageHeader
+        title={localized(team, 'name', locale)}
+        description={t('subtitle')}
+        back={{ href: '/teams', label: tCommon('back') }}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

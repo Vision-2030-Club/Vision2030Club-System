@@ -1,4 +1,5 @@
 import { getTranslations } from 'next-intl/server';
+import { Link } from '@/i18n/navigation';
 import { ActionForm } from '@/components/ActionForm';
 import { ConfirmForm } from '@/components/ConfirmForm';
 import { Badge, Card, Input, Label, Select, cx } from '@/components/ui';
@@ -72,7 +73,9 @@ export async function TaskCard({
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="font-medium">{task.title}</div>
+          <Link href={`/tasks/${task.id}`} className="font-medium text-brand-700 hover:underline">
+            {task.title}
+          </Link>
           <div className="mt-0.5 text-xs text-ink-muted">
             {homeLabel}
             {' · '}
@@ -114,6 +117,20 @@ export async function TaskCard({
             {task.submission_url}
           </a>
         </div>
+      ) : null}
+
+      {/* What was said on delivery, and by the reviewer (0058). */}
+      {task.submission_note ? (
+        <p className="mt-2 text-sm text-ink">
+          <span className="text-ink-muted">{t('submissionNote')}: </span>
+          {task.submission_note}
+        </p>
+      ) : null}
+      {task.review_note ? (
+        <p className="mt-1 text-sm text-ink">
+          <span className="text-ink-muted">{t('reviewNote')}: </span>
+          {task.review_note}
+        </p>
       ) : null}
 
       {/* §4 scores. Null means the viewer is barred (§8), not zero. */}
@@ -171,25 +188,28 @@ export async function TaskCard({
             <ActionForm
               action={submitTaskAction}
               submitLabel={t('submitForReview')}
-              className={task.requires_link ? 'flex items-end gap-2 space-y-0' : 'space-y-0'}
+              className="flex flex-wrap items-end gap-2 space-y-0"
             >
               {hidden}
-              {/* Work that came from a request is delivered as a link — no
-                  upload. The database refuses a blank one; this asks for it. */}
-              {task.requires_link ? (
-                <div>
-                  <Label htmlFor={`url-${task.id}`}>{t('submissionUrl')}</Label>
-                  <Input
-                    id={`url-${task.id}`}
-                    name="submission_url"
-                    type="url"
-                    dir="ltr"
-                    placeholder="https://"
-                    defaultValue={task.submission_url ?? ''}
-                    required
-                  />
-                </div>
-              ) : null}
+              {/* Any task may be delivered as a link with a comment (0058).
+                  Work that came from a request MUST carry the link — the
+                  database refuses a blank one; `required` says so first. */}
+              <div>
+                <Label htmlFor={`url-${task.id}`}>{t('submissionUrl')}</Label>
+                <Input
+                  id={`url-${task.id}`}
+                  name="submission_url"
+                  type="url"
+                  dir="ltr"
+                  placeholder="https://"
+                  defaultValue={task.submission_url ?? ''}
+                  required={task.requires_link}
+                />
+              </div>
+              <div>
+                <Label htmlFor={`snote-${task.id}`}>{t('submissionNote')}</Label>
+                <Input id={`snote-${task.id}`} name="submission_note" />
+              </div>
             </ActionForm>
           ) : null}
 
@@ -215,6 +235,10 @@ export async function TaskCard({
                       </option>
                     ))}
                   </Select>
+                </div>
+                <div>
+                  <Label htmlFor={`cnote-${task.id}`}>{t('reviewNote')}</Label>
+                  <Input id={`cnote-${task.id}`} name="note" />
                 </div>
               </ActionForm>
 

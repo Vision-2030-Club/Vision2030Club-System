@@ -24,6 +24,7 @@ export default async function RequestPage({
   setRequestLocale(locale);
 
   const t = await getTranslations('requests');
+  const tCommon = await getTranslations('common');
   const supabase = await createClient();
   const me = await getMyMember();
 
@@ -188,6 +189,7 @@ export default async function RequestPage({
         // Same order as the list: who it is for, then what kind of request.
         title={target}
         description={localized(type, 'name', locale)}
+        back={{ href: '/requests', label: tCommon('back') }}
         action={
           <Badge tone={status?.is_approved ? 'ok' : status?.is_terminal ? 'neutral' : 'warn'}>
             {localized(status, 'name', locale) || String(request.status)}

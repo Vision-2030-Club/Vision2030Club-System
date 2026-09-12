@@ -97,6 +97,8 @@ const PEOPLE = {
 };
 
 async function cleanUp() {
+  await db.query(`delete from team_posts where title like $1`, [`${TAG}%`]);
+  await db.query(`delete from calendar_entries where title like $1`, [`${TAG}%`]);
   await db.query(`delete from tasks where title like $1`, [`${TAG}%`]);
   await db.query(`delete from projects where name_en like $1`, [`${TAG}%`]);
   await db.query(
@@ -135,6 +137,12 @@ async function seed() {
       rows[0].id,
       spec.national,
     ]);
+    // A device each, so the outbox has somebody to write for. Never contacted.
+    await db.query(
+      `insert into push_subscriptions (member_id, endpoint, p256dh, auth, locale)
+       values ($1, $2, 'p256dh', 'auth', 'en')`,
+      [rows[0].id, `https://push.example.test/${PREFIX}${name}`],
+    );
     p[name] = { id: rows[0].id, email, token: await signIn(email) };
   }
   const { rows: t } = await db.query(`select key, id from teams where key in ('DESIGN','MEDIA')`);
@@ -292,6 +300,67 @@ async function run(p) {
   check('a Director who is also on the task cannot confirm it', !selfConfirm.ok, JSON.stringify(selfConfirm.body));
   const presConfirm = await rpc(p.pres.token, 'confirm_task', { p_task: selfId, p_quality: 'good' });
   check('the President can', presConfirm.ok, JSON.stringify(presConfirm.body));
+
+  // --- 0058 A. An announcement reaches the team -------------------------------------
+  const post = await rest(p.design.token, 'team_posts', {
+    method: 'POST',
+    body: JSON.stringify({ team_id: p.teams.DESIGN, author_id: p.design.id, title: `${TAG}post`, body: 'Meeting moved to Sunday.' }),
+  });
+  check('a Director can announce to their team', allowed(post), JSON.stringify(post.body));
+  const told = async (id) => (await db.query(
+    `select count(*)::int n from notification_outbox where member_id = $1 and kind = 'team_post'`, [id])).rows[0].n;
+  check('every member of the team is told', (await told(p.member.id)) === 1 && (await told(p.member2.id)) === 1);
+  check('the author is not', (await told(p.design.id)) === 0);
+  check('another team is not', (await told(p.media.id)) === 0);
+  const elsewhere = await rest(p.design.token, 'team_posts', {
+    method: 'POST',
+    body: JSON.stringify({ team_id: p.teams.MEDIA, author_id: p.design.id, title: `${TAG}wrong`, body: 'x' }),
+  });
+  check("a Director cannot announce to another team", !elsewhere.ok);
+
+  // --- 0058 B. A link and a comment either way ----------------------------------------
+  const noted = await rest(p.pm.token, 'tasks', {
+    method: 'POST',
+    body: JSON.stringify({ title: `${TAG}noted`, project_id: p.projectId, created_by: p.pm.id, assigned_at: new Date().toISOString() }),
+  });
+  const notedId = noted.body?.[0]?.id;
+  await rest(p.pm.token, 'task_assignees', { method: 'POST', body: JSON.stringify({ task_id: notedId, member_id: p.member.id }) });
+  const submitNoted = await rpc(p.member.token, 'submit_task_for_review', {
+    p_task: notedId, p_url: 'https://example.com/work', p_note: 'First draft, two variants.',
+  });
+  check('work is submitted with a link and a comment', submitNoted.ok, JSON.stringify(submitNoted.body));
+  const confirmNoted = await rpc(p.pm.token, 'confirm_task', { p_task: notedId, p_quality: 'very_good', p_note: 'Variant B, please.' });
+  check('and confirmed with a comment', confirmNoted.ok, JSON.stringify(confirmNoted.body));
+  const { rows: notes } = await db.query(
+    `select submission_url, submission_note, review_note from tasks where id = $1`, [notedId]);
+  check('both comments are on the task',
+    notes[0]?.submission_note === 'First draft, two variants.' && notes[0]?.review_note === 'Variant B, please.' && notes[0]?.submission_url === 'https://example.com/work',
+    JSON.stringify(notes[0]));
+  const sneaked = await rest(p.member.token, `tasks?id=eq.${notedId}`, {
+    method: 'PATCH', body: JSON.stringify({ submission_note: 'edited after the fact' }),
+  });
+  check('a comment cannot be rewritten outside the workflow', !sneaked.ok || (Array.isArray(sneaked.body) && sneaked.body.length === 0), JSON.stringify(sneaked.body));
+
+  // --- 0058 C. A calendar entry is the creator's to remove -------------------------------
+  const { rows: entry } = await db.query(
+    `insert into calendar_entries (kind, title, starts_at, ends_at, created_by, meeting_scope_kind, meeting_scope_team_id)
+     values ('meeting', $1, now() + interval '1 day', now() + interval '1 day 1 hour', $2, 'team', $3) returning id`,
+    [`${TAG}entry`, p.member.id, p.teams.DESIGN],
+  );
+  const delByDirector = await rest(p.design.token, `calendar_entries?id=eq.${entry[0].id}`, { method: 'DELETE' });
+  check("a Director cannot delete another person's entry on their team's calendar",
+    !delByDirector.ok || delByDirector.body?.length === 0, JSON.stringify(delByDirector.body));
+  const delByCreator = await rest(p.member.token, `calendar_entries?id=eq.${entry[0].id}`, { method: 'DELETE' });
+  check('the creator can', delByCreator.ok && delByCreator.body?.length === 1, JSON.stringify(delByCreator.body));
+
+  // --- 0058 D. Names for Directors and Project Managers -----------------------------
+  const { rows: dirScopes } = await db.query(
+    `select r.key, rp.scope from role_permissions rp join roles r on r.id = rp.role_id
+      where rp.permission_key = 'members.directory' and r.key in ('team_director','project_manager')`);
+  check('Directors and PMs hold a names-only directory scope',
+    dirScopes.find((r) => r.key === 'team_director')?.scope === 'own_team'
+      && dirScopes.find((r) => r.key === 'project_manager')?.scope === 'own_projects',
+    JSON.stringify(dirScopes));
 
   // --- G. Experience is in the past --------------------------------------------------
   const future = await db

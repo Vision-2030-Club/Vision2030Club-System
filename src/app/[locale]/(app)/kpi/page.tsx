@@ -2,7 +2,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { MemberLink } from '@/components/MemberLink';
 import { createClient } from '@/lib/supabase/server';
-import { getMyMember, hasPermission } from '@/lib/auth/session';
+import { getMyMember, hasPermission, scopeFor } from '@/lib/auth/session';
 import { BarList, StatTile, type BarRow } from '@/components/charts/BarList';
 import { Alert, Badge, Card, EmptyState, PageHeader } from '@/components/ui';
 import { formatDate, localized } from '@/lib/format';
@@ -57,7 +57,8 @@ export default async function KpiPage({
 
   // Whose name is a link and whose is plain text. The profile page enforces
   // this itself; this only avoids offering a link that leads to a refusal.
-  const canOpenProfiles = await hasPermission('members.directory');
+  // Profiles are the Presidency's and HR's (scope `all`, 0058).
+  const canOpenProfiles = (await scopeFor('members.directory')) === 'all';
 
   const [
     { data: memberRows },

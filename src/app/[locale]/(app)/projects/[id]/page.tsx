@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { MemberLink } from '@/components/MemberLink';
 import { createClient } from '@/lib/supabase/server';
-import { getMyMember, hasPermission, scopeFor } from '@/lib/auth/session';
+import { getMyMember, scopeFor } from '@/lib/auth/session';
 import { ActionForm } from '@/components/ActionForm';
 import { ConfirmForm } from '@/components/ConfirmForm';
 import { TaskCard } from '@/components/TaskCard';
@@ -42,9 +42,10 @@ export default async function ProjectPage({
   const tCommon = await getTranslations('common');
   const supabase = await createClient();
   const me = await getMyMember();
-  // Whose name is a link and whose is plain text. The profile page enforces
-  // this itself; this only avoids offering a link that leads to a refusal.
-  const canOpenProfiles = await hasPermission('members.directory');
+  // Whose name is a link and whose is plain text. Profiles are the
+  // Presidency's and HR's (scope `all`, 0058). The profile page enforces this
+  // itself; this only avoids offering a link that leads to a refusal.
+  const canOpenProfiles = (await scopeFor('members.directory')) === 'all';
 
   const { data: project } = await supabase
     .from('projects')
@@ -136,6 +137,7 @@ export default async function ProjectPage({
   return (
     <>
       <PageHeader
+        back={{ href: '/projects', label: tCommon('back') }}
         title={projectLabel}
         description={localized(
           project.teams as unknown as Record<string, string>,

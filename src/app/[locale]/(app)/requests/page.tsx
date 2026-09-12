@@ -2,7 +2,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getMyMember, hasPermission, scopeFor } from '@/lib/auth/session';
-import { Badge, Card, EmptyState, PageHeader } from '@/components/ui';
+import { Alert, Badge, Card, EmptyState, PageHeader } from '@/components/ui';
 import { formatDateTime, localized } from '@/lib/format';
 import {
   canActOnRequest,
@@ -18,10 +18,10 @@ export default async function RequestsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; created?: string }>;
 }) {
   const { locale } = await params;
-  const { filter } = await searchParams;
+  const { filter, created } = await searchParams;
   setRequestLocale(locale);
 
   const t = await getTranslations('requests');
@@ -135,6 +135,12 @@ export default async function RequestsPage({
           </Link>
         ))}
       </div>
+
+      {created ? (
+        <div className="mb-4">
+          <Alert tone="ok">{t('created')}</Alert>
+        </div>
+      ) : null}
 
       {visible.length ? (
         <Card className="overflow-x-auto p-0">

@@ -133,7 +133,8 @@
     "present": "حتى الآن",
     "noExperience": "لا توجد خبرات مسجّلة بعد.",
     "deleteExperienceTitle": "حذف هذه الخبرة؟",
-    "deleteExperienceBody": "ستُحذف من الملف الشخصي ولا يمكن التراجع."
+    "deleteExperienceBody": "ستُحذف من الملف الشخصي ولا يمكن التراجع.",
+    "namesOnly": "الأسماء فقط — الملفات الشخصية للرئاسة والموارد البشرية."
   },
   "teams": {
     "title": "الفرق",
@@ -254,7 +255,14 @@
     "filterReview": "بانتظار الاعتماد",
     "submissionUrl": "رابط العمل",
     "newStartingDate": "تاريخ البدء الجديد",
-    "newDeliveryDate": "تاريخ التسليم الجديد"
+    "newDeliveryDate": "تاريخ التسليم الجديد",
+    "submissionNote": "تعليق",
+    "reviewNote": "تعليق المراجع",
+    "editAssignees": "تغيير المسؤولين",
+    "details": "التفاصيل",
+    "createdBy": "أنشأها",
+    "assignedOn": "تاريخ الإسناد",
+    "confirmedOn": "تاريخ الاعتماد"
   },
   "requests": {
     "title": "الطلبات",
