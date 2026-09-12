@@ -16,6 +16,11 @@ import { deliverPendingNotifications, pruneOutbox } from '@/lib/push';
  * `Authorization: Bearer $CRON_SECRET`; anyone else gets 401. The proxy
  * matcher already excludes /api, so no session is involved.
  */
+// The database is a continent away and a busy pass sends dozens of pushes;
+// the platform's default budget (10s on Hobby) is not enough. Delivery stops
+// starting new sends at 40s and leaves the rest leased for the next sweep.
+export const maxDuration = 60;
+
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get('authorization') !== `Bearer ${secret}`) {

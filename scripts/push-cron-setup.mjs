@@ -91,7 +91,7 @@ try {
           'Authorization',
           'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = '${SECRET_NAME}')
         ),
-        timeout_milliseconds := 30000
+        timeout_milliseconds := 60000
       )`;
 
     // cron.schedule with a name replaces an existing job of that name.

@@ -1,4 +1,5 @@
 import 'server-only';
+import { after } from 'next/server';
 import webpush, { WebPushError } from 'web-push';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -19,6 +20,13 @@ import { createAdminClient } from '@/lib/supabase/admin';
  *     retries anything the first attempt could not send
  * They can overlap; `push_claim_outbox` leases rows so they never both send
  * the same one.
+ *
+ * The database is a continent away from the function (HANDOFF: Sydney vs
+ * Mumbai), so every round trip is ~1s. A pass therefore makes as few as it
+ * can — one claim, one read of every device involved, then the sends in
+ * parallel — and stops starting new sends once its time budget is spent,
+ * leaving the rest leased for the next pass rather than being cut off
+ * mid-flight by the platform.
  */
 
 export type PushPayload = {
@@ -42,6 +50,7 @@ type OutboxRow = {
 
 type SubscriptionRow = {
   id: string;
+  member_id: string;
   endpoint: string;
   p256dh: string;
   auth: string;
@@ -57,7 +66,14 @@ export type DeliveryReport = {
   dropped: number;
   /** Rows every device refused; they stay queued for a retry. */
   failed: number;
+  /** Rows claimed but not attempted because the time budget ran out. */
+  deferred: number;
+  /** Wall time of the pass, in milliseconds. */
+  ms: number;
 };
+
+/** How many rows are sent at once. Apple's service copes with far more. */
+const CONCURRENCY = 6;
 
 export function isPushConfigured(): boolean {
   return Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
@@ -101,7 +117,7 @@ async function sendToSubscription(
       JSON.stringify(payload),
       // A day: a phone that is off overnight still gets "your request was
       // approved" in the morning; anything older than that is stale.
-      { TTL: 60 * 60 * 24, urgency: 'high' },
+      { TTL: 60 * 60 * 24, urgency: 'high', timeout: 10_000 },
     );
     return 'sent';
   } catch (error) {
@@ -114,87 +130,128 @@ async function sendToSubscription(
   }
 }
 
-/**
- * Sends one payload to every device a member has. Used by the test button
- * and by the outbox drain alike, so both paths clean up dead subscriptions.
- */
-async function sendToMember(
-  memberId: string,
+/** Sends one payload to each of a member's devices, in parallel. */
+async function sendToDevices(
+  subs: SubscriptionRow[],
   render: (locale: 'ar' | 'en') => PushPayload,
-): Promise<{ delivered: number; dropped: number; errors: string[]; devices: number }> {
+): Promise<{ delivered: number; gone: string[]; errors: string[] }> {
+  const outcomes = await Promise.all(subs.map((sub) => sendToSubscription(sub, render(sub.locale))));
+  const gone: string[] = [];
+  const errors: string[] = [];
+  let delivered = 0;
+  outcomes.forEach((outcome, i) => {
+    if (outcome === 'sent') delivered += 1;
+    else if (outcome === 'gone') gone.push(subs[i].id);
+    else errors.push(outcome.error);
+  });
+  return { delivered, gone, errors };
+}
+
+async function subscriptionsOf(memberIds: string[]): Promise<Map<string, SubscriptionRow[]>> {
+  const byMember = new Map<string, SubscriptionRow[]>();
+  if (memberIds.length === 0) return byMember;
   const admin = createAdminClient();
   const { data } = await admin
     .from('push_subscriptions')
-    .select('id, endpoint, p256dh, auth, locale')
-    .eq('member_id', memberId);
-
-  const subs = (data ?? []) as SubscriptionRow[];
-  let delivered = 0;
-  let dropped = 0;
-  const errors: string[] = [];
-
-  for (const sub of subs) {
-    const outcome = await sendToSubscription(sub, render(sub.locale));
-    if (outcome === 'sent') {
-      delivered += 1;
-    } else if (outcome === 'gone') {
-      await admin.from('push_subscriptions').delete().eq('id', sub.id);
-      dropped += 1;
-    } else {
-      errors.push(outcome.error);
-    }
+    .select('id, member_id, endpoint, p256dh, auth, locale')
+    .in('member_id', [...new Set(memberIds)]);
+  for (const sub of (data ?? []) as SubscriptionRow[]) {
+    const list = byMember.get(sub.member_id) ?? [];
+    list.push(sub);
+    byMember.set(sub.member_id, list);
   }
-
-  return { delivered, dropped, errors, devices: subs.length };
+  return byMember;
 }
 
 /**
  * Drains the outbox. Safe to call from anywhere at any time: with nothing
  * queued it does nothing, and without VAPID keys it leaves the rows for a
  * deployment that has them.
+ *
+ * `budgetMs` bounds the pass. Rows not reached stay leased and are picked up
+ * by the next pass once the lease lapses (two minutes).
  */
-export async function deliverPendingNotifications(limit = 50): Promise<DeliveryReport> {
-  const report: DeliveryReport = { claimed: 0, delivered: 0, dropped: 0, failed: 0 };
+export async function deliverPendingNotifications(
+  limit = 50,
+  budgetMs = 40_000,
+): Promise<DeliveryReport> {
+  const started = Date.now();
+  const report: DeliveryReport = { claimed: 0, delivered: 0, dropped: 0, failed: 0, deferred: 0, ms: 0 };
   if (!isPushConfigured()) return report;
 
   const admin = createAdminClient();
   const { data, error } = await admin.rpc('push_claim_outbox', { p_limit: limit });
   if (error) throw new Error(error.message);
 
-  for (const row of (data ?? []) as OutboxRow[]) {
-    report.claimed += 1;
-
-    const result = await sendToMember(row.member_id, (locale) => payloadFor(row, locale));
-    report.delivered += result.delivered;
-    report.dropped += result.dropped;
-
-    // "Failed" means every device refused. Zero devices is not a failure —
-    // the person turned notifications off between the trigger and now.
-    const failed = result.devices > 0 && result.delivered === 0 && result.errors.length > 0;
-    if (failed) report.failed += 1;
-
-    await admin
-      .from('notification_outbox')
-      .update({
-        sent_at: failed ? null : new Date().toISOString(),
-        delivered: result.delivered,
-        last_error: result.errors[0] ?? null,
-        claimed_at: null,
-      })
-      .eq('id', row.id);
+  const rows = (data ?? []) as OutboxRow[];
+  report.claimed = rows.length;
+  if (rows.length === 0) {
+    report.ms = Date.now() - started;
+    return report;
   }
 
+  const devices = await subscriptionsOf(rows.map((r) => r.member_id));
+  const gone = new Set<string>();
+  // Supabase builders are thenables, not Promises; Promise.all takes either.
+  const updates: PromiseLike<unknown>[] = [];
+
+  const queue = [...rows];
+  const worker = async () => {
+    for (let row = queue.shift(); row; row = queue.shift()) {
+      if (Date.now() - started > budgetMs) {
+        report.deferred += 1;
+        continue;
+      }
+
+      const subs = devices.get(row.member_id) ?? [];
+      const result = await sendToDevices(subs, (locale) => payloadFor(row!, locale));
+      result.gone.forEach((id) => gone.add(id));
+      report.delivered += result.delivered;
+
+      // "Failed" means every device refused. Zero devices is not a failure —
+      // the person turned notifications off between the trigger and now.
+      const failed = subs.length > 0 && result.delivered === 0 && result.errors.length > 0;
+      if (failed) report.failed += 1;
+
+      updates.push(
+        admin
+          .from('notification_outbox')
+          .update({
+            sent_at: failed ? null : new Date().toISOString(),
+            delivered: result.delivered,
+            last_error: result.errors[0] ?? null,
+            claimed_at: null,
+          })
+          .eq('id', row.id),
+      );
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, rows.length) }, worker));
+
+  if (gone.size > 0) {
+    updates.push(admin.from('push_subscriptions').delete().in('id', [...gone]));
+    report.dropped = gone.size;
+  }
+  await Promise.all(updates);
+
+  report.ms = Date.now() - started;
   return report;
 }
 
 /**
- * Fire-and-forget delivery for the end of a server action. Not awaited for
- * the same reason `ensureMeetLink` is not: the write has committed, and the
- * page should not wait on Apple to update.
+ * Delivery for the end of a server action. Runs once the response has been
+ * sent (`after`), so the page updates immediately and the platform keeps the
+ * function alive for the sends — a bare `void promise` after the return is
+ * not guaranteed to finish on a serverless host.
  */
 export function kickPushDelivery(): void {
-  void deliverPendingNotifications().catch((error) => {
-    console.error('[push] delivery failed', error);
+  after(async () => {
+    try {
+      await deliverPendingNotifications();
+    } catch (error) {
+      console.error('[push] delivery failed', error);
+    }
   });
 }
 
@@ -210,7 +267,8 @@ export async function sendTestNotification(
     };
   }
 
-  const result = await sendToMember(memberId, (locale) => ({
+  const subs = (await subscriptionsOf([memberId])).get(memberId) ?? [];
+  const result = await sendToDevices(subs, (locale) => ({
     title: locale === 'ar' ? 'الإشعارات تعمل' : 'Notifications are working',
     body:
       locale === 'ar'
@@ -220,9 +278,13 @@ export async function sendTestNotification(
     tag: 'test',
   }));
 
+  if (result.gone.length > 0) {
+    await createAdminClient().from('push_subscriptions').delete().in('id', result.gone);
+  }
+
   return {
     delivered: result.delivered,
-    devices: result.devices - result.dropped,
+    devices: subs.length - result.gone.length,
     error: result.errors[0],
   };
 }
