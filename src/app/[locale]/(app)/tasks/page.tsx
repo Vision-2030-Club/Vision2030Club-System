@@ -207,17 +207,32 @@ export default async function TasksPage({
 
               {canCreateProjectTask ? (
                 <>
-                  <div>
-                    <Label htmlFor="project_id">{t('project')}</Label>
-                    <Select id="project_id" name="project_id">
-                      <option value="">—</option>
-                      {creatableProjects.map((project) => (
-                        <option key={project.id} value={project.id}>
-                          {localized(project, 'name', locale)}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
+                  {creatableProjects.length === 1 ? (
+                    // One project — a Project Manager running just the one is
+                    // not asked; it is fixed text, the way a Director's team is.
+                    <div>
+                      <Label>{t('project')}</Label>
+                      <input type="hidden" name="project_id" value={creatableProjects[0].id} />
+                      <div className="rounded-lg bg-surface-muted px-3 py-2 text-sm">
+                        {localized(creatableProjects[0], 'name', locale)}
+                      </div>
+                    </div>
+                  ) : (
+                    // Several — a real choice, and one that cannot be skipped:
+                    // a project task with no project matches nobody's
+                    // permission, and the database said so as an RLS error.
+                    <div>
+                      <Label htmlFor="project_id">{t('project')}</Label>
+                      <Select id="project_id" name="project_id" required defaultValue="">
+                        <option value="">—</option>
+                        {creatableProjects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {localized(project, 'name', locale)}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  )}
 
                   {/* §3: a project task sits in one split, or stays project-wide. */}
                   <div>
@@ -250,7 +265,7 @@ export default async function TasksPage({
                 ) : (
                   <div>
                     <Label htmlFor="team_id">{t('team')}</Label>
-                    <Select id="team_id" name="team_id">
+                    <Select id="team_id" name="team_id" required defaultValue="">
                       <option value="">—</option>
                       {creatableTeams.map((team) => (
                         <option key={team.id} value={team.id}>

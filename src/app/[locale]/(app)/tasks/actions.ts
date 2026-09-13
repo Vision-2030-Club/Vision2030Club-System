@@ -58,6 +58,15 @@ export async function createTaskAction(
   const dueDate = text(formData, 'due_date');
   const pastDue = pastDateError(dueDate, 'The due date');
   if (pastDue) return fail(pastDue);
+
+  // A task with no home matches nobody's permission scope, so the database
+  // refuses it as an RLS error — which is what a Project Manager saw after
+  // leaving the project at "—". Say it in a sentence first.
+  const projectId = isProject ? text(formData, 'project_id') : null;
+  const teamId = isProject ? null : text(formData, 'team_id');
+  if (isProject && !projectId) return fail('Choose the project this task belongs to.');
+  if (!isProject && !teamId) return fail('Choose the team this task belongs to.');
+
   const me = await getMyMember();
   const supabase = await createClient();
 
@@ -66,8 +75,8 @@ export async function createTaskAction(
     .insert({
       title: requiredText(formData, 'title'),
       description: text(formData, 'description'),
-      project_id: isProject ? text(formData, 'project_id') : null,
-      team_id: isProject ? null : text(formData, 'team_id'),
+      project_id: projectId,
+      team_id: teamId,
       split_id: isProject ? text(formData, 'split_id') : null,
       due_date: dueDate,
       created_by: me?.id ?? null,
