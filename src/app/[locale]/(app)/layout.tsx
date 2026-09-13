@@ -8,6 +8,7 @@ import { signAvatar } from '@/lib/avatars';
 import { Avatar } from '@/components/Avatar';
 import { LocaleSwitch } from '@/components/LocaleSwitch';
 import { NavLinks, type NavItem } from '@/components/NavLinks';
+import { ProfileMenu } from '@/components/ProfileMenu';
 import { RegisterServiceWorker } from '@/components/RegisterServiceWorker';
 import { signOutAction } from '../login/actions';
 
@@ -55,6 +56,7 @@ export default async function AppLayout({
   const can = (key: string) => (permissions.get(key) ?? 'none') !== 'none';
   const t = await getTranslations('nav');
   const tApp = await getTranslations('app');
+  const tMembers = await getTranslations('members');
 
   /*
    * A Project Manager's projects are on their dashboard, so the club-wide
@@ -154,44 +156,56 @@ export default async function AppLayout({
             className="h-8 w-auto"
           />
 
-          <div className="ms-auto flex items-center gap-3">
-            {/* The photo and the name are the way to your own profile — the
-                only page in here that is about you rather than about work. */}
-            <Link
-              href={`/members/${member!.id}`}
-              className="flex items-center gap-3 rounded-lg px-1 py-0.5 hover:bg-surface-muted"
+          <div className="ms-auto">
+            {/* The photo and the name open a short menu: your profile — the
+                only page in here that is about you rather than about work —
+                the language, and sign out. */}
+            <ProfileMenu
+              label={t('menu')}
+              trigger={
+                <>
+                  {/*
+                    Signing a photo URL is a Storage round trip, and it used to
+                    block the whole shell on every page load to mint a URL that
+                    is never reused. Behind Suspense the initials paint
+                    immediately and the photo swaps in when it arrives.
+                  */}
+                  <Suspense fallback={<Avatar name={displayName} size={36} />}>
+                    <HeaderAvatar avatarPath={member!.avatar_path} name={displayName} />
+                  </Suspense>
+                  <span className="text-end">
+                    <span className="block text-sm font-medium text-ink">{displayName}</span>
+                    <span className="block text-xs text-ink-muted">
+                      {/* "Team Director" is one role; the UI composes the label. */}
+                      {member!.role_key === 'team_director'
+                        ? isArabic
+                          ? `${roleName} — ${teamName}`
+                          : `Director of ${teamName}`
+                        : `${roleName} · ${teamName}`}
+                    </span>
+                  </span>
+                </>
+              }
             >
-              {/*
-                Signing a photo URL is a Storage round trip, and it used to
-                block the whole shell on every page load to mint a URL that is
-                never reused. Behind Suspense the initials paint immediately
-                and the photo swaps in when it arrives.
-              */}
-              <Suspense fallback={<Avatar name={displayName} size={36} />}>
-                <HeaderAvatar avatarPath={member!.avatar_path} name={displayName} />
-              </Suspense>
-              <span className="text-end">
-                <span className="block text-sm font-medium text-ink">{displayName}</span>
-                <span className="block text-xs text-ink-muted">
-                  {/* "Team Director" is one role; the UI composes the label. */}
-                  {member!.role_key === 'team_director'
-                    ? isArabic
-                      ? `${roleName} — ${teamName}`
-                      : `Director of ${teamName}`
-                    : `${roleName} · ${teamName}`}
-                </span>
-              </span>
-            </Link>
-            <LocaleSwitch />
-            <form action={signOutAction}>
-              <input type="hidden" name="locale" value={locale} />
-              <button
-                type="submit"
-                className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-muted hover:bg-surface-muted"
+              <Link
+                href={`/members/${member!.id}`}
+                role="menuitem"
+                className="block rounded px-3 py-2 text-sm text-ink hover:bg-surface-muted"
               >
-                {t('signOut')}
-              </button>
-            </form>
+                {tMembers('profile')}
+              </Link>
+              <LocaleSwitch className="block w-full rounded px-3 py-2 text-start text-sm text-ink hover:bg-surface-muted" />
+              <form action={signOutAction}>
+                <input type="hidden" name="locale" value={locale} />
+                <button
+                  type="submit"
+                  role="menuitem"
+                  className="block w-full rounded px-3 py-2 text-start text-sm text-ink-muted hover:bg-surface-muted"
+                >
+                  {t('signOut')}
+                </button>
+              </form>
+            </ProfileMenu>
           </div>
         </div>
       </header>

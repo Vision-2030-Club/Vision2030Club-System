@@ -9,7 +9,7 @@ import { useParams } from 'next/navigation';
  * from our i18n navigation returns the path WITHOUT the locale prefix, so the
  * router can simply re-render it under the other one.
  */
-export function LocaleSwitch() {
+export function LocaleSwitch({ className }: { className?: string } = {}) {
   const t = useTranslations('common');
   const locale = useLocale();
   const pathname = usePathname();
@@ -27,7 +27,8 @@ export function LocaleSwitch() {
           { locale: next },
         )
       }
-      className="rounded-lg px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-50"
+      role="menuitem"
+      className={className ?? 'rounded-lg px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-50'}
     >
       {t('language')}
     </button>
