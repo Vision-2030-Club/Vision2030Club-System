@@ -4,6 +4,7 @@ import { ActionForm } from '@/components/ActionForm';
 import { ConfirmForm } from '@/components/ConfirmForm';
 import { Badge, Card, Input, Label, Select, cx } from '@/components/ui';
 import { formatDate, formatDateTime } from '@/lib/format';
+import { toDateInput } from '@/lib/time';
 import {
   QUALITY_CHOICES,
   RISK_CLASSES,
@@ -259,11 +260,23 @@ export async function TaskCard({
                   <>
                     <div>
                       <Label htmlFor={`start-${task.id}`}>{t('newStartingDate')}</Label>
-                      <Input id={`start-${task.id}`} name="new_start" type="date" required />
+                      <Input
+                        id={`start-${task.id}`}
+                        name="new_start"
+                        type="date"
+                        min={toDateInput(new Date())}
+                        required
+                      />
                     </div>
                     <div>
                       <Label htmlFor={`due-${task.id}`}>{t('newDeliveryDate')}</Label>
-                      <Input id={`due-${task.id}`} name="new_due" type="date" required />
+                      <Input
+                        id={`due-${task.id}`}
+                        name="new_due"
+                        type="date"
+                        min={toDateInput(new Date())}
+                        required
+                      />
                     </div>
                   </>
                 ) : null}

@@ -8,6 +8,7 @@ import { TaskCard } from '@/components/TaskCard';
 import { EmptyState, Input, Label, PageHeader, Select, Textarea, cx } from '@/components/ui';
 import { localized } from '@/lib/format';
 import { groupTaskRows, type TaskKpi } from '@/lib/kpi';
+import { toDateInput } from '@/lib/time';
 import { createTaskAction } from './actions';
 
 const FILTERS = ['all', 'mine', 'open', 'review'] as const;
@@ -97,7 +98,9 @@ export default async function TasksPage({
 
   const visible = tasks.filter(({ task, assigneeIds }) => {
     if (filter === 'mine') return me !== null && assigneeIds.includes(me.id);
-    if (filter === 'open') return task.state === 'in_progress' || task.state === 'not_started';
+    // "Open" is open TO CLAIM — nobody holds it. It used to mean "not
+    // finished", which put assigned work under a label that says otherwise.
+    if (filter === 'open') return assigneeIds.length === 0 && task.state === 'not_started';
     // "To review" is everything actually waiting on this viewer.
     if (filter === 'review') return task.state === 'pending_confirmation' && task.can_confirm;
     return true;
@@ -261,7 +264,7 @@ export default async function TasksPage({
 
               <div>
                 <Label htmlFor="due_date">{t('dueDate')}</Label>
-                <Input id="due_date" name="due_date" type="date" />
+                <Input id="due_date" name="due_date" type="date" min={toDateInput(new Date())} />
               </div>
 
               {/* Several people may hold the same task (0057 E). Nobody

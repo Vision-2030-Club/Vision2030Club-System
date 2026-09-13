@@ -5,6 +5,12 @@ import { kickPushDelivery } from '@/lib/push';
 import { createClient } from '@/lib/supabase/server';
 import { getMyMember } from '@/lib/auth/session';
 import { all, fail, ok, requiredText, text, type ActionResult } from '@/lib/actions';
+import { toDateInput } from '@/lib/time';
+
+/** Dates typed into a task form are on the club's calendar; none may be behind it. */
+function pastDateError(value: string | null, label: string): string | null {
+  return value && value < toDateInput(new Date()) ? `${label} cannot be in the past.` : null;
+}
 
 /**
  * Task actions.
@@ -49,6 +55,9 @@ export async function createTaskAction(
   const belongsTo = requiredText(formData, 'belongs_to');
   const isProject = belongsTo === 'project';
   const assignees = all(formData, 'assignee_ids');
+  const dueDate = text(formData, 'due_date');
+  const pastDue = pastDateError(dueDate, 'The due date');
+  if (pastDue) return fail(pastDue);
   const me = await getMyMember();
   const supabase = await createClient();
 
@@ -60,7 +69,7 @@ export async function createTaskAction(
       project_id: isProject ? text(formData, 'project_id') : null,
       team_id: isProject ? null : text(formData, 'team_id'),
       split_id: isProject ? text(formData, 'split_id') : null,
-      due_date: text(formData, 'due_date'),
+      due_date: dueDate,
       created_by: me?.id ?? null,
       // §3: the Assigned Date is when someone actually took the work on. A task
       // posted for claiming has none until it is claimed.
@@ -167,6 +176,10 @@ export async function rejectTaskAction(
   formData: FormData,
 ): Promise<ActionResult> {
   const locale = requiredText(formData, 'locale');
+  const newStart = text(formData, 'new_start');
+  const newDue = text(formData, 'new_due');
+  const past = pastDateError(newStart, 'The starting date') ?? pastDateError(newDue, 'The delivery date');
+  if (past) return fail(past);
   const supabase = await createClient();
 
   const { error } = await supabase.rpc('reject_task', {
@@ -174,8 +187,8 @@ export async function rejectTaskAction(
     p_note: text(formData, 'note'),
     // Sending request-created work back needs fresh dates: the old ones are no
     // longer a commitment anybody made. Ordinary tasks ignore these.
-    p_start: text(formData, 'new_start'),
-    p_due: text(formData, 'new_due'),
+    p_start: newStart,
+    p_due: newDue,
   });
 
   if (error) return fail(error.message);
