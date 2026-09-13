@@ -95,30 +95,41 @@ export default async function CalendarPage({
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      {/*
+        The month, with an arrow either side. Flex follows the writing
+        direction, so in Arabic "previous" sits on the right — and the
+        chevrons rotate with it, so each still points the way it moves.
+      */}
+      <div className="mb-4 flex items-center justify-between gap-2">
         <Link
           href={`/calendar?month=${monthParam(previous.year, previous.month)}`}
-          className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-muted hover:bg-surface-muted"
+          aria-label={t('previousMonth')}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line text-lg text-ink-muted hover:bg-surface-muted"
         >
-          {t('previousMonth')}
+          <span aria-hidden="true" className="rtl:rotate-180">‹</span>
         </Link>
+        <div className="flex flex-col items-center">
+          <h2 className="text-lg font-semibold text-ink">{monthLabel}</h2>
+          <Link
+            href={`/calendar?month=${monthParam(today.getFullYear(), today.getMonth())}`}
+            className="text-xs text-brand-700 hover:underline"
+          >
+            {t('today')}
+          </Link>
+        </div>
         <Link
           href={`/calendar?month=${monthParam(next.year, next.month)}`}
-          className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-muted hover:bg-surface-muted"
+          aria-label={t('nextMonth')}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line text-lg text-ink-muted hover:bg-surface-muted"
         >
-          {t('nextMonth')}
+          <span aria-hidden="true" className="rtl:rotate-180">›</span>
         </Link>
-        <Link
-          href={`/calendar?month=${monthParam(today.getFullYear(), today.getMonth())}`}
-          className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-muted hover:bg-surface-muted"
-        >
-          {t('today')}
-        </Link>
-        <h2 className="ms-2 text-lg font-semibold text-ink">{monthLabel}</h2>
       </div>
 
-      <Card className="overflow-x-auto p-0">
-        <div className="min-w-[46rem]">
+      {/* Seven columns of whatever width the screen gives — on a phone the
+          bars are colour only and the list underneath carries the titles. */}
+      <Card className="overflow-hidden p-0">
+        <div className="min-w-0">
           <div className="grid grid-cols-7 border-b border-line bg-surface-muted">
             {weeks[0]?.days.map((day) => (
               <div
@@ -147,7 +158,7 @@ export default async function CalendarPage({
                       <div
                         key={day.toISOString()}
                         style={{ minHeight: cellHeight }}
-                        className={`border-b border-e border-line last:border-e-0 px-2 py-1.5 ${
+                        className={`border-b border-e border-line last:border-e-0 px-1 py-1 sm:px-2 sm:py-1.5 ${
                           inMonth ? 'bg-surface' : 'bg-surface-muted/50'
                         }`}
                       >
@@ -205,11 +216,11 @@ export default async function CalendarPage({
                         className="pointer-events-auto mx-0.5 flex items-center gap-1 overflow-hidden rounded px-1.5 text-xs text-white"
                       >
                         {!bar.entry.all_day && !bar.continuesBefore ? (
-                          <span className="ltr-nums shrink-0 opacity-80">
+                          <span className="ltr-nums hidden shrink-0 opacity-80 sm:inline">
                             {formatTime(bar.entry.starts_at, locale)}
                           </span>
                         ) : null}
-                        <span className="truncate font-medium">{bar.entry.title}</span>
+                        <span className="hidden truncate font-medium sm:inline">{bar.entry.title}</span>
                       </Link>
                     );
                   })}
