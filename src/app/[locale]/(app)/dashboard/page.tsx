@@ -7,14 +7,16 @@ import { PushNudge } from '@/components/PushNudge';
 import {
   HEALTH_TONES,
   RISK_CLASSES,
+  compareTasks,
   formatScore,
   healthKey,
   riskKey,
   type ProjectHealth,
+  type TaskKpi,
   type TaskRisk,
 } from '@/lib/kpi';
 import { formatDate, formatDateTime, localized } from '@/lib/format';
-import { describeTarget, findStatus, loadStatusLookup } from '@/lib/requests';
+import { compareRequests, describeTarget, findStatus, loadStatusLookup } from '@/lib/requests';
 
 type ManagedProject = {
   id: string;
@@ -63,7 +65,7 @@ export default async function DashboardPage({
       supabase
         .from('requests')
         .select(
-          'id, status, created_at, request_type_id, target_kind, request_types(name_en, name_ar), target_member:target_member_id(name_en, name_ar), teams(name_en, name_ar), projects(name_en, name_ar)',
+          'id, status, data, created_at, request_type_id, target_kind, request_types(name_en, name_ar), target_member:target_member_id(name_en, name_ar), teams(name_en, name_ar), projects(name_en, name_ar)',
         )
         .eq('submitted_by', member!.id)
         .order('created_at', { ascending: false })
@@ -73,6 +75,24 @@ export default async function DashboardPage({
   const statuses = await loadStatusLookup(
     supabase,
     (myRequests ?? []).map((r) => r.request_type_id as string),
+  );
+
+  // The same order the full lists use: what is burning first, then by
+  // deadline, finished last.
+  (myTasks ?? []).sort((a, b) => compareTasks(a as unknown as TaskKpi, b as unknown as TaskKpi));
+  (myRequests ?? []).sort((a, b) =>
+    compareRequests(
+      {
+        data: a.data,
+        created_at: a.created_at as string,
+        is_terminal: findStatus(statuses, a.request_type_id as string, a.status as string)?.is_terminal,
+      },
+      {
+        data: b.data,
+        created_at: b.created_at as string,
+        is_terminal: findStatus(statuses, b.request_type_id as string, b.status as string)?.is_terminal,
+      },
+    ),
   );
 
   /*

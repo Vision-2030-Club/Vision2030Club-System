@@ -7,7 +7,7 @@ import { Disclosure } from '@/components/Disclosure';
 import { TaskCard } from '@/components/TaskCard';
 import { EmptyState, Input, Label, PageHeader, Select, Textarea, cx } from '@/components/ui';
 import { localized } from '@/lib/format';
-import { groupTaskRows, type TaskKpi } from '@/lib/kpi';
+import { compareTasks, groupTaskRows, type TaskKpi } from '@/lib/kpi';
 import { toDateInput } from '@/lib/time';
 import { createTaskAction } from './actions';
 
@@ -94,7 +94,10 @@ export default async function TasksPage({
     : { data: [] as { id: string; name_en: string; name_ar: string }[] };
 
   // task_kpi is one row per (task, assignee); the list wants each task once.
-  const tasks = groupTaskRows((rows ?? []) as TaskKpi[]);
+  // Burning first: overdue, then by how soon it is due; finished last.
+  const tasks = groupTaskRows((rows ?? []) as TaskKpi[]).sort((a, b) =>
+    compareTasks(a.task, b.task),
+  );
 
   const visible = tasks.filter(({ task, assigneeIds }) => {
     if (filter === 'mine') return me !== null && assigneeIds.includes(me.id);

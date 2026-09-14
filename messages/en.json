@@ -306,7 +306,11 @@
     "targetTeams": "Teams",
     "targetProjects": "Projects",
     "request": "Request",
-    "anyReceiver": "You choose who it goes to"
+    "anyReceiver": "You choose who it goes to",
+    "priorityUrgent": "Urgent",
+    "priorityHigh": "High",
+    "priorityMedium": "Medium",
+    "priorityLow": "Low"
   },
   "calendar": {
     "title": "Calendar",

@@ -90,6 +90,36 @@ export type TaskWithAssignees = {
   assigneeIds: string[];
 };
 
+/**
+ * The order a task list reads in: what is burning first.
+ *
+ * Priority is the due-date risk (§4) — the club chose not to add a priority
+ * field. Overdue, then due within two days, five, later; then work waiting
+ * on a reviewer; then open work with no date; finished work last. Inside a
+ * tier, the nearest due date first (none last), then the newest.
+ */
+const RISK_ORDER: Record<TaskRisk, number> = {
+  overdue: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+  pending_review: 4,
+  none: 5,
+  completed: 6,
+  not_done: 7,
+};
+
+export function compareTasks(a: TaskKpi, b: TaskKpi): number {
+  const tier = RISK_ORDER[a.risk] - RISK_ORDER[b.risk];
+  if (tier !== 0) return tier;
+  if (a.due_date !== b.due_date) {
+    if (!a.due_date) return 1;
+    if (!b.due_date) return -1;
+    return a.due_date < b.due_date ? -1 : 1;
+  }
+  return a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0;
+}
+
 export function groupTaskRows(rows: TaskKpi[]): TaskWithAssignees[] {
   const byId = new Map<string, TaskWithAssignees>();
   for (const row of rows) {

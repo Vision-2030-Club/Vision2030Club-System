@@ -164,6 +164,56 @@ export function isRequestApprover(
   return false;
 }
 
+/**
+ * The order a request list reads in: priority, then deadline.
+ *
+ * Priority is the request's own `priority` answer (Content, Media, Design,
+ * the two Legal types) or the IT Ticket's `urgency`, folded onto one scale;
+ * a type that asks neither sorts after those. The deadline is whichever of
+ * the type's date questions it has. Both come out of `data`, so a new type
+ * with a `priority` field sorts correctly without a code change.
+ */
+export type RequestPriority = 'urgent' | 'high' | 'medium' | 'low';
+
+const PRIORITY_ORDER: Record<RequestPriority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+
+export function requestPriority(data: Record<string, unknown> | null | undefined): RequestPriority | null {
+  const raw = String(data?.priority ?? data?.urgency ?? '');
+  if (raw === 'normal') return 'medium';
+  return raw in PRIORITY_ORDER ? (raw as RequestPriority) : null;
+}
+
+const DEADLINE_KEYS = ['required_date', 'needed_by', 'needed_from', 'proposed_start', 'delivery_date'];
+
+export function requestDeadline(data: Record<string, unknown> | null | undefined): string | null {
+  for (const key of DEADLINE_KEYS) {
+    const value = data?.[key];
+    if (typeof value === 'string' && value) return value;
+  }
+  return null;
+}
+
+export function compareRequests(
+  a: { data: unknown; created_at: string; is_terminal?: boolean },
+  b: { data: unknown; created_at: string; is_terminal?: boolean },
+): number {
+  // Finished ones sink; what still needs someone comes first.
+  if (Boolean(a.is_terminal) !== Boolean(b.is_terminal)) return a.is_terminal ? 1 : -1;
+  const pa = requestPriority(a.data as Record<string, unknown>);
+  const pb = requestPriority(b.data as Record<string, unknown>);
+  const ra = pa ? PRIORITY_ORDER[pa] : 4;
+  const rb = pb ? PRIORITY_ORDER[pb] : 4;
+  if (ra !== rb) return ra - rb;
+  const da = requestDeadline(a.data as Record<string, unknown>);
+  const db = requestDeadline(b.data as Record<string, unknown>);
+  if (da !== db) {
+    if (!da) return 1;
+    if (!db) return -1;
+    return da < db ? -1 : 1;
+  }
+  return a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0;
+}
+
 export type ActorRule = 'requester' | 'target_approver' | 'permission' | 'either';
 
 /**

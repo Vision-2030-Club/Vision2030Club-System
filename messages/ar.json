@@ -306,7 +306,11 @@
     "targetTeams": "الفرق",
     "targetProjects": "المشاريع",
     "request": "الطلب",
-    "anyReceiver": "توجّهه إلى من تختار"
+    "anyReceiver": "توجّهه إلى من تختار",
+    "priorityUrgent": "عاجل",
+    "priorityHigh": "عالية",
+    "priorityMedium": "متوسطة",
+    "priorityLow": "منخفضة"
   },
   "calendar": {
     "title": "التقويم",

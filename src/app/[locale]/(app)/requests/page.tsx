@@ -6,10 +6,12 @@ import { Alert, Badge, Card, EmptyState, PageHeader } from '@/components/ui';
 import { formatDateTime, localized } from '@/lib/format';
 import {
   canActOnRequest,
+  compareRequests,
   describeTarget,
   findStatus,
   isRequestApprover,
   loadStatusLookup,
+  requestPriority,
   type ActorRule,
 } from '@/lib/requests';
 
@@ -42,7 +44,7 @@ export default async function RequestsPage({
      * It has to stay one string literal: supabase-js reads it to type the row.
      */
     .select(
-      'id, status, created_at, request_type_id, submitted_by, target_kind, target_team_id, target_project_id, target_member_id, request_types(name_en, name_ar), members:submitted_by(name_en, name_ar), target_member:target_member_id(name_en, name_ar), teams(name_en, name_ar), projects(name_en, name_ar)',
+      'id, status, data, created_at, request_type_id, submitted_by, target_kind, target_team_id, target_project_id, target_member_id, request_types(name_en, name_ar), members:submitted_by(name_en, name_ar), target_member:target_member_id(name_en, name_ar), teams(name_en, name_ar), projects(name_en, name_ar)',
     )
     .order('created_at', { ascending: false })
     .limit(200);
@@ -93,6 +95,16 @@ export default async function RequestsPage({
       request.submitted_by === me!.id,
     );
   });
+
+  // Priority, then deadline; anything finished after everything open.
+  const terminal = (r: { request_type_id: unknown; status: unknown }) =>
+    findStatus(statuses, r.request_type_id as string, r.status as string)?.is_terminal;
+  visible.sort((a, b) =>
+    compareRequests(
+      { data: a.data, created_at: a.created_at as string, is_terminal: terminal(a) },
+      { data: b.data, created_at: b.created_at as string, is_terminal: terminal(b) },
+    ),
+  );
 
   const canSubmit = await hasPermission('requests.submit');
 
@@ -164,6 +176,7 @@ export default async function RequestsPage({
                 // subtitle. A reader scanning the list is looking for "the
                 // one to Design", not "the Media Request".
                 const target = describeTarget(request, locale, t('targetPresidency'));
+                const priority = requestPriority(request.data as Record<string, unknown>);
 
                 return (
                   <tr key={request.id} className="hover:bg-surface-muted">
@@ -178,6 +191,21 @@ export default async function RequestsPage({
                           )}
                         </span>
                       </Link>
+                      {priority ? (
+                        <span className="mt-1 inline-block">
+                          <Badge
+                            tone={
+                              priority === 'urgent'
+                                ? 'danger'
+                                : priority === 'high'
+                                  ? 'warn'
+                                  : 'neutral'
+                            }
+                          >
+                            {t(`priority${priority.charAt(0).toUpperCase()}${priority.slice(1)}`)}
+                          </Badge>
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-2.5">
                       {localized(
