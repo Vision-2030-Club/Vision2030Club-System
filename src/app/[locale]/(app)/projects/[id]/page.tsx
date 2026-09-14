@@ -62,6 +62,7 @@ export default async function ProjectPage({
     { data: staff },
     { data: taskRows },
     { data: allMembers },
+    { data: pms },
     { data: splits },
     { data: splitManagers },
     { data: splitMembers },
@@ -82,6 +83,14 @@ export default async function ProjectPage({
       .eq('project_id', id)
       .order('due_date', { ascending: true, nullsFirst: false }),
     supabase.from('members').select('id, name_en, name_ar').eq('status', 'active').order('name_en'),
+    // Who may be made a manager: only people holding the role (0061). The
+    // database refuses anyone else; this list simply never offers them.
+    supabase
+      .from('members')
+      .select('id, name_en, name_ar, roles!inner(key)')
+      .eq('status', 'active')
+      .eq('roles.key', 'project_manager')
+      .order('name_en'),
     supabase.from('project_splits').select('id, name').eq('project_id', id).order('name'),
     // Filtered through the embedded split: these used to fetch the WHOLE
     // club's split membership and narrow it in JS.
@@ -234,17 +243,23 @@ export default async function ProjectPage({
           )}
 
           {canManage ? (
-            <ActionForm action={addProjectManagerAction} submitLabel={t('addManager')}>
-              <input type="hidden" name="project_id" value={project.id} />
-              <input type="hidden" name="locale" value={locale} />
-              <Select name="member_id" aria-label={t('addManager')} required>
-                {(allMembers ?? []).map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {localized(person, 'name', locale)}
-                  </option>
-                ))}
-              </Select>
-            </ActionForm>
+            (pms ?? []).some((person) => !managerIds.has(person.id as string)) ? (
+              <ActionForm action={addProjectManagerAction} submitLabel={t('addManager')}>
+                <input type="hidden" name="project_id" value={project.id} />
+                <input type="hidden" name="locale" value={locale} />
+                <Select name="member_id" aria-label={t('addManager')} required>
+                  {(pms ?? [])
+                    .filter((person) => !managerIds.has(person.id as string))
+                    .map((person) => (
+                      <option key={person.id} value={person.id}>
+                        {localized(person, 'name', locale)}
+                      </option>
+                    ))}
+                </Select>
+              </ActionForm>
+            ) : (
+              <p className="text-xs text-ink-muted">{t('noPmsAvailable')}</p>
+            )
           ) : null}
         </Card>
 
@@ -445,7 +460,8 @@ export default async function ProjectPage({
                               aria-label={t('addSplitManager')}
                               required
                             >
-                              {(allMembers ?? []).map((person) => (
+                              {/* A split's PMs hold the role too (0061). */}
+                              {(pms ?? []).map((person) => (
                                 <option key={person.id} value={person.id}>
                                   {localized(person, 'name', locale)}
                                 </option>

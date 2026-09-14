@@ -236,6 +236,26 @@ async function run(p) {
   });
   check('a Project Manager can add a split to their project', allowed(splitByPm), JSON.stringify(splitByPm.body));
 
+  // --- Managers hold the role (0061) ------------------------------------------
+  const memberAsManager = await rest(p.pres.token, 'project_managers', {
+    method: 'POST',
+    body: JSON.stringify({ project_id: p.projectId, member_id: p.member.id }),
+  });
+  check('a Member cannot be made a project manager',
+    !memberAsManager.ok && String(memberAsManager.body?.message).includes('Project Manager role'),
+    JSON.stringify(memberAsManager.body));
+  const splitId = splitByPm.body?.[0]?.id;
+  const memberOnSplit = await rest(p.pres.token, 'project_split_managers', {
+    method: 'POST',
+    body: JSON.stringify({ split_id: splitId, member_id: p.member.id }),
+  });
+  check('nor of a split', !memberOnSplit.ok, JSON.stringify(memberOnSplit.body));
+  const pmOnSplit = await rest(p.pres.token, 'project_split_managers', {
+    method: 'POST',
+    body: JSON.stringify({ split_id: splitId, member_id: p.pm.id }),
+  });
+  check('a Project Manager can be', allowed(pmOnSplit), JSON.stringify(pmOnSplit.body));
+
   // --- A. Directors see their own team's tasks ------------------------------------
   const designTask = await rest(p.design.token, 'tasks', {
     method: 'POST',

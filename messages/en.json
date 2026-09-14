@@ -188,7 +188,8 @@
     "deleteSplitBody": "Its tasks become project-wide and fall to the project PMs to confirm. Scores are not affected.",
     "health": "Health",
     "completion": "Completion",
-    "kpiHidden": "You do not have permission to see this project’s KPI figures."
+    "kpiHidden": "You do not have permission to see this project’s KPI figures.",
+    "noPmsAvailable": "Nobody holds the Project Manager role yet — assign it on a member's profile first."
   },
   "tasks": {
     "title": "Tasks",
