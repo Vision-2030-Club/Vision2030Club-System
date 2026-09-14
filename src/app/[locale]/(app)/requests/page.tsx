@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getMyMember, hasPermission, scopeFor } from '@/lib/auth/session';
+import { ScopeFilter } from '@/components/ScopeFilter';
 import { Alert, Badge, Card, EmptyState, PageHeader } from '@/components/ui';
 import { formatDateTime, localized } from '@/lib/format';
 import {
@@ -20,10 +21,10 @@ export default async function RequestsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ filter?: string; created?: string }>;
+  searchParams: Promise<{ filter?: string; created?: string; scope?: string }>;
 }) {
   const { locale } = await params;
-  const { filter, created } = await searchParams;
+  const { filter, created, scope: rawScope } = await searchParams;
   setRequestLocale(locale);
 
   const t = await getTranslations('requests');
@@ -83,7 +84,22 @@ export default async function RequestsPage({
     (rulesFrom.get(key) ?? rulesFrom.set(key, new Set()).get(key)!).add(move.actor_rule as ActorRule);
   }
 
+  // Whoever sees the whole club can look at one team or one project of it.
+  // The scope only exists for `all`; anyone narrower already sees a slice.
+  const viewScope = await scopeFor('requests.view');
+  const scope = viewScope === 'all' && rawScope ? rawScope : '';
+  const [scopeKind, scopeId] = scope.split(':');
+  const [{ data: teams }, { data: projects }] =
+    viewScope === 'all'
+      ? await Promise.all([
+          supabase.from('teams').select('id, name_en, name_ar').eq('is_active', true).order('name_en'),
+          supabase.from('projects').select('id, name_en, name_ar').order('name_en'),
+        ])
+      : [{ data: [] }, { data: [] }];
+
   const visible = (requests ?? []).filter((request) => {
+    if (scopeKind === 'team' && request.target_team_id !== scopeId) return false;
+    if (scopeKind === 'project' && request.target_project_id !== scopeId) return false;
     if (filter !== 'decide') return true;
     const status = findStatus(statuses, request.request_type_id as string, request.status as string);
     if (status?.is_terminal) return false;
@@ -108,10 +124,13 @@ export default async function RequestsPage({
 
   const canSubmit = await hasPermission('requests.submit');
 
+  // The tabs keep whatever slice of the club is chosen.
+  const withScope = (href: string) =>
+    scope ? `${href}${href.includes('?') ? '&' : '?'}scope=${scope}` : href;
   const tabs = [
-    { key: 'all', label: tCommon('all'), href: '/requests' },
-    { key: 'mine', label: t('mine'), href: '/requests?filter=mine' },
-    { key: 'decide', label: t('toDecide'), href: '/requests?filter=decide' },
+    { key: 'all', label: tCommon('all'), href: withScope('/requests') },
+    { key: 'mine', label: t('mine'), href: withScope('/requests?filter=mine') },
+    { key: 'decide', label: t('toDecide'), href: withScope('/requests?filter=decide') },
   ];
   const active = filter ?? 'all';
 
@@ -147,6 +166,17 @@ export default async function RequestsPage({
           </Link>
         ))}
       </div>
+
+      {viewScope === 'all' ? (
+        <div className="mb-4">
+          <ScopeFilter
+            teams={(teams ?? []) as { id: string; name_en: string; name_ar: string }[]}
+            projects={(projects ?? []) as { id: string; name_en: string; name_ar: string }[]}
+            value={scope}
+            labels={{ all: tCommon('all'), teams: t('targetTeams'), projects: t('targetProjects') }}
+          />
+        </div>
+      ) : null}
 
       {created ? (
         <div className="mb-4">

@@ -257,6 +257,11 @@ async function run(p) {
   });
   check("a Director cannot create a task for another team", !otherTeam.ok);
 
+  // 0060: a Project Manager sees their projects' tasks, not the club's.
+  const pmSees = await rest(p.pm.token, `task_kpi?select=id&title=like.${encodeURIComponent(TAG + '%')}`);
+  check("a Project Manager does not see a team's internal task",
+    pmSees.ok && !pmSees.body.some((t) => t.id === designTaskId), JSON.stringify(pmSees.body));
+
   // --- F. A PM is offered their project's members --------------------------------
   const offered = await rest(p.pm.token, 'assignable_members?select=id');
   check('a Project Manager is offered the members of their project',

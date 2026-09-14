@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getMyMember, scopeFor } from '@/lib/auth/session';
 import { ActionForm } from '@/components/ActionForm';
 import { Disclosure } from '@/components/Disclosure';
+import { ScopeFilter } from '@/components/ScopeFilter';
 import { TaskCard } from '@/components/TaskCard';
 import { EmptyState, Input, Label, PageHeader, Select, Textarea, cx } from '@/components/ui';
 import { localized } from '@/lib/format';
@@ -19,10 +20,10 @@ export default async function TasksPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; scope?: string }>;
 }) {
   const { locale } = await params;
-  const { filter: rawFilter } = await searchParams;
+  const { filter: rawFilter, scope: rawScope } = await searchParams;
   setRequestLocale(locale);
 
   const filter: Filter = (FILTERS as readonly string[]).includes(rawFilter ?? '')
@@ -31,6 +32,7 @@ export default async function TasksPage({
 
   const t = await getTranslations('tasks');
   const tCommon = await getTranslations('common');
+  const tRequests = await getTranslations('requests');
   const supabase = await createClient();
   const me = await getMyMember();
 
@@ -99,7 +101,15 @@ export default async function TasksPage({
     compareTasks(a.task, b.task),
   );
 
+  // Whoever sees the whole club can look at one team or one project of it.
+  // The scope only exists for `all`; anyone narrower already sees a slice.
+  const viewScope = await scopeFor('tasks.view');
+  const scope = viewScope === 'all' && rawScope ? rawScope : '';
+  const [scopeKind, scopeId] = scope.split(':');
+
   const visible = tasks.filter(({ task, assigneeIds }) => {
+    if (scopeKind === 'team' && task.team_id !== scopeId) return false;
+    if (scopeKind === 'project' && task.project_id !== scopeId) return false;
     if (filter === 'mine') return me !== null && assigneeIds.includes(me.id);
     // "Open" is open TO CLAIM — nobody holds it. It used to mean "not
     // finished", which put assigned work under a label that says otherwise.
@@ -139,7 +149,12 @@ export default async function TasksPage({
             {FILTERS.map((key) => (
               <Link
                 key={key}
-                href={key === 'all' ? '/tasks' : `/tasks?filter=${key}`}
+                href={`/tasks${
+                  [key === 'all' ? '' : `filter=${key}`, scope ? `scope=${scope}` : '']
+                    .filter(Boolean)
+                    .join('&')
+                    .replace(/^(.)/, '?$1')
+                }`}
                 className={cx(
                   'rounded px-3 py-1',
                   filter === key
@@ -153,6 +168,21 @@ export default async function TasksPage({
           </div>
         }
       />
+
+      {viewScope === 'all' ? (
+        <div className="mb-4">
+          <ScopeFilter
+            teams={(teams ?? []) as { id: string; name_en: string; name_ar: string }[]}
+            projects={(projects ?? []) as { id: string; name_en: string; name_ar: string }[]}
+            value={scope}
+            labels={{
+              all: tCommon('all'),
+              teams: tRequests('targetTeams'),
+              projects: tRequests('targetProjects'),
+            }}
+          />
+        </div>
+      ) : null}
 
       {/*
         Creating a task is an occasional act, so it is a button rather than a
