@@ -84,6 +84,7 @@ export default async function TaskPage({
             isMine={isMine}
             homeLabel={homeLabel}
             assigneeNames={assigneeNames}
+            showViewLink={false}
           />
 
           <Card>

@@ -39,6 +39,7 @@ export async function TaskCard({
   isMine,
   homeLabel,
   assigneeNames,
+  showViewLink = true,
 }: {
   task: TaskKpi;
   locale: string;
@@ -48,6 +49,8 @@ export async function TaskCard({
   homeLabel: string;
   /** Everyone on it, localised — empty when it is posted for claiming. */
   assigneeNames: string[];
+  /** The task's own page renders this card too, and needs no button to itself. */
+  showViewLink?: boolean;
 }) {
   const t = await getTranslations('tasks');
   const tCommon = await getTranslations('common');
@@ -74,9 +77,7 @@ export async function TaskCard({
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <Link href={`/tasks/${task.id}`} className="font-medium text-brand-700 hover:underline">
-            {task.title}
-          </Link>
+          <div className="font-medium text-ink">{task.title}</div>
           <div className="mt-0.5 text-xs text-ink-muted">
             {homeLabel}
             {' · '}
@@ -90,6 +91,16 @@ export async function TaskCard({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+          {/* A button, not a linked title: on a phone a tappable name looks
+              like plain text, and testers asked where the details were. */}
+          {showViewLink ? (
+            <Link
+              href={`/tasks/${task.id}`}
+              className="inline-flex touch-manipulation items-center rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-medium text-ink hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+            >
+              {t('viewTask')}
+            </Link>
+          ) : null}
           <Badge tone={STATE_TONES[task.state]}>{t(stateKey(task.state))}</Badge>
           {/* §4's risk read is only meaningful while work is outstanding. */}
           {isOpen ? (

@@ -173,6 +173,11 @@ export default async function RoomsPage({
     return hours * 60 + minutes;
   };
 
+  // How far today's clock has run, so the grid can grey out what is over.
+  // Only today has a past; the page never shows an earlier day (clamped
+  // above), and a later day has nothing elapsed yet.
+  const elapsedUntil = selectedDay === today ? minuteOfDay(new Date().toISOString()) : -1;
+
   const partyLabel = (booking: BookingRow) => {
     const own =
       booking.party_kind === 'block'
@@ -267,6 +272,7 @@ export default async function RoomsPage({
         defaultIdentity={defaultIdentity}
         meId={me?.id ?? ''}
         canRemoveAny={canRemoveAny}
+        elapsedUntil={elapsedUntil}
       />
     </>
   );

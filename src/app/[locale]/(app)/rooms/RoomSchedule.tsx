@@ -36,6 +36,7 @@ export function RoomSchedule({
   defaultIdentity,
   meId,
   canRemoveAny,
+  elapsedUntil,
 }: {
   locale: string;
   day: string;
@@ -46,6 +47,13 @@ export function RoomSchedule({
   meId: string;
   /** True for IT, who may clear anyone's booking (§4). */
   canRemoveAny: boolean;
+  /**
+   * Minutes from midnight on the club's clock, as of the page being served —
+   * for today only; -1 for a later day. Half-hours that ended before this are
+   * drawn greyed out and are not offered, so the morning's empty slots stop
+   * reading as bookable at four in the afternoon.
+   */
+  elapsedUntil: number;
 }) {
   /*
    * A Project Manager with no project yet has nothing to book AS. They can
@@ -61,11 +69,13 @@ export function RoomSchedule({
   return (
     <>
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
-        <div className="min-w-[36rem]">
+        {/* As wide as the rooms need and no wider: two rooms fit a phone
+            without scrolling, and a third scrolls sideways inside the frame. */}
+        <div style={{ minWidth: `calc(3.5rem + ${columns.length} * 8rem)` }}>
           {/* Header: one cell per room. */}
           <div
             className="grid border-b border-line bg-surface-muted"
-            style={{ gridTemplateColumns: `4.5rem repeat(${columns.length}, minmax(9rem, 1fr))` }}
+            style={{ gridTemplateColumns: `3.5rem repeat(${columns.length}, minmax(8rem, 1fr))` }}
           >
             <div className="px-2 py-2 text-center text-xs font-medium text-ink-muted">
               {t('time')}
@@ -83,8 +93,10 @@ export function RoomSchedule({
           <div
             className="grid"
             style={{
-              gridTemplateColumns: `4.5rem repeat(${columns.length}, minmax(9rem, 1fr))`,
-              gridTemplateRows: `repeat(${slots.length}, 2.75rem)`,
+              gridTemplateColumns: `3.5rem repeat(${columns.length}, minmax(8rem, 1fr))`,
+              // A floor, not a fixed height: a booking's three lines and its
+              // cancel link grow the row instead of being cut off at 44px.
+              gridTemplateRows: `repeat(${slots.length}, minmax(2.75rem, auto))`,
             }}
           >
             {/* Time labels down the side. */}
@@ -92,7 +104,10 @@ export function RoomSchedule({
               <div
                 key={slot.minute}
                 style={{ gridColumn: 1, gridRow: row + 1 }}
-                className="ltr-nums border-b border-line px-2 py-1 text-xs text-ink-muted"
+                className={cx(
+                  'ltr-nums border-b border-line px-2 py-1 text-xs text-ink-muted',
+                  slot.minute + 30 <= elapsedUntil && 'opacity-50',
+                )}
               >
                 {slot.label}
               </div>
@@ -110,29 +125,32 @@ export function RoomSchedule({
                 if (cell.kind === 'busy') {
                   const { booking } = cell;
                   const mine = booking.bookedById === meId;
+                  const over = booking.endMinute <= elapsedUntil;
 
                   return (
                     <div
                       key={`${room.id}-${row}`}
                       style={{ gridColumn, gridRow: `${gridRow} / span ${cell.span}` }}
-                      className="border-b border-s border-line p-1"
+                      className={cx('border-b border-s border-line p-1', over && 'bg-surface-muted')}
                     >
                       <div
                         className={cx(
-                          'flex h-full flex-col gap-0.5 overflow-hidden rounded p-1.5 text-xs',
+                          'flex h-full flex-col gap-0.5 rounded p-1.5 text-xs leading-tight',
                           booking.status === 'blocked'
                             ? 'bg-danger/10 text-danger'
                             : booking.status === 'held'
                               ? 'bg-warn/10 text-warn'
                               : 'bg-brand-50 text-brand-700',
+                          // Already happened: still on the record, but grey.
+                          over && 'opacity-50 grayscale',
                         )}
                       >
-                        <div className="truncate font-semibold">{booking.title}</div>
+                        <div className="break-words font-semibold">{booking.title}</div>
                         {/* §4: everyone sees the group and who booked it. */}
-                        <div className="truncate opacity-80">{booking.partyLabel}</div>
-                        <div className="truncate opacity-70">{booking.bookedByName}</div>
+                        <div className="break-words opacity-80">{booking.partyLabel}</div>
+                        <div className="break-words opacity-70">{booking.bookedByName}</div>
 
-                        {mine || canRemoveAny ? (
+                        {(mine || canRemoveAny) && !over ? (
                           <CancelButton
                             locale={locale}
                             bookingId={booking.id}
@@ -140,6 +158,22 @@ export function RoomSchedule({
                           />
                         ) : null}
                       </div>
+                    </div>
+                  );
+                }
+
+                // Gone by: greyed and not offered. The half-hour under way is
+                // still open — somebody standing at the door can take it.
+                if (cell.minute + 30 <= elapsedUntil) {
+                  return (
+                    <div
+                      key={`${room.id}-${row}`}
+                      style={{ gridColumn, gridRow }}
+                      className="border-b border-s border-line bg-surface-muted p-1"
+                    >
+                      <span className="flex h-full items-center justify-center text-xs text-ink-muted opacity-50">
+                        {t('elapsed')}
+                      </span>
                     </div>
                   );
                 }

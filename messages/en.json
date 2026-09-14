@@ -263,7 +263,8 @@
     "details": "Details",
     "createdBy": "Created by",
     "assignedOn": "Assigned",
-    "confirmedOn": "Confirmed"
+    "confirmedOn": "Confirmed",
+    "viewTask": "View task"
   },
   "requests": {
     "title": "Requests",
@@ -522,7 +523,8 @@
     "hourUnavailable": "An hour would run into the next booking or past closing time.",
     "notForMembers": "The room schedule is for Team Directors, Project Managers, and the Presidency. To use a room, ask your Director to book it.",
     "noRoomsYet": "No rooms have been added yet. IT sets them up under Admin → Rooms.",
-    "noIdentity": "You have no team or project to book for yet, so you can see the schedule but not take a slot."
+    "noIdentity": "You have no team or project to book for yet, so you can see the schedule but not take a slot.",
+    "elapsed": "Past"
   },
   "google": {
     "title": "Google connection",
