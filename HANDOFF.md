@@ -408,6 +408,39 @@ Nine more comments the same evening. Migration `0058`; the checks joined
   HR: `members.directory` is `own_team` / `own_projects` for them, and
   every "open a profile" link checks for scope `all`.
 
+### The third batch
+
+Follow-ups from the same testers over the next days. Migrations `0059`–`0061`
+(all three applied through the SQL Editor — port 5432 was unreachable from the
+IT lead's machine, see below); the checks joined `npm run db:round1`.
+
+- **No past dates on a task** (`0059`): starting and delivery dates in the
+  request transitions are `no_past`, and the task form refuses them too.
+- **A Project Manager sees their projects' tasks only** (`0060`): `tasks.view`
+  went from `all` to `own_projects`, matching the rest of their scopes.
+- **Whoever sees the whole club can look at one slice of it**: the task and
+  request lists carry a team/project filter (`ScopeFilter`, `?scope=team:…` /
+  `project:…`) for anyone whose view scope is `all`; the tabs keep it.
+- **Sorted by urgency**: tasks by due-date risk (overdue, then high, medium,
+  low, pending review, none, finished), then due date, then newest
+  (`compareTasks`); requests by their own priority or urgency, none last,
+  finished last, then deadline (`compareRequests`).
+- **"Open" means open to claim** — a task with anyone on it is no longer
+  listed there.
+- **A project's managers must hold the Project Manager role** (`0061`): a
+  trigger refuses the row on `project_managers` and `project_split_managers`,
+  and the project page offers only PM-role holders not already managing.
+- **Language and sign-out live inside the profile menu** (`ProfileMenu`), and
+  the calendar fits a phone with a "September 2026" heading between arrows.
+- **Each task card has a "View task" button**; a linked title read as plain
+  text on a phone. The task's own page leaves the button out.
+- **The room schedule fits its bookings**: rows are a floor, not a fixed
+  height, so a booking's three lines and its cancel link are never clipped;
+  the frame is only as wide as the rooms need. Half-hours that have already
+  ended are greyed out and not offered (the one under way stays open), and
+  past bookings stay on the record, dim. The clock is the server's at render
+  time, on the club's zone (`elapsedUntil`).
+
 ## Picking this up again
 
 Nothing is blocked. To get running from a fresh clone:
