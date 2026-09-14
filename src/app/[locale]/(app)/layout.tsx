@@ -200,7 +200,7 @@ export default async function AppLayout({
                 <button
                   type="submit"
                   role="menuitem"
-                  className="block w-full rounded px-3 py-2 text-start text-sm text-ink-muted hover:bg-surface-muted"
+                  className="block w-full rounded px-3 py-2 text-start text-sm text-ink hover:bg-surface-muted"
                 >
                   {t('signOut')}
                 </button>

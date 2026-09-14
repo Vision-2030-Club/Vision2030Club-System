@@ -62,8 +62,13 @@ export function ProfileMenu({
       {open ? (
         <div
           role="menu"
-          // Any tap inside closes it too: every item navigates or submits.
-          onClick={() => setOpen(false)}
+          // A tap on a link closes the menu (the layout survives navigation,
+          // so it would otherwise stay open on the next page). A tap on a
+          // FORM must not: closing unmounts the form before the browser gets
+          // to submit it — which is exactly how "Sign out" did nothing.
+          onClick={(event) => {
+            if (!(event.target as HTMLElement).closest('form')) setOpen(false);
+          }}
           className="absolute end-0 z-30 mt-1 min-w-48 rounded-lg border border-line bg-surface p-1 shadow-lg"
         >
           {children}
