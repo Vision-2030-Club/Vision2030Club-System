@@ -200,7 +200,9 @@
     "componentNone": "No component attached.",
     "detachComponent": "Detach",
     "detachComponentTitle": "Detach this component?",
-    "detachComponentBody": "The button disappears for everyone. Nothing is deleted: attaching it again finds the same edition and its data."
+    "detachComponentBody": "The button disappears for everyone. Nothing is deleted: attaching it again finds the same edition and its data.",
+    "componentEdition": "Edition",
+    "componentEditionNew": "Start a new edition"
   },
   "tasks": {
     "title": "Tasks",

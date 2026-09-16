@@ -272,33 +272,64 @@ export async function attachComponentAction(
 
   const db = createInterviewsClient();
   const actor = { kind: 'member', id: me.id, name: me.name_en };
-
-  // A detached project keeps its edition; attaching again finds it rather
-  // than starting a second one and stranding the first.
-  const { data: existing } = await db
-    .from('editions')
-    .select('id')
-    .eq('club_project_id', projectId)
-    .maybeSingle();
-
-  let editionId = existing?.id as string | undefined;
-  let created = false;
-
-  if (!editionId) {
-    const { newToken } = await import('@/lib/interviews/tokens');
-    const { data: edition, error } = await db.rpc('create_edition', {
-      p_payload: {
-        name_en: project.name_en,
-        name_ar: project.name_ar,
-        public_slug: await uniqueSlug(db, project.name_en as string),
-        club_project_id: projectId,
-        tv_token: newToken(),
-      },
+  const link = (editionId: string, projectRef: string) =>
+    db.rpc('update_edition', {
+      p_edition: editionId,
+      p_patch: { club_project_id: projectRef },
       p_actor: actor,
     });
-    if (error) return fail(error.message);
-    editionId = (edition as { id: string }).id;
-    created = true;
+
+  /*
+   * Which edition this project shows. "new" starts one named after the
+   * project; anything else is an existing edition nobody else holds — the
+   * archived April 2026 week, or an edition a detached project left behind.
+   * A project that once held an edition finds it again by club_project_id.
+   */
+  const choice = text(formData, 'edition_id') ?? 'new';
+  let editionId: string | undefined;
+  let created = false;
+  let linked = false;
+
+  if (choice !== 'new') {
+    const { data: chosen } = await db
+      .from('editions')
+      .select('id, club_project_id')
+      .eq('id', choice)
+      .maybeSingle();
+    if (!chosen) return fail('That edition no longer exists.');
+    if (chosen.club_project_id && chosen.club_project_id !== projectId) {
+      return fail('That edition is attached to another project.');
+    }
+    if (chosen.club_project_id !== projectId) {
+      const { error } = await link(chosen.id as string, projectId);
+      if (error) return fail(error.message);
+      linked = true;
+    }
+    editionId = chosen.id as string;
+  } else {
+    const { data: existing } = await db
+      .from('editions')
+      .select('id')
+      .eq('club_project_id', projectId)
+      .maybeSingle();
+    editionId = existing?.id as string | undefined;
+
+    if (!editionId) {
+      const { newToken } = await import('@/lib/interviews/tokens');
+      const { data: edition, error } = await db.rpc('create_edition', {
+        p_payload: {
+          name_en: project.name_en,
+          name_ar: project.name_ar,
+          public_slug: await uniqueSlug(db, project.name_en as string),
+          club_project_id: projectId,
+          tv_token: newToken(),
+        },
+        p_actor: actor,
+      });
+      if (error) return fail(error.message);
+      editionId = (edition as { id: string }).id;
+      created = true;
+    }
   }
 
   const { error } = await supabase.from('project_components').insert({
@@ -309,8 +340,9 @@ export async function attachComponentAction(
   });
 
   if (error) {
-    // Refused by the club database: do not leave a brand-new edition behind.
+    // Refused by the club database: leave the other database as it was.
     if (created) await db.from('editions').delete().eq('id', editionId);
+    else if (linked) await link(editionId, '');
     return fail(error.message);
   }
 
@@ -331,10 +363,23 @@ export async function detachComponentAction(
     .from('project_components')
     .delete()
     .eq('project_id', projectId)
-    .select('project_id');
+    .select('project_id, external_ref');
 
   if (error) return fail(error.message);
   if (!deleted?.length) return fail('Nothing to detach, or you may not manage this project.');
+
+  // The edition and its data stay; only the link goes. Clearing the back
+  // reference lets another project pick the edition up from the list.
+  const { isInterviewsConfigured, createInterviewsClient } = await import('@/lib/supabase/interviews');
+  const editionId = deleted[0].external_ref as string | null;
+  if (editionId && isInterviewsConfigured()) {
+    const me = await getMyMember();
+    await createInterviewsClient().rpc('update_edition', {
+      p_edition: editionId,
+      p_patch: { club_project_id: '' },
+      p_actor: { kind: 'member', id: me?.id ?? null, name: me?.name_en ?? 'member' },
+    });
+  }
 
   revalidatePath(`/${locale}/projects/${projectId}`);
   return ok();

@@ -5,6 +5,7 @@ import { MemberLink } from '@/components/MemberLink';
 import { createClient } from '@/lib/supabase/server';
 import { getMyMember, scopeFor } from '@/lib/auth/session';
 import { componentHref, getMyComponentAccess } from '@/lib/interviews/access';
+import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/interviews';
 import { ActionForm } from '@/components/ActionForm';
 import { ConfirmForm } from '@/components/ConfirmForm';
 import { TaskCard } from '@/components/TaskCard';
@@ -129,6 +130,23 @@ export default async function ProjectPage({
     projectScope === 'all' ||
     (projectScope === 'own_projects' && managerIds.has(me?.id ?? '')) ||
     (projectScope === 'own_team' && project.owning_team_id === me?.team_id);
+
+  /*
+   * Editions in the interviews database that no project holds — offered when
+   * attaching, so a project can show an archived week (April 2026) or pick
+   * up an edition a detached project left behind, instead of always starting
+   * a new one. Only loaded when the form will be drawn.
+   */
+  const tInterviews = await getTranslations('interviews');
+  let editionOptions: { id: string; name_en: string; name_ar: string; status: string }[] = [];
+  if (canManage && !component && isInterviewsConfigured()) {
+    const { data } = await createInterviewsClient()
+      .from('editions')
+      .select('id, name_en, name_ar, status')
+      .is('club_project_id', null)
+      .order('created_at', { ascending: false });
+    editionOptions = (data ?? []) as typeof editionOptions;
+  }
 
   // task_kpi is one row per (task, assignee); the list wants each task once.
   const tasks = groupTaskRows((taskRows ?? []) as TaskKpi[]);
@@ -375,11 +393,24 @@ export default async function ProjectPage({
             <ActionForm action={attachComponentAction} submitLabel={t('attachComponent')}>
               <input type="hidden" name="locale" value={locale} />
               <input type="hidden" name="project_id" value={project.id} />
-              <div className="max-w-sm">
-                <Label htmlFor="component_key">{t('componentPick')}</Label>
-                <Select id="component_key" name="component_key" required>
-                  <option value="mock_interviews">{t('component_mock_interviews')}</option>
-                </Select>
+              <div className="grid max-w-xl gap-3 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="component_key">{t('componentPick')}</Label>
+                  <Select id="component_key" name="component_key" required>
+                    <option value="mock_interviews">{t('component_mock_interviews')}</option>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="edition_id">{t('componentEdition')}</Label>
+                  <Select id="edition_id" name="edition_id" defaultValue="new">
+                    <option value="new">{t('componentEditionNew')}</option>
+                    {editionOptions.map((edition) => (
+                      <option key={edition.id} value={edition.id}>
+                        {localized(edition, 'name', locale)} · {tInterviews(`status.${edition.status}`)}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
               </div>
             </ActionForm>
           ) : (

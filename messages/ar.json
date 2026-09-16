@@ -200,7 +200,9 @@
     "componentNone": "لا يوجد مكوّن مرفق.",
     "detachComponent": "فصل",
     "detachComponentTitle": "فصل هذا المكوّن؟",
-    "detachComponentBody": "يختفي الزر عن الجميع. لا يُحذف شيء: إعادة الإرفاق تجد النسخة نفسها وبياناتها."
+    "detachComponentBody": "يختفي الزر عن الجميع. لا يُحذف شيء: إعادة الإرفاق تجد النسخة نفسها وبياناتها.",
+    "componentEdition": "النسخة",
+    "componentEditionNew": "بدء نسخة جديدة"
   },
   "tasks": {
     "title": "المهام",

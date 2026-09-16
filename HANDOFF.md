@@ -1048,9 +1048,16 @@ overlapped another company in the old schedule live in rooms named
 `INTERVIEWS_*` variables are in Vercel (Production and Preview) and the
 production deployment was rebuilt with them: the cron route answers with a
 real report, the archived edition's apply page renders, the TV board API
-answers with its token. Still to do by a person: Resend (API key + verified
-domain, then `RESEND_API_KEY` and `EMAIL_FROM` in Vercel and one more
-redeploy), and the Pro upgrade of the organization.
+answers with its token. Two club projects carry the component: the club's own "Mockup
+Interviews" (a fresh draft edition, `mockup-interviews-2026`) and "Mock
+Interviews — April 2026 (archive)", a completed project attached to the
+imported edition so last year can be browsed read-only; detach or delete it
+whenever it has served its purpose. The Component card's *Edition* choice is
+how a project attaches to an existing, unheld edition rather than starting a
+new one; detaching clears the edition's `club_project_id` so another project
+can pick it up. Still to do by a person: Resend (API key + verified domain,
+then `RESEND_API_KEY` and `EMAIL_FROM` in Vercel and one more redeploy), and
+the Pro upgrade of the organization.
 
 ### Verified
 
