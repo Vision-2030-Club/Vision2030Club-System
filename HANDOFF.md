@@ -1044,9 +1044,13 @@ is scheduled with pg_cron next to `push-sweep`, reusing the Vault secret, and
 answers "not configured" until Vercel has the `INTERVIEWS_*` variables. April 2026 is imported as the archived edition `april-2026` (876
 applications, 69 sessions, 851 slots, 119 bookings); three sessions that
 overlapped another company in the old schedule live in rooms named
-"<room> (overlap)" so the room-clash constraint keeps its meaning. Still to
-do by a person: Resend (API key + verified domain), the five Vercel
-variables, a redeploy, and the Pro upgrade of the organization.
+"<room> (overlap)" so the room-clash constraint keeps its meaning. The three
+`INTERVIEWS_*` variables are in Vercel (Production and Preview) and the
+production deployment was rebuilt with them: the cron route answers with a
+real report, the archived edition's apply page renders, the TV board API
+answers with its token. Still to do by a person: Resend (API key + verified
+domain, then `RESEND_API_KEY` and `EMAIL_FROM` in Vercel and one more
+redeploy), and the Pro upgrade of the organization.
 
 ### Verified
 
