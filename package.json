@@ -18,6 +18,7 @@
     "db:notify": "node --env-file=.env.local scripts/push-tests.mjs",
     "push:cron": "node --env-file=.env.local scripts/push-cron-setup.mjs",
     "db:reset-for-testing": "node --env-file=.env.local scripts/reset-for-testing.mjs",
+    "db:load-club": "node --env-file=.env.local scripts/load-club.mjs",
     "db:round1": "node --env-file=.env.local scripts/round1-tests.mjs"
   },
   "dependencies": {

@@ -441,6 +441,31 @@ IT lead's machine, see below); the checks joined `npm run db:round1`.
   past bookings stay on the record, dim. The clock is the server's at render
   time, on the club's zone (`elapsedUntil`).
 
+## The real club is back (2026-09-16)
+
+The tester club from `db:reset-for-testing` was replaced with the real one by
+`npm run db:load-club -- --yes` (`scripts/load-club.mjs`). It backs everything
+up first, wipes the same tables the reset script does, then loads
+`members-import.csv` (regenerate it from `Database club.xlsx` with
+`build-member-csv.mjs` first), restores the five projects and the twelve
+timeline entries from the newest `backups/reset-*.json` with their ids kept,
+and replays the role changes the club made in the app after the first import
+— which is why Abdullah Alhussan is President and Hamad Alkhorayef a Vice
+President although the spreadsheet still says otherwise. Without that replay
+the spreadsheet does not even load: Career Fair would name five Project
+Managers against a limit of four.
+
+Two things worth knowing about it:
+
+- It runs over the REST API and the Auth admin API with the service-role key,
+  not over 5432, so it works where `db:push` and the suites do not. The price
+  is no transaction: it validates everything and prints the plan before the
+  first write (`--dry` stops there), but a failure part-way means running it
+  again.
+- Only the Super Admin keeps a login. The other 97 set a password at first
+  sign-in, as after the first import. Nawaf Zaid Alzaid is still missing
+  (no national ID in the spreadsheet).
+
 ## Picking this up again
 
 Nothing is blocked. To get running from a fresh clone:
