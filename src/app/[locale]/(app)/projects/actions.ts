@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { getMyMember } from '@/lib/auth/session';
 import { fail, ok, requiredText, text, type ActionResult } from '@/lib/actions';
@@ -229,4 +230,133 @@ export async function deleteSplitAction(
 
   revalidatePath(`/${locale}/projects/${projectId}`);
   return ok();
+}
+
+// -----------------------------------------------------------------------------
+// Components (0062)
+//
+// A project can carry ONE component — today, Mock Interviews — whose data
+// lives in a separate database. Attaching creates (or re-links) that
+// database's edition for the project, then records the link here. The club
+// database's policy on `project_components` is what decides who may do this;
+// nothing below re-checks a role.
+// -----------------------------------------------------------------------------
+
+export async function attachComponentAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const projectId = requiredText(formData, 'project_id');
+  const locale = requiredText(formData, 'locale');
+  const componentKey = requiredText(formData, 'component_key');
+
+  if (componentKey !== 'mock_interviews') return fail('Unknown component.');
+
+  const { isInterviewsConfigured, createInterviewsClient } = await import('@/lib/supabase/interviews');
+  if (!isInterviewsConfigured()) {
+    return fail(
+      'The Mock Interviews database is not configured on this server (INTERVIEWS_SUPABASE_URL / INTERVIEWS_SUPABASE_SERVICE_ROLE_KEY).',
+    );
+  }
+
+  const me = await getMyMember();
+  if (!me) return fail('Not signed in');
+  const supabase = await createClient();
+
+  const { data: project } = await supabase
+    .from('projects')
+    .select('id, name_en, name_ar')
+    .eq('id', projectId)
+    .maybeSingle();
+  if (!project) return fail('No such project.');
+
+  const db = createInterviewsClient();
+  const actor = { kind: 'member', id: me.id, name: me.name_en };
+
+  // A detached project keeps its edition; attaching again finds it rather
+  // than starting a second one and stranding the first.
+  const { data: existing } = await db
+    .from('editions')
+    .select('id')
+    .eq('club_project_id', projectId)
+    .maybeSingle();
+
+  let editionId = existing?.id as string | undefined;
+  let created = false;
+
+  if (!editionId) {
+    const { newToken } = await import('@/lib/interviews/tokens');
+    const { data: edition, error } = await db.rpc('create_edition', {
+      p_payload: {
+        name_en: project.name_en,
+        name_ar: project.name_ar,
+        public_slug: await uniqueSlug(db, project.name_en as string),
+        club_project_id: projectId,
+        tv_token: newToken(),
+      },
+      p_actor: actor,
+    });
+    if (error) return fail(error.message);
+    editionId = (edition as { id: string }).id;
+    created = true;
+  }
+
+  const { error } = await supabase.from('project_components').insert({
+    project_id: projectId,
+    component_key: componentKey,
+    external_ref: editionId,
+    attached_by: me.id,
+  });
+
+  if (error) {
+    // Refused by the club database: do not leave a brand-new edition behind.
+    if (created) await db.from('editions').delete().eq('id', editionId);
+    return fail(error.message);
+  }
+
+  revalidatePath(`/${locale}/projects/${projectId}`);
+  return ok();
+}
+
+/** Removes the link only. The edition and every row in it stay where they are. */
+export async function detachComponentAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const projectId = requiredText(formData, 'project_id');
+  const locale = requiredText(formData, 'locale');
+  const supabase = await createClient();
+
+  const { data: deleted, error } = await supabase
+    .from('project_components')
+    .delete()
+    .eq('project_id', projectId)
+    .select('project_id');
+
+  if (error) return fail(error.message);
+  if (!deleted?.length) return fail('Nothing to detach, or you may not manage this project.');
+
+  revalidatePath(`/${locale}/projects/${projectId}`);
+  return ok();
+}
+
+/**
+ * The apply-form URL segment, from the project's English name: lowercase,
+ * dashes, and a year, made unique against the editions that already exist.
+ */
+async function uniqueSlug(db: SupabaseClient, name: string): Promise<string> {
+  const base =
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 30) || 'mock-interviews';
+  const year = new Date().getFullYear();
+
+  for (let n = 0; n < 50; n += 1) {
+    const candidate = n === 0 ? `${base}-${year}` : `${base}-${year}-${n + 1}`;
+    const { data } = await db.from('editions').select('id').eq('public_slug', candidate).maybeSingle();
+    if (!data) return candidate;
+  }
+  return `${base}-${Date.now()}`;
 }

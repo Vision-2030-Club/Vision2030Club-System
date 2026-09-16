@@ -33,6 +33,15 @@ export function NavLinks({
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  /*
+   * The longest matching href is the active one. A component's button points
+   * INSIDE a project (/projects/<id>/interviews), so without this both it and
+   * "Projects" would light up at once.
+   */
+  const activeHref = items
+    .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+
   return (
     <>
       <button
@@ -48,8 +57,7 @@ export function NavLinks({
       <nav className={cx(open ? 'block' : 'hidden', 'lg:block')}>
         <ul className="space-y-1 rounded-xl border border-line bg-surface p-2 shadow-sm">
           {items.map((item) => {
-            const active =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const active = item.href === activeHref;
             return (
               <li key={item.href}>
                 <Link

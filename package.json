@@ -19,7 +19,12 @@
     "push:cron": "node --env-file=.env.local scripts/push-cron-setup.mjs",
     "db:reset-for-testing": "node --env-file=.env.local scripts/reset-for-testing.mjs",
     "db:load-club": "node --env-file=.env.local scripts/load-club.mjs",
-    "db:round1": "node --env-file=.env.local scripts/round1-tests.mjs"
+    "db:round1": "node --env-file=.env.local scripts/round1-tests.mjs",
+    "db:push:interviews": "node --env-file=.env.local scripts/db-push.mjs --target interviews",
+    "db:interviews": "node --env-file=.env.local scripts/interviews-tests.mjs",
+    "db:components": "node --env-file=.env.local scripts/component-tests.mjs",
+    "interviews:import": "node --env-file=.env.local scripts/import-mock-interviews.mjs",
+    "interviews:cron": "node --env-file=.env.local scripts/interviews-cron-setup.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

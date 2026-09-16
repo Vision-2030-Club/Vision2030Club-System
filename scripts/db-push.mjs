@@ -1,31 +1,57 @@
 /**
- * Applies supabase/migrations/*.sql to the database in SUPABASE_DB_URL.
+ * Applies a migrations folder to a database.
  *
- *   npm run db:push
+ *   npm run db:push                          the club database (supabase/migrations)
+ *   npm run db:push -- --target interviews   the Mock Interviews database
+ *                                            (supabase/interviews/migrations)
  *
  * Each file runs inside its own transaction and is recorded in the
- * `schema_migrations` table, so re-running only applies what is new.
- * Pass --redo <name> to re-run one file (useful for the seed files, which are
- * written to be safe to repeat).
+ * `schema_migrations` table of THAT database, so re-running only applies what
+ * is new. Pass --redo <name> to re-run one file (useful for the seed files,
+ * which are written to be safe to repeat).
+ *
+ * The two targets are two Supabase projects with two connection strings —
+ * SUPABASE_DB_URL and INTERVIEWS_SUPABASE_DB_URL — and nothing here can apply
+ * one folder to the other project's database: the folder and the variable are
+ * chosen together from TARGETS below.
  */
 import { readdir, readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
-const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'supabase', 'migrations');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-const connectionString = process.env.SUPABASE_DB_URL;
-if (!connectionString) {
-  console.error(
-    'SUPABASE_DB_URL is not set.\n' +
-      'Add it to .env.local — Supabase dashboard → Connect → Session pooler URI.',
-  );
+const TARGETS = {
+  club: {
+    dir: join(ROOT, 'supabase', 'migrations'),
+    env: 'SUPABASE_DB_URL',
+    hint: 'Supabase dashboard → Connect → Session pooler URI.',
+  },
+  interviews: {
+    dir: join(ROOT, 'supabase', 'interviews', 'migrations'),
+    env: 'INTERVIEWS_SUPABASE_DB_URL',
+    hint: 'the Mock Interviews project → Connect → Session pooler URI.',
+  },
+};
+
+const args = process.argv.slice(2);
+const targetIndex = args.indexOf('--target');
+const targetName = targetIndex === -1 ? 'club' : args[targetIndex + 1];
+const target = TARGETS[targetName];
+if (!target) {
+  console.error(`Unknown target "${targetName}". Use one of: ${Object.keys(TARGETS).join(', ')}.`);
   process.exit(1);
 }
 
-const redoIndex = process.argv.indexOf('--redo');
-const redo = redoIndex === -1 ? null : process.argv[redoIndex + 1];
+const connectionString = process.env[target.env];
+if (!connectionString) {
+  console.error(`${target.env} is not set.\nAdd it to .env.local — ${target.hint}`);
+  process.exit(1);
+}
+
+const redoIndex = args.indexOf('--redo');
+const redo = redoIndex === -1 ? null : args[redoIndex + 1];
 
 const client = new pg.Client({
   connectionString,
@@ -44,13 +70,13 @@ await client.query(`
 const { rows } = await client.query('select name from schema_migrations');
 const applied = new Set(rows.map((r) => r.name));
 
-const files = (await readdir(MIGRATIONS_DIR)).filter((f) => f.endsWith('.sql')).sort();
+const files = (await readdir(target.dir)).filter((f) => f.endsWith('.sql')).sort();
 
 let count = 0;
 for (const file of files) {
   if (applied.has(file) && file !== redo) continue;
 
-  const sql = await readFile(join(MIGRATIONS_DIR, file), 'utf8');
+  const sql = await readFile(join(target.dir, file), 'utf8');
   process.stdout.write(`→ ${file} `);
 
   try {
@@ -78,4 +104,8 @@ for (const file of files) {
 }
 
 await client.end();
-console.log(count === 0 ? 'Already up to date.' : `Applied ${count} migration(s).`);
+console.log(
+  count === 0
+    ? `${targetName}: already up to date.`
+    : `${targetName}: applied ${count} migration(s).`,
+);

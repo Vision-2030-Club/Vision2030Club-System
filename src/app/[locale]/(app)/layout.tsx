@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link, redirect } from '@/i18n/navigation';
 import { getMyMember, getMyPermissions } from '@/lib/auth/session';
+import { componentHref, getMyComponentAccess } from '@/lib/interviews/access';
 import { createClient } from '@/lib/supabase/server';
 import { signAvatar } from '@/lib/avatars';
 import { Avatar } from '@/components/Avatar';
@@ -47,7 +48,13 @@ export default async function AppLayout({
    * every single navigation. `cache()` in lib/auth/session.ts still dedupes
    * them for the page itself.
    */
-  const [member, permissions] = await Promise.all([getMyMember(), getMyPermissions()]);
+  const [member, permissions, components] = await Promise.all([
+    getMyMember(),
+    getMyPermissions(),
+    // Which project components (Mock Interviews) this person may open. One
+    // RPC, run alongside the other two rather than after them.
+    getMyComponentAccess(),
+  ]);
 
   if (!member) {
     redirect({ href: '/login', locale });
@@ -66,6 +73,19 @@ export default async function AppLayout({
    * answers for them, and their projects.view scope is untouched.
    */
   const isProjectManager = member!.role_key === 'project_manager';
+
+  /*
+   * A project that carries a component gets its own button, named after the
+   * project, for exactly the people the club database says may enter it
+   * (0062: its managers, its organizers, HR). It opens the component's pages
+   * inside that project, not a club-wide list.
+   */
+  const componentItems: NavItem[] = components.map((component) => ({
+    href: componentHref(component.project_id, component.component_key),
+    label: locale === 'ar' ? component.name_ar : component.name_en,
+    icon: 'interviews',
+    show: true,
+  }));
 
   // `satisfies` (rather than a plain annotation) contextually types the
   // literal so each `icon` narrows to NavIconName instead of widening to
@@ -115,6 +135,7 @@ export default async function AppLayout({
       { href: '/rooms', label: t('rooms'), icon: 'rooms', show: can('rooms.book') },
       // §8: View KPI is its own permission — nothing else unlocks this page.
       { href: '/kpi', label: t('kpi'), icon: 'kpi', show: can('kpi.view') },
+      ...componentItems,
       {
         href: '/admin',
         label: t('admin'),

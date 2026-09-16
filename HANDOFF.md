@@ -954,6 +954,125 @@ being able to delete the Director's own tasks.
 
 ---
 
+## The Mock Interviews component (افترض)
+
+The club's mock-interview week is now a **project component**: a club
+project carries "Mock Interviews", and everyone the club database lets in gets
+a sidebar button named after the project. The event data lives in a **second
+Supabase project** so it can never be lost with, or by, this one. The plan and
+the decisions taken with the club are in the plan file this was built from; the
+short version:
+
+- **Two databases, one login.** Migration `0062` adds `project_components`
+  (which project carries which component, and its edition id over there) and
+  `project_component_people` (organizers, chosen by whoever manages the
+  project; HR people, chosen by whoever holds `members.manage` — HR's
+  Directors by the 0004 override). `public.my_component_access()` is the one
+  question the app asks: which components may I open, and as **manager**
+  (projects.manage over the project), **hr**, or **organizer**. No role name
+  appears anywhere; `npm run db:components` proves the rules.
+- **The interviews database is server-only.** `supabase/interviews/migrations/`
+  (four files, applied with `npm run db:push -- --target interviews`) has RLS
+  enabled on every table with no policies and the API roles revoked (0004).
+  Only `src/lib/supabase/interviews.ts` — the service role, the fourth and
+  last permitted use of it — ever reaches it. Every write is a Postgres
+  function that takes an actor and sets it for the transaction, so the audit
+  trigger on every table records who did what; public pages resolve a token to
+  a student or a company and the function sets the actor itself.
+- **Guarantees are constraints.** `bookings_one_per_slot` (partial unique) is
+  why a slot is taken once however many tap it; `bookings_no_overlap` and
+  `sessions_room_no_overlap` are EXCLUDE constraints; stage moves are checked
+  in `advance_stage`. Nothing pre-checks; the loser gets a sentence with a
+  machine-readable HINT (`app.refuse`) that the public pages translate.
+- **Nothing rewrites a dataset.** The old tool lost data because every edit
+  rewrote everything. Here applying inserts one row (or updates one, while
+  nothing is decided or booked), checking in updates one row, cancelling sets
+  `cancelled_at` and the partial indexes free the slot. `audit_log` is never
+  pruned.
+- **Email is an outbox.** The database writes `email_outbox` rows (acceptance
+  link, booking confirmed/moved/cancelled, reminder, feedback); the server
+  renders them in the student's language and sends through Resend
+  (`src/lib/interviews/email.ts`, plain HTTP, no SDK). Kicked after each
+  action, swept by `/api/interviews/cron` every five minutes
+  (`npm run interviews:cron` schedules it with pg_cron in the CLUB project,
+  same mechanism as push). Without `RESEND_API_KEY` rows wait and the
+  Messages page says so. Feedback is **email only** and held until a manager
+  presses *Send feedback emails* (or sent at once, per edition setting).
+- **Exports.** `edition_snapshot` renders an edition as one JSON document;
+  the sweep writes it to the private `exports` bucket once a night after 03:00
+  club time, and Settings has *Take a copy now* and *Download JSON*.
+- **CVs** are PDFs (5 MB) in the private `cvs` bucket; `/api/interviews/cv`
+  signs a ten-minute URL for HR, managers, or the company that holds the
+  booking (past its PIN if one is set).
+
+Pages: signed-in under `/projects/[id]/interviews/…` (overview, applicants,
+companies, schedule with the session generator, floor board, bookings, people,
+settings, log, messages — tabs filtered by role); public under `/interviews/…`
+(`apply/<slug>`, `s/<token>` the student, `c/<token>` the interviewer,
+`tv/<token>` the waiting-area screen). The three boards poll every 10–12 s.
+`src/proxy.ts` lets `/interviews` through and only `/login` bounces a signed-in
+visitor now.
+
+### Setting it up
+
+1. Create the interviews Supabase project (**Pro**, region next to Vercel's
+   functions), put `INTERVIEWS_SUPABASE_URL`, `INTERVIEWS_SUPABASE_SERVICE_ROLE_KEY`
+   and (laptop only) `INTERVIEWS_SUPABASE_DB_URL` in `.env.local`, then
+   `npm run db:push -- --target interviews` and `npm run db:interviews`
+   (add `INTERVIEWS_SUPABASE_ANON_KEY` for the anon-key checks).
+2. `npm run db:push` for `0062`, then `npm run db:components`.
+3. Resend: an API key and a verified sender domain; `RESEND_API_KEY` and
+   `EMAIL_FROM`. Until the domain is verified Resend delivers only to the
+   account owner's address.
+4. Vercel: the five variables above; then `npm run interviews:cron`.
+5. In the app: open a project, attach *Mock Interviews*, then Settings → set
+   the windows and status *Active*; Companies; Schedule → rooms and sessions;
+   People → organizers.
+6. `npm run interviews:import -- --dry`, then without `--dry`, to bring April
+   2026 in as an archived edition from `mockinterviews.xlsx`. The importer
+   writes through the REST API with the service role, so it works from a
+   network where port 5432 is blocked.
+
+**State on 2026-09-16:** steps 1, 2 and the cron job are DONE. The interviews
+project is `qadhnttgtytnibgumrax` (org Vision 2030 Club, still on the Free
+plan — upgrade the org to Pro before the event; that covers both projects).
+Its four migrations and the club's `0062` were applied through the dashboard's
+SQL editor because 5432 was unreachable, with the `schema_migrations` rows
+added by hand, so `db:push` reports both databases up to date. A REST smoke
+test drove every function on the real project (17 checks). `interviews-sweep`
+is scheduled with pg_cron next to `push-sweep`, reusing the Vault secret, and
+answers "not configured" until Vercel has the `INTERVIEWS_*` variables. April 2026 is imported as the archived edition `april-2026` (876
+applications, 69 sessions, 851 slots, 119 bookings); three sessions that
+overlapped another company in the old schedule live in rooms named
+"<room> (overlap)" so the room-clash constraint keeps its meaning. Still to
+do by a person: Resend (API key + verified domain), the five Vercel
+variables, a redeploy, and the Pro upgrade of the organization.
+
+### Verified
+
+The four interviews migrations and every function were driven through an
+embedded Postgres (PGlite) before touching any project: 66 checks — the
+double-booking race, overlap, room clash, stage rules, duplicate-application
+rules, dedupe of every email, the archived edition refusing writes.
+`scripts/interviews-tests.mjs` repeats them against the real project with two
+connections firing at once; `scripts/component-tests.mjs` covers 0062.
+`npm run build`, `npm run typecheck` and `npx eslint` are clean.
+
+### Things easy to break
+
+- **A function that raises must raise with a hint.** The public pages map
+  `error.hint` to a translated sentence and fall back to the message. Use
+  `app.refuse('some_key', 'A sentence.')` and add `errors.some_key` to both
+  catalogs.
+- **`edition_settings` fills in defaults.** Read settings through it (or
+  `app.edition_settings`), never `editions.settings` directly.
+- **The roster is club-side.** Adding a way for someone to enter the
+  component means a row in `project_component_people` or a rule in
+  `my_component_access()`; the interviews database never decides who.
+- **The scripts read the workbook through `scripts/lib/xlsx.mjs`** (central
+  directory, not local headers — see "Reading .xlsx without a dependency").
+  The two older scripts still carry their own copy; they were left alone.
+
 ## Conventions to keep
 
 - Phone numbers are stored as `+9665XXXXXXXX` and nothing else. Use

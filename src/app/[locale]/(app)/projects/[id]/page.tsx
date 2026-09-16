@@ -1,8 +1,10 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { Link } from '@/i18n/navigation';
 import { MemberLink } from '@/components/MemberLink';
 import { createClient } from '@/lib/supabase/server';
 import { getMyMember, scopeFor } from '@/lib/auth/session';
+import { componentHref, getMyComponentAccess } from '@/lib/interviews/access';
 import { ActionForm } from '@/components/ActionForm';
 import { ConfirmForm } from '@/components/ConfirmForm';
 import { TaskCard } from '@/components/TaskCard';
@@ -22,8 +24,10 @@ import {
   addProjectManagerAction,
   addProjectMemberAction,
   addSplitPersonAction,
+  attachComponentAction,
   createSplitAction,
   deleteSplitAction,
+  detachComponentAction,
   removeProjectPersonAction,
   removeSplitPersonAction,
 } from '../actions';
@@ -68,6 +72,8 @@ export default async function ProjectPage({
     { data: splitMembers },
     { data: kpiRow },
     { data: splitKpis },
+    { data: component },
+    componentAccess,
   ] = await Promise.all([
     supabase
       .from('project_managers')
@@ -105,7 +111,17 @@ export default async function ProjectPage({
     // Empty unless the caller holds kpi.view for this project (§8).
     supabase.from('project_kpi').select('*').eq('project_id', id).maybeSingle(),
     supabase.from('project_split_kpi').select('*').eq('project_id', id),
+    // The component this project carries, if any (0062), and whether the
+    // viewer may open it — the button is offered only to those who can.
+    supabase
+      .from('project_components')
+      .select('component_key, external_ref')
+      .eq('project_id', id)
+      .maybeSingle(),
+    getMyComponentAccess(),
   ]);
+
+  const canOpenComponent = componentAccess.some((row) => row.project_id === id);
 
   const managerIds = new Set((managers ?? []).map((m) => m.member_id as string));
   const projectScope = await scopeFor('projects.manage');
@@ -319,6 +335,56 @@ export default async function ProjectPage({
               </Select>
             </ActionForm>
           ) : null}
+        </Card>
+
+        {/* ---- A component: a whole system this project carries (0062) ---- */}
+        <Card className="lg:col-span-3">
+          <h2 className="mb-1 font-semibold">{t('component')}</h2>
+          <p className="mb-3 text-xs text-ink-muted">{t('componentHint')}</p>
+
+          {component ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge tone="brand">{t(`component_${component.component_key as string}`)}</Badge>
+              {canOpenComponent ? (
+                <Link
+                  href={componentHref(project.id, component.component_key as string)}
+                  className="text-sm font-medium text-brand-600 hover:underline"
+                >
+                  {t('openComponent')}
+                </Link>
+              ) : (
+                <span className="text-sm text-ink-muted">{t('componentNoAccess')}</span>
+              )}
+              {canManage ? (
+                <div className="ms-auto">
+                  <ConfirmForm
+                    action={detachComponentAction}
+                    trigger={t('detachComponent')}
+                    title={t('detachComponentTitle')}
+                    body={t('detachComponentBody')}
+                    confirmLabel={t('detachComponent')}
+                    variant="secondary"
+                  >
+                    <input type="hidden" name="locale" value={locale} />
+                    <input type="hidden" name="project_id" value={project.id} />
+                  </ConfirmForm>
+                </div>
+              ) : null}
+            </div>
+          ) : canManage ? (
+            <ActionForm action={attachComponentAction} submitLabel={t('attachComponent')}>
+              <input type="hidden" name="locale" value={locale} />
+              <input type="hidden" name="project_id" value={project.id} />
+              <div className="max-w-sm">
+                <Label htmlFor="component_key">{t('componentPick')}</Label>
+                <Select id="component_key" name="component_key" required>
+                  <option value="mock_interviews">{t('component_mock_interviews')}</option>
+                </Select>
+              </div>
+            </ActionForm>
+          ) : (
+            <p className="text-sm text-ink-muted">{t('componentNone')}</p>
+          )}
         </Card>
 
         {/* ---- §3: splits ---- */}

@@ -6,8 +6,18 @@ import { supabaseEnv } from '@/lib/supabase/env';
 
 const handleLocale = createIntlMiddleware(routing);
 
-/** Paths (after the locale prefix) reachable without being signed in. */
-const PUBLIC_PATHS = ['/login'];
+/**
+ * Paths (after the locale prefix) reachable without being signed in.
+ *
+ * `/interviews/...` is the Mock Interviews component's public face: the apply
+ * form, a student's personal link, a company's interviewer link and the
+ * waiting-area TV. Each is guarded by an unguessable token checked on the
+ * server, not by a session.
+ */
+const PUBLIC_PATHS = ['/login', '/interviews'];
+
+/** Public paths that make no sense once signed in: a member is sent on. */
+const SIGNED_OUT_ONLY_PATHS = ['/login'];
 
 /**
  * Runs before every page render. Two jobs:
@@ -64,7 +74,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && isPublic) {
+  // An organizer opening the TV link while signed in must get the TV, not
+  // the dashboard — only the login page bounces a signed-in visitor.
+  const isSignedOutOnly = SIGNED_OUT_ONLY_PATHS.some(
+    (p) => pathAfterLocale === p || pathAfterLocale.startsWith(`${p}/`),
+  );
+
+  if (user && isSignedOutOnly) {
     const url = request.nextUrl.clone();
     url.pathname = `/${locale}/dashboard`;
     url.search = '';

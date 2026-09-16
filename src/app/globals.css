@@ -59,3 +59,28 @@ body {
      of numbers stop jittering as their values change. */
   font-variant-numeric: tabular-nums;
 }
+
+/* The waiting-area TV's bottom strip: every room's state, scrolling past.
+   The list is rendered twice so the loop is seamless; under
+   prefers-reduced-motion it simply wraps and stands still. */
+@keyframes tv-ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.tv-ticker {
+  animation: tv-ticker 40s linear infinite;
+}
+
+html[dir="rtl"] .tv-ticker {
+  animation-direction: reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-ticker {
+    animation: none;
+    width: auto;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+}
