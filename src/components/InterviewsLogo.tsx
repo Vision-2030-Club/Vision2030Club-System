@@ -9,11 +9,11 @@ import { NavIcon } from '@/components/NavIcons';
  */
 export function InterviewsLogo({ name }: { name: string }) {
   return (
-    <span className="flex h-8 items-center gap-2 text-brand-700" aria-label={name}>
+    <span className="flex h-8 max-w-full items-center gap-2 text-brand-700" aria-label={name}>
       <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white">
         <NavIcon name="interviews" className="size-5" />
       </span>
-      <span className="truncate font-latin text-base font-bold leading-none tracking-tight">{name}</span>
+      <span className="min-w-0 truncate font-latin text-base font-bold leading-none tracking-tight">{name}</span>
     </span>
   );
 }

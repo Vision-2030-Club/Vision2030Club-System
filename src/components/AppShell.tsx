@@ -71,8 +71,9 @@ export function AppShell({
     <div className="min-h-dvh">
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-3">
-          {/* Both marks are always in the tree; opacity decides which shows. */}
-          <div className="relative h-8 w-44">
+          {/* Both marks are always in the tree; opacity decides which shows.
+              Wide enough for a project's name; a longer one is truncated. */}
+          <div className="relative h-8 w-44 sm:w-72">
             <span
               aria-hidden={inComponent}
               className={cx(
