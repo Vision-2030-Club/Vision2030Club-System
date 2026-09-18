@@ -29,6 +29,8 @@ export type Edition = {
   booking_closes_at: string | null;
   time_zone: string;
   tv_token: string | null;
+  floor_sheet_id: string | null;
+  floor_sheet_url: string | null;
   settings: Partial<EditionSettings>;
   created_at: string;
   updated_at: string;

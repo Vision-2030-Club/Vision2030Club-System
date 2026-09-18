@@ -541,7 +541,7 @@
   },
   "google": {
     "title": "Google connection",
-    "subtitle": "One shared account creates every Meet link and sends every invitation.",
+    "subtitle": "One shared account creates every Meet link, sends every invitation, and keeps the Mock Interviews floor sheet in sync.",
     "status": "Connection",
     "linked": "Connected",
     "notLinked": "No Google account is connected yet, so confirmed online meetings will not get a Meet link.",
@@ -565,7 +565,8 @@
     "redirectLabel": "Redirect URL",
     "pending": "Waiting for a link",
     "pendingHint": "Confirmed online meetings whose Meet link could not be created yet — usually because Google was unreachable at the time.",
-    "retry": "Try these again"
+    "retry": "Try these again",
+    "reconnectNote": "Already connected from before this was added? Press Reconnect once so Google grants the extra permission the floor sheet needs."
   },
   "push": {
     "title": "Notifications",
@@ -728,7 +729,11 @@
       "exportNow": "Take a copy now",
       "download": "Download JSON",
       "notes": "How this works",
-      "notesBody": "Applications and booking follow the windows above. A student who applies twice with the same email updates their form until HR decides or they book. Organizers move students through the stages on the Floor tab. Every change is logged with who made it; nothing is ever deleted."
+      "notesBody": "Applications and booking follow the windows above. A student who applies twice with the same email updates their form until HR decides or they book. Organizers move students through the stages on the Floor tab. Every change is logged with who made it; nothing is ever deleted.",
+      "floorSheet": "Live Google Sheet",
+      "floorSheetHint": "A read-only mirror of every booked slot, across every room and day, kept in sync automatically. Requires the club's Google account to be connected under Admin → Google.",
+      "floorSheetNone": "Not created yet — it appears the first time the floor changes, or press Sync now.",
+      "floorSheetSync": "Sync now"
     },
     "companies": {
       "new": "New company",

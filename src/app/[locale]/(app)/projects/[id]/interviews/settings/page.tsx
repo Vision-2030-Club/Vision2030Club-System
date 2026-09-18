@@ -12,6 +12,7 @@ import {
   exportNowAction,
   releaseFeedbackAction,
   rotateTvTokenAction,
+  syncFloorSheetAction,
   updateEditionAction,
 } from '../actions';
 
@@ -176,6 +177,28 @@ export default async function InterviewsSettingsPage({
               <input type="hidden" name="project_id" value={id} />
             </ConfirmForm>
           </div>
+        </Card>
+
+        <Card>
+          <h2 className="mb-1 font-semibold">{t('settings.floorSheet')}</h2>
+          <p className="mb-3 text-xs text-ink-muted">{t('settings.floorSheetHint')}</p>
+          {edition.floor_sheet_url ? (
+            <a
+              href={edition.floor_sheet_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mb-3 block break-all text-sm font-medium text-brand-600 hover:underline"
+              dir="ltr"
+            >
+              {edition.floor_sheet_url}
+            </a>
+          ) : (
+            <p className="mb-3 text-sm text-ink-muted">{t('settings.floorSheetNone')}</p>
+          )}
+          <ActionForm action={syncFloorSheetAction} submitLabel={t('settings.floorSheetSync')} variant="secondary" className="space-y-0">
+            <input type="hidden" name="locale" value={locale} />
+            <input type="hidden" name="project_id" value={id} />
+          </ActionForm>
         </Card>
 
         <Card>

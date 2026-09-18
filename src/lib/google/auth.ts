@@ -26,6 +26,11 @@ const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
  */
 export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar',
+  // Only files this app creates — not the account's whole Drive. Backs the
+  // Mock Interviews floor sheet (lib/google/sheets.ts): the spreadsheet
+  // itself is Sheets API, but making it viewable by a link is a Drive
+  // permission, and this is the narrowest scope that allows setting one.
+  'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/userinfo.email',
 ];
 

@@ -13,6 +13,7 @@ import {
 } from '@/lib/interviews/access';
 import { newPin, newToken } from '@/lib/interviews/tokens';
 import { deliverPendingEmails, kickEmailDelivery } from '@/lib/interviews/email';
+import { kickFloorSheetSync, syncFloorSheet } from '@/lib/interviews/floorSheet';
 import { takeExport } from '@/lib/interviews/export';
 import type { Stage } from '@/lib/interviews/types';
 import { fromClubWallClock } from '@/lib/time';
@@ -126,6 +127,28 @@ export async function rotateTvTokenAction(
     p_actor: g.access.actor,
   });
   if (error) return fromPostgrest(error);
+
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
+/**
+ * A manual trigger for the floor sheet (floorSheet.ts): creates it on first
+ * use rather than waiting for the next real booking change, and gives the
+ * button a moment people can point at when they ask "is it working".
+ */
+export async function syncFloorSheetAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  try {
+    await syncFloorSheet(g.access.edition.id);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Sync failed.');
+  }
 
   revalidate(g.locale, g.projectId);
   return ok();
@@ -612,6 +635,7 @@ export async function stageAction(input: {
   });
   if (error) return fromPostgrest(error);
 
+  if (access.edition) kickFloorSheetSync(access.edition.id);
   revalidate(input.locale, input.projectId);
   return ok();
 }
@@ -636,6 +660,7 @@ export async function staffBookAction(
   if (error) return fromPostgrest(error);
 
   kickEmailDelivery();
+  kickFloorSheetSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok('created');
 }
@@ -656,6 +681,7 @@ export async function staffMoveAction(
   if (error) return fromPostgrest(error);
 
   kickEmailDelivery();
+  kickFloorSheetSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
 }
@@ -676,6 +702,7 @@ export async function staffCancelAction(
   if (error) return fromPostgrest(error);
 
   kickEmailDelivery();
+  kickFloorSheetSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
 }
