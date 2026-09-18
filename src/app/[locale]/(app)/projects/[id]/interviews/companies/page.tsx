@@ -7,11 +7,17 @@ import { Badge, Card, EmptyState, Input, Label, Textarea } from '@/components/ui
 import { localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { siteUrl } from '@/lib/interviews/email';
-import { loadCompanies, loadCounters } from '@/lib/interviews/queries';
+import { loadAcceptedPhones, loadCompanies, loadCounters, type AcceptedPhone } from '@/lib/interviews/queries';
 import type { Company } from '@/lib/interviews/types';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { CopyField } from '../CopyField';
-import { rotateCompanyTokenAction, upsertCompanyAction } from '../actions';
+import {
+  acceptPhonesAction,
+  createRoomAction,
+  rotateCompanyTokenAction,
+  unacceptPhoneAction,
+  upsertCompanyAction,
+} from '../actions';
 
 export default async function InterviewsCompaniesPage({
   params,
@@ -33,13 +39,41 @@ export default async function InterviewsCompaniesPage({
     loadCompanies(db, edition.id),
     loadCounters(db, edition.id),
   ]);
+  const acceptedPhonesByCompany = new Map(
+    await Promise.all(
+      companies.map(async (c): Promise<[string, AcceptedPhone[]]> => [c.id, await loadAcceptedPhones(db, c.id)]),
+    ),
+  );
 
   const manage = can.manage(role);
+  const decide = can.decide(role);
   const linkFor = (company: Company) =>
     `${siteUrl()}/${locale}/interviews/c/${company.access_token}`;
+  const candidateLinkFor = (company: Company) =>
+    company.candidate_token ? `${siteUrl()}/${locale}/interviews/room/${company.candidate_token}` : null;
 
   return (
     <div className="space-y-4">
+      {manage ? (
+        <Disclosure label={t('companies.addRoom')}>
+          <ActionForm action={createRoomAction} submitLabel={tCommon('create')}>
+            <input type="hidden" name="locale" value={locale} />
+            <input type="hidden" name="project_id" value={id} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="new-room-name">{t('companies.roomName')}</Label>
+                <Input id="new-room-name" name="name" required />
+              </div>
+              <div>
+                <Label htmlFor="new-room-logo">{t('companies.logoUrl')}</Label>
+                <Input id="new-room-logo" name="logo_url" type="url" dir="ltr" />
+              </div>
+            </div>
+            <p className="text-xs text-ink-muted">{t('companies.addRoomHint')}</p>
+          </ActionForm>
+        </Disclosure>
+      ) : null}
+
       {manage ? (
         <Disclosure label={t('companies.new')}>
           <CompanyForm locale={locale} projectId={id} t={t} tCommon={tCommon} />
@@ -114,6 +148,22 @@ export default async function InterviewsCompaniesPage({
                         <input type="hidden" name="company_id" value={company.id} />
                       </ConfirmForm>
                     </div>
+                  </div>
+                ) : null}
+
+                {decide && candidateLinkFor(company) ? (
+                  <div className="mt-4 space-y-3 border-t border-line pt-3">
+                    <CopyField label={t('companies.candidateLink')} value={candidateLinkFor(company)!} />
+                    <Disclosure label={t('companies.acceptedPhones')}>
+                      <AcceptedPhones
+                        locale={locale}
+                        projectId={id}
+                        company={company}
+                        phones={acceptedPhonesByCompany.get(company.id) ?? []}
+                        t={t}
+                        tCommon={tCommon}
+                      />
+                    </Disclosure>
                   </div>
                 ) : null}
               </Card>
@@ -210,5 +260,71 @@ function CompanyForm({
         </div>
       </fieldset>
     </ActionForm>
+  );
+}
+
+/**
+ * HR's pre-approval list for one room's candidate link (0005): phone numbers
+ * pasted in ahead of time are what "already chosen by HR" checks against when
+ * someone visits the link and identifies themselves.
+ */
+function AcceptedPhones({
+  locale,
+  projectId,
+  company,
+  phones,
+  t,
+  tCommon,
+}: {
+  locale: string;
+  projectId: string;
+  company: Company;
+  phones: AcceptedPhone[];
+  t: T;
+  tCommon: TCommon;
+}) {
+  return (
+    <div className="space-y-3">
+      {phones.length ? (
+        <ul className="space-y-1 text-sm">
+          {phones.map((p) => (
+            <li key={p.phone} className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-1.5">
+              <span className="ltr-nums">
+                {p.phone}
+                {p.name ? ` · ${p.name}` : ''}
+              </span>
+              <form action={unacceptPhoneAction}>
+                <input type="hidden" name="locale" value={locale} />
+                <input type="hidden" name="project_id" value={projectId} />
+                <input type="hidden" name="company_id" value={company.id} />
+                <input type="hidden" name="phone" value={p.phone} />
+                <button type="submit" className="text-xs text-ink-muted hover:text-danger-600">
+                  {tCommon('delete')}
+                </button>
+              </form>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-ink-muted">{t('companies.noAcceptedPhones')}</p>
+      )}
+
+      <ActionForm action={acceptPhonesAction} submitLabel={tCommon('save')}>
+        <input type="hidden" name="locale" value={locale} />
+        <input type="hidden" name="project_id" value={projectId} />
+        <input type="hidden" name="company_id" value={company.id} />
+        <div>
+          <Label htmlFor={`${company.id}-phones`}>{t('companies.addPhones')}</Label>
+          <Textarea
+            id={`${company.id}-phones`}
+            name="phones"
+            rows={3}
+            placeholder={'05xxxxxxxx\n05xxxxxxxx'}
+            dir="ltr"
+          />
+          <p className="mt-1 text-xs text-ink-muted">{t('companies.addPhonesHint')}</p>
+        </div>
+      </ActionForm>
+    </div>
   );
 }

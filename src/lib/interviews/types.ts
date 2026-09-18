@@ -56,6 +56,7 @@ export type Company = {
   access_token: string;
   access_pin: string | null;
   token_rotated_at: string | null;
+  candidate_token: string | null;
 };
 
 export type Decision = 'pending' | 'accepted' | 'rejected';
@@ -63,7 +64,7 @@ export type Decision = 'pending' | 'accepted' | 'rejected';
 export type Application = {
   id: string;
   edition_id: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   name: string;
   is_club_member: boolean | null;

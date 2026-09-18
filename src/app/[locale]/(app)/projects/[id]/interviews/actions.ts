@@ -231,6 +231,128 @@ export async function upsertCompanyAction(
   return ok();
 }
 
+/**
+ * The simplified "room" flow (0005): one button creates the room, the
+ * company behind it (with its own candidate-facing link), and a full week of
+ * 2pm–8pm/15-minute sessions — Oct 12–16, 2026 — so nothing further needs
+ * scheduling by hand. Each step is its own transaction in the database; if a
+ * later step fails the earlier ones stand, same as every other admin form
+ * here that is not meant to be re-run under load.
+ */
+const ROOM_EVENT_DAYS = ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16'];
+const ROOM_SLOT_START = '14:00';
+const ROOM_SLOT_END = '20:00';
+const ROOM_SLOT_MINUTES = 15;
+
+export async function createRoomAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const name = requiredText(formData, 'name');
+  const logoUrl = text(formData, 'logo_url') ?? '';
+  const db = createInterviewsClient();
+
+  const { data: room, error: roomError } = await db.rpc('upsert_room', {
+    p_edition: g.access.edition.id,
+    p_room: null,
+    p_payload: { name },
+    p_actor: g.access.actor,
+  });
+  if (roomError) return fromPostgrest(roomError);
+
+  const { data: company, error: companyError } = await db.rpc('upsert_company', {
+    p_edition: g.access.edition.id,
+    p_company: null,
+    p_payload: {
+      name_en: name,
+      name_ar: name,
+      logo_url: logoUrl,
+      access_token: newToken(),
+      candidate_token: newToken(),
+    },
+    p_actor: g.access.actor,
+  });
+  if (companyError) return fromPostgrest(companyError);
+
+  for (const day of ROOM_EVENT_DAYS) {
+    const { error: sessionError } = await db.rpc('create_session', {
+      p_edition: g.access.edition.id,
+      p_payload: {
+        company_id: company.id,
+        room_id: room.id,
+        day,
+        start_time: ROOM_SLOT_START,
+        end_time: ROOM_SLOT_END,
+        slot_minutes: ROOM_SLOT_MINUTES,
+      },
+      p_actor: g.access.actor,
+    });
+    if (sessionError) return fromPostgrest(sessionError);
+  }
+
+  revalidate(g.locale, g.projectId);
+  return ok('created');
+}
+
+/** HR's pre-approval list for one room: phone numbers, one per line. */
+export async function acceptPhonesAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.decide);
+  if ('error' in g) return fail(g.error);
+
+  const companyId = requiredText(formData, 'company_id');
+  const phones = Array.from(
+    new Set(
+      (text(formData, 'phones') ?? '')
+        .split(/[\s,]+/)
+        .map((p) => p.trim())
+        .filter(Boolean),
+    ),
+  );
+  if (phones.length === 0) return fail('Enter at least one phone number.');
+
+  const db = createInterviewsClient();
+  for (const phone of phones) {
+    const { error } = await db.rpc('accept_phone', {
+      p_edition: g.access.edition.id,
+      p_company: companyId,
+      p_phone: phone,
+      p_token: newToken(),
+      p_actor: g.access.actor,
+    });
+    if (error) return fromPostgrest(error);
+  }
+
+  revalidate(g.locale, g.projectId);
+  return ok('saved', { count: String(phones.length) });
+}
+
+/**
+ * A plain form action (no useActionState, no per-row error UI) — same shape
+ * as signOutAction in the app layout. Removing a phone from an "accepted"
+ * list is low-stakes and reversible by pasting it back in, so it does not
+ * need a confirmation dialog or its own feedback state.
+ */
+export async function unacceptPhoneAction(formData: FormData): Promise<void> {
+  const g = await guard(formData, can.decide);
+  if ('error' in g) return;
+
+  const db = createInterviewsClient();
+  await db.rpc('unaccept_phone', {
+    p_edition: g.access.edition.id,
+    p_company: requiredText(formData, 'company_id'),
+    p_phone: requiredText(formData, 'phone'),
+    p_actor: g.access.actor,
+  });
+
+  revalidate(g.locale, g.projectId);
+}
+
 export async function rotateCompanyTokenAction(
   _previous: ActionResult,
   formData: FormData,

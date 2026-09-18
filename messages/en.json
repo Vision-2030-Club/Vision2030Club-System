@@ -752,7 +752,15 @@
       "pinKeep": "Keep",
       "pinNone": "No PIN",
       "pinNew": "Generate",
-      "pinTyped": "Use this:"
+      "pinTyped": "Use this:",
+      "addRoom": "Add room",
+      "addRoomHint": "Creates the room and its own booking link, with Oct 12–16 2026, 2pm–8pm in 15-minute slots ready to book.",
+      "roomName": "Room name",
+      "candidateLink": "Candidate link",
+      "acceptedPhones": "Accepted phone numbers",
+      "noAcceptedPhones": "No phone numbers accepted yet.",
+      "addPhones": "Add phone numbers",
+      "addPhonesHint": "One per line. Anyone who logs in on the room link with one of these numbers sees the available times right away."
     },
     "people": {
       "add": "Add",
@@ -919,7 +927,9 @@
       "already_cancelled": "That booking was already cancelled.",
       "archived": "This edition is closed.",
       "wrong_pin": "Wrong PIN.",
-      "feedback_sent": "This feedback has already been sent to the student."
+      "feedback_sent": "This feedback has already been sent to the student.",
+      "missing_phone": "Enter a phone number.",
+      "closed": "This room is no longer open."
     },
     "student": {
       "hello": "Hello, {name}.",
@@ -974,6 +984,15 @@
       "next": "Next",
       "idle": "Free",
       "quiet": "Waiting for the next interview"
+    },
+    "room": {
+      "intro": "Enter your name and phone number, and attach your CV, to see whether you have been accepted here.",
+      "name": "Name",
+      "phone": "Phone number",
+      "cvFile": "CV (PDF, up to 5 MB)",
+      "cvHint": "Optional if you already sent one — attaching a new one replaces it.",
+      "submit": "Continue",
+      "notAccepted": "You have not been accepted for this company yet. Check back later, or contact the club."
     }
   }
 }
