@@ -280,6 +280,24 @@ export async function loadFreeSlots(
   return (data ?? []) as SlotStatus[];
 }
 
+/**
+ * Every future slot of one company, free or already held — what the room
+ * picker (0005) shows, so a candidate sees the whole day's shape rather than
+ * gaps where a taken time used to be.
+ */
+export async function loadAllSlots(
+  db: SupabaseClient,
+  companyId: string,
+): Promise<SlotStatus[]> {
+  const { data } = await db
+    .from('slot_status')
+    .select('*')
+    .eq('company_id', companyId)
+    .gt('starts_at', new Date().toISOString())
+    .order('starts_at');
+  return (data ?? []) as SlotStatus[];
+}
+
 /** The board shape every polling route returns. */
 export function toFloorRow(row: DayRow): FloorRow {
   return {

@@ -3,9 +3,9 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Alert, Badge, Card } from '@/components/ui';
 import { formatDate, formatDateTime, formatTime, localized } from '@/lib/format';
 import {
+  loadAllSlots,
   loadBookingsOf,
   loadCompanies,
-  loadFreeSlots,
   loadPreferences,
   loadRooms,
 } from '@/lib/interviews/queries';
@@ -71,18 +71,20 @@ export default async function StudentPage({
     .filter((c): c is NonNullable<typeof c> => Boolean(c));
   const active = bookings.filter((b) => !b.cancelled_at);
 
-  // Free slots for every accepted company without a booking, or with one
-  // that may still be moved.
-  const freeByCompany = new Map<string, PickableSlot[]>();
+  // Every future slot of each accepted company — open and taken alike, so
+  // the picker can show the day's whole shape instead of just its gaps.
+  const slotsByCompany = new Map<string, PickableSlot[]>();
   await Promise.all(
     accepted.map(async (company) => {
-      const slots = await loadFreeSlots(db, company.id);
-      freeByCompany.set(
+      const slots = await loadAllSlots(db, company.id);
+      slotsByCompany.set(
         company.id,
         slots.map((s) => ({
           id: s.id,
-          day: formatDate(toDateInput(new Date(s.starts_at)) + 'T12:00:00Z', locale),
-          label: `${formatTime(s.starts_at, locale)} – ${formatTime(s.ends_at, locale)} · ${roomName.get(s.room_id) ?? ''}`,
+          day: toDateInput(new Date(s.starts_at)),
+          dayLabel: formatDate(toDateInput(new Date(s.starts_at)) + 'T12:00:00Z', locale),
+          timeLabel: `${formatTime(s.starts_at, locale)} – ${formatTime(s.ends_at, locale)}`,
+          taken: s.is_closed || s.booking_id !== null,
         })),
       );
     }),
@@ -115,7 +117,8 @@ export default async function StudentPage({
 
       {accepted.map((company) => {
         const booking = active.find((b) => b.company_id === company.id);
-        const free = freeByCompany.get(company.id) ?? [];
+        const slots = slotsByCompany.get(company.id) ?? [];
+        const hasFree = slots.some((s) => !s.taken);
         const canChange =
           bookingOpen &&
           booking?.stage === 'scheduled' &&
@@ -144,13 +147,13 @@ export default async function StudentPage({
                 </p>
                 {canChange ? (
                   <div className="flex flex-wrap items-start gap-4">
-                    {free.length ? (
+                    {hasFree ? (
                       <SlotPicker
                         token={token}
                         locale={locale}
                         companyId={company.id}
                         bookingId={booking.id}
-                        slots={free}
+                        slots={slots}
                         mode="move"
                       />
                     ) : null}
@@ -161,9 +164,9 @@ export default async function StudentPage({
                 ) : null}
               </div>
             ) : bookingOpen ? (
-              free.length ? (
+              hasFree ? (
                 <div className="mt-3">
-                  <SlotPicker token={token} locale={locale} companyId={company.id} slots={free} mode="book" />
+                  <SlotPicker token={token} locale={locale} companyId={company.id} slots={slots} mode="book" />
                 </div>
               ) : (
                 <p className="mt-3 text-sm text-ink-muted">{t('student.noFreeSlots')}</p>
