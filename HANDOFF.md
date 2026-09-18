@@ -1013,6 +1013,20 @@ settings, log, messages — tabs filtered by role); public under `/interviews/�
 `src/proxy.ts` lets `/interviews` through and only `/login` bounces a signed-in
 visitor now.
 
+### The shell inside the component
+
+Entering a project's interviews pages does not change layouts; `AppShell`
+(client) keeps the same header and sidebar mounted and reads the URL. Inside
+`/projects/<id>/interviews` it shows only that component's pages with a
+*Back to the club* button on top, cross-fades the club logo into the
+project's mark (`InterviewsLogo` — a wordmark from the project's name, until
+the club supplies an image), and sets `data-theme="interviews"` on `<html>`.
+The brand colour tokens are registered with `@property` in `globals.css`, so
+that attribute change is animated (700 ms) rather than cut; the root layout's
+inline script sets the attribute before the first paint on a direct load, and
+`theme-animate` is only added afterwards, so nothing fades in from teal. The
+public `/interviews` pages wear the same palette.
+
 ### Setting it up
 
 1. Create the interviews Supabase project (**Pro**, region next to Vercel's

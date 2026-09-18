@@ -47,8 +47,23 @@ export default async function LocaleLayout({
       lang={locale}
       dir={localeDirection[locale as Locale]}
       className={`${plexArabic.variable} ${gilroy.variable} h-full`}
+      // The inline script below adds `data-theme` before React hydrates.
+      suppressHydrationWarning
     >
       <body className="min-h-full antialiased">
+        {/*
+          Which colours the first paint uses. A project component's pages
+          (and the public interviews pages) wear the interviews palette; the
+          shell keeps this attribute in step afterwards. Setting it here,
+          before anything renders, is what stops a direct load of such a page
+          from painting teal and then fading to violet.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){var p=location.pathname;if(/^\\/(ar|en)\\/(projects\\/[^/]+\\/interviews|interviews)(\\/|$)/.test(p)){document.documentElement.setAttribute('data-theme','interviews')}})();",
+          }}
+        />
         <NextIntlClientProvider>{children}</NextIntlClientProvider>
       </body>
     </html>

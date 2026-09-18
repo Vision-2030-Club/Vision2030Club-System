@@ -84,3 +84,68 @@ html[dir="rtl"] .tv-ticker {
     white-space: normal;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Two worlds, one shell.
+
+   Inside a project's Mock Interviews pages the app wears that component's
+   colours. Tailwind v4 reads every `bg-brand-*` / `text-brand-*` utility from
+   a CSS variable, so recolouring the whole app is a matter of redefining the
+   variables under `html[data-theme="interviews"]` — and because each variable
+   is REGISTERED below, the browser can animate the change instead of cutting
+   to it. `theme-animate` is added by the shell after its first paint so a
+   direct load of an interviews page opens in violet rather than fading from
+   teal; from then on every crossing of the boundary is a 700 ms fade.
+   --------------------------------------------------------------------------- */
+@property --color-brand-50  { syntax: '<color>'; inherits: true; initial-value: #eefafc; }
+@property --color-brand-100 { syntax: '<color>'; inherits: true; initial-value: #d3f1f5; }
+@property --color-brand-200 { syntax: '<color>'; inherits: true; initial-value: #ade4eb; }
+@property --color-brand-300 { syntax: '<color>'; inherits: true; initial-value: #74d0dc; }
+@property --color-brand-400 { syntax: '<color>'; inherits: true; initial-value: #12abb8; }
+@property --color-brand-500 { syntax: '<color>'; inherits: true; initial-value: #0d94a4; }
+@property --color-brand-600 { syntax: '<color>'; inherits: true; initial-value: #007a8f; }
+@property --color-brand-700 { syntax: '<color>'; inherits: true; initial-value: #076174; }
+@property --color-brand-800 { syntax: '<color>'; inherits: true; initial-value: #0b4f5f; }
+@property --color-brand-900 { syntax: '<color>'; inherits: true; initial-value: #0e4251; }
+@property --color-brand-950 { syntax: '<color>'; inherits: true; initial-value: #052a35; }
+@property --color-surface-muted { syntax: '<color>'; inherits: true; initial-value: #f6f8f9; }
+
+html[data-theme="interviews"] {
+  --color-brand-50: #f5f3ff;
+  --color-brand-100: #ede9fe;
+  --color-brand-200: #ddd6fe;
+  --color-brand-300: #c4b5fd;
+  --color-brand-400: #a78bfa;
+  --color-brand-500: #7c3aed;
+  --color-brand-600: #6d28d9;
+  --color-brand-700: #5b21b6;
+  --color-brand-800: #4c1d95;
+  --color-brand-900: #3b1a78;
+  --color-brand-950: #22104a;
+  --color-surface-muted: #f6f4fb;
+}
+
+html.theme-animate {
+  transition:
+    --color-brand-50 700ms ease-in-out, --color-brand-100 700ms ease-in-out,
+    --color-brand-200 700ms ease-in-out, --color-brand-300 700ms ease-in-out,
+    --color-brand-400 700ms ease-in-out, --color-brand-500 700ms ease-in-out,
+    --color-brand-600 700ms ease-in-out, --color-brand-700 700ms ease-in-out,
+    --color-brand-800 700ms ease-in-out, --color-brand-900 700ms ease-in-out,
+    --color-brand-950 700ms ease-in-out, --color-surface-muted 700ms ease-in-out;
+}
+
+/* The sidebar's list is replaced when the world changes; the new one settles in. */
+@keyframes shell-fade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.shell-fade {
+  animation: shell-fade 400ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-animate { transition: none; }
+  .shell-fade { animation: none; }
+}

@@ -23,6 +23,10 @@ export type NavIconName =
   | 'kpi'
   | 'admin'
   | 'interviews'
+  | 'company'
+  | 'stage'
+  | 'mail'
+  | 'back'
   | 'menu';
 
 const GLYPHS: Record<NavIconName, ReactNode> = {
@@ -118,6 +122,31 @@ const GLYPHS: Record<NavIconName, ReactNode> = {
       <path d="M3 20.5h18" />
     </>
   ),
+  // An office building: the companies that interview.
+  company: (
+    <>
+      <path d="M4 20.5V5.5A1.5 1.5 0 0 1 5.5 4h8A1.5 1.5 0 0 1 15 5.5v15" />
+      <path d="M15 10h3.5A1.5 1.5 0 0 1 20 11.5v9" />
+      <path d="M2.75 20.5h18.5M7.5 8h4M7.5 11.5h4M7.5 15h4M17 14v.01M17 17v.01" />
+    </>
+  ),
+  // A person stepping through a doorway: the floor, where stages move.
+  stage: (
+    <>
+      <path d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13" />
+      <circle cx="8" cy="8.5" r="2.25" />
+      <path d="M3.5 19.5a4.5 4.5 0 0 1 9 0" />
+      <path d="M11.5 12h5.5m-2.25-2.25L17 12l-2.25 2.25" />
+    </>
+  ),
+  mail: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <path d="m3.5 7.5 8.5 6 8.5-6" />
+    </>
+  ),
+  // The one directional glyph here; the shell mirrors it in RTL.
+  back: <path d="M15.5 5.5 9 12l6.5 6.5" />,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
 };
 
