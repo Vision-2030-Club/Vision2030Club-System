@@ -127,7 +127,13 @@ export function AppShell({
         </aside>
 
         <main id="main" className="min-w-0 flex-1">
-          {children}
+          {/* The page settles in with the sidebar when the world changes —
+              which also covers the typeface swap, the one thing CSS cannot
+              fade. Within a world the key is stable, so pages navigate
+              without remounting. */}
+          <div key={active ? 'interviews' : 'club'} className="shell-fade">
+            {children}
+          </div>
         </main>
       </div>
     </div>

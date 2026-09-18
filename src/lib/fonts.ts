@@ -23,3 +23,15 @@ export const gilroy = localFont({
     { path: '../fonts/Gilroy-Bold.ttf', weight: '700', style: 'normal' },
   ],
 });
+
+/**
+ * The Mock Interviews (افترض) face, used inside that component's pages.
+ * One Light cut exists, so it is declared at 300 only: headings and buttons
+ * ask for 600–700 and the browser emboldens this cut for them, which reads
+ * far better than letting a single thin face claim every weight.
+ */
+export const dgHeaven = localFont({
+  variable: '--font-interviews',
+  display: 'swap',
+  src: [{ path: '../fonts/DG-Heaven-Light.ttf', weight: '300', style: 'normal' }],
+});

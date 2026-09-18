@@ -23,6 +23,11 @@
   --color-ink-muted: #64748b;
   --color-line: #e2e8f0;
 
+  /* The Mock Interviews brand's two accents (lime, lavender); the club's
+     own world leaves them unused. */
+  --color-accent: #c3f04a;
+  --color-accent-2: #c2b7ef;
+
   --color-ok: #15803d;
   --color-warn: #b45309;
   --color-danger: #b91c1c;
@@ -94,8 +99,8 @@ html[dir="rtl"] .tv-ticker {
    variables under `html[data-theme="interviews"]` — and because each variable
    is REGISTERED below, the browser can animate the change instead of cutting
    to it. `theme-animate` is added by the shell after its first paint so a
-   direct load of an interviews page opens in violet rather than fading from
-   teal; from then on every crossing of the boundary is a 700 ms fade.
+   direct load of an interviews page opens in the component's colours rather
+   than fading from teal; every later crossing of the boundary is a 700 ms fade.
    --------------------------------------------------------------------------- */
 @property --color-brand-50  { syntax: '<color>'; inherits: true; initial-value: #eefafc; }
 @property --color-brand-100 { syntax: '<color>'; inherits: true; initial-value: #d3f1f5; }
@@ -111,18 +116,26 @@ html[dir="rtl"] .tv-ticker {
 @property --color-surface-muted { syntax: '<color>'; inherits: true; initial-value: #f6f8f9; }
 
 html[data-theme="interviews"] {
-  --color-brand-50: #f5f3ff;
-  --color-brand-100: #ede9fe;
-  --color-brand-200: #ddd6fe;
-  --color-brand-300: #c4b5fd;
-  --color-brand-400: #a78bfa;
-  --color-brand-500: #7c3aed;
-  --color-brand-600: #6d28d9;
-  --color-brand-700: #5b21b6;
-  --color-brand-800: #4c1d95;
-  --color-brand-900: #3b1a78;
-  --color-brand-950: #22104a;
-  --color-surface-muted: #f6f4fb;
+  /* افترض: deep teal #0e5a67 with the mint #a6eddd as its light end. */
+  --color-brand-50: #eefaf6;
+  --color-brand-100: #d3f5ea;
+  --color-brand-200: #a6eddd;
+  --color-brand-300: #78d9c8;
+  --color-brand-400: #3fb2a6;
+  --color-brand-500: #1f8489;
+  --color-brand-600: #0e5a67;
+  --color-brand-700: #0c4b56;
+  --color-brand-800: #093b44;
+  --color-brand-900: #072d34;
+  --color-brand-950: #041c21;
+  --color-surface-muted: #e9f8f3;
+  /* The brand's typeface, for both scripts; digits and Latin fall back
+     glyph by glyph where the cut lacks them. */
+  font-family: var(--font-interviews), var(--font-arabic), system-ui, sans-serif;
+}
+
+html[data-theme="interviews"][lang="en"] {
+  font-family: var(--font-interviews), var(--font-latin), var(--font-arabic), system-ui, sans-serif;
 }
 
 html.theme-animate {

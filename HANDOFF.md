@@ -1018,14 +1018,19 @@ visitor now.
 Entering a project's interviews pages does not change layouts; `AppShell`
 (client) keeps the same header and sidebar mounted and reads the URL. Inside
 `/projects/<id>/interviews` it shows only that component's pages with a
-*Back to the club* button on top, cross-fades the club logo into the
-project's mark (`InterviewsLogo` — a wordmark from the project's name, until
-the club supplies an image), and sets `data-theme="interviews"` on `<html>`.
-The brand colour tokens are registered with `@property` in `globals.css`, so
-that attribute change is animated (700 ms) rather than cut; the root layout's
-inline script sets the attribute before the first paint on a direct load, and
-`theme-animate` is only added afterwards, so nothing fades in from teal. The
-public `/interviews` pages wear the same palette.
+*Back to the club* button on top, cross-fades the club logo into the افترض
+mark (`public/brand/interviews-logo.png`, drawn by `InterviewsLogo`; the TV
+shows it white through a CSS filter), and sets `data-theme="interviews"` on
+`<html>`. That attribute switches the brand colour tokens to the component's
+palette (deep teal `#0e5a67`, mint `#a6eddd`, with lime `#c3f04a` and
+lavender `#c2b7ef` as `accent` / `accent-2`) and the typeface to DG Heaven
+(`src/fonts/DG-Heaven-Light.ttf`, one Light cut; bolder weights are
+synthesised). The tokens are registered with `@property` in `globals.css`, so
+the colour change is animated (700 ms) rather than cut, and the page and
+sidebar fade in over the typeface swap; the root layout's inline script sets
+the attribute before the first paint on a direct load, and `theme-animate` is
+only added afterwards, so nothing fades in from the club's teal. The public
+`/interviews` pages carry the brand outright.
 
 ### Setting it up
 
