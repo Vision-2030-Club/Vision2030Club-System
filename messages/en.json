@@ -597,7 +597,7 @@
     "tabs": {
       "overview": "Overview",
       "applicants": "Applicants",
-      "companies": "Companies",
+      "companies": "Rooms",
       "schedule": "Schedule",
       "floor": "Floor",
       "bookings": "Bookings",
@@ -732,7 +732,7 @@
     },
     "companies": {
       "new": "New company",
-      "empty": "No companies yet.",
+      "empty": "No rooms yet.",
       "hidden": "Hidden from form",
       "interviewerLink": "Interviewer link",
       "pinIs": "PIN: {pin}",

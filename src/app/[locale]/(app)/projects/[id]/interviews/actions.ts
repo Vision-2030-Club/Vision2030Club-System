@@ -170,6 +170,54 @@ export async function exportNowAction(
 // Rooms and companies
 // -----------------------------------------------------------------------------
 
+/**
+ * Renames a room created by createRoomAction: the company (name + logo) and
+ * its paired physical room together, so the two never drift apart. The pair
+ * is found through any session already scheduled for the company — the only
+ * place the two are linked — rather than a new column, since createRoomAction
+ * always creates both at once.
+ */
+export async function renameRoomAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const companyId = requiredText(formData, 'company_id');
+  const name = requiredText(formData, 'name');
+  const logoUrl = text(formData, 'logo_url') ?? '';
+
+  const db = createInterviewsClient();
+  const { error: companyError } = await db.rpc('upsert_company', {
+    p_edition: g.access.edition.id,
+    p_company: companyId,
+    p_payload: { name_en: name, name_ar: name, logo_url: logoUrl },
+    p_actor: g.access.actor,
+  });
+  if (companyError) return fromPostgrest(companyError);
+
+  const { data: session } = await db
+    .from('sessions')
+    .select('room_id')
+    .eq('company_id', companyId)
+    .limit(1)
+    .maybeSingle();
+
+  if (session?.room_id) {
+    const { error: roomError } = await db.rpc('upsert_room', {
+      p_edition: g.access.edition.id,
+      p_room: session.room_id,
+      p_payload: { name },
+      p_actor: g.access.actor,
+    });
+    if (roomError) return fromPostgrest(roomError);
+  }
+
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
 export async function upsertRoomAction(
   _previous: ActionResult,
   formData: FormData,

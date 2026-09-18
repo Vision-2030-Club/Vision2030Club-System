@@ -597,7 +597,7 @@
     "tabs": {
       "overview": "نظرة عامة",
       "applicants": "المتقدمون",
-      "companies": "الشركات",
+      "companies": "الغرف",
       "schedule": "الجدول",
       "floor": "الميدان",
       "bookings": "الحجوزات",
@@ -732,7 +732,7 @@
     },
     "companies": {
       "new": "شركة جديدة",
-      "empty": "لا توجد شركات بعد.",
+      "empty": "لا توجد غرف بعد.",
       "hidden": "مخفية عن النموذج",
       "interviewerLink": "رابط المُقابِل",
       "pinIs": "الرمز: {pin}",
