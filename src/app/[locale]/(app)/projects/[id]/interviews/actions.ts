@@ -265,6 +265,55 @@ export async function renameRoomAction(
   return ok();
 }
 
+/**
+ * "Delete" a room — a soft delete, on purpose. It hides the company from
+ * this grid and marks the room inactive (so its candidate link stops
+ * working, per room/[token]/page.tsx), but touches nothing else: the
+ * sessions, slots and bookings stay exactly as they are. The floor sheet
+ * reads that same live data, so a deleted room's history keeps showing
+ * there — nothing to resync or preserve specially, because nothing about
+ * the underlying data changed. `deleted: 'false'` reverses it.
+ */
+export async function setRoomDeletedAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const companyId = requiredText(formData, 'company_id');
+  const deleted = text(formData, 'deleted') !== 'false';
+
+  const db = createInterviewsClient();
+  const { error: companyError } = await db.rpc('upsert_company', {
+    p_edition: g.access.edition.id,
+    p_company: companyId,
+    p_payload: { is_hidden: deleted },
+    p_actor: g.access.actor,
+  });
+  if (companyError) return fromPostgrest(companyError);
+
+  const { data: session } = await db
+    .from('sessions')
+    .select('room_id')
+    .eq('company_id', companyId)
+    .limit(1)
+    .maybeSingle();
+
+  if (session?.room_id) {
+    const { error: roomError } = await db.rpc('upsert_room', {
+      p_edition: g.access.edition.id,
+      p_room: session.room_id,
+      p_payload: { is_active: !deleted },
+      p_actor: g.access.actor,
+    });
+    if (roomError) return fromPostgrest(roomError);
+  }
+
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
 export async function upsertRoomAction(
   _previous: ActionResult,
   formData: FormData,

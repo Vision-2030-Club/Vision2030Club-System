@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { ActionForm } from '@/components/ActionForm';
+import { ConfirmForm } from '@/components/ConfirmForm';
 import { Disclosure } from '@/components/Disclosure';
-import { Card, EmptyState, Input, Label, Textarea } from '@/components/ui';
+import { Badge, Card, EmptyState, Input, Label, Textarea } from '@/components/ui';
 import { localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { siteUrl } from '@/lib/interviews/email';
@@ -11,7 +12,13 @@ import type { Company } from '@/lib/interviews/types';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { toDateInput } from '@/lib/time';
 import { CopyField } from '../CopyField';
-import { acceptPhonesAction, createRoomAction, renameRoomAction, unacceptPhoneAction } from '../actions';
+import {
+  acceptPhonesAction,
+  createRoomAction,
+  renameRoomAction,
+  setRoomDeletedAction,
+  unacceptPhoneAction,
+} from '../actions';
 
 /**
  * One room per card: a booth a candidate books into, with its own link.
@@ -99,7 +106,10 @@ export default async function InterviewsCompaniesPage({
                     />
                   ) : null}
                   <div className="min-w-0 flex-1">
-                    <span className="font-semibold">{localized(company, 'name', locale)}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">{localized(company, 'name', locale)}</span>
+                      {company.is_hidden ? <Badge tone="danger">{t('companies.deleted')}</Badge> : null}
+                    </div>
                     <p className="mt-1 text-xs text-ink-muted">
                       {t('decision.accepted')}: <span className="ltr-nums">{c?.accepted ?? 0}</span> ·{' '}
                       {t('overview.bookedOfSlots')}:{' '}
@@ -115,9 +125,37 @@ export default async function InterviewsCompaniesPage({
                     <CopyField label={t('companies.candidateLink')} value={candidateLinkFor(company)!} />
 
                     {manage ? (
-                      <Disclosure label={tCommon('edit')} title={localized(company, 'name', locale)}>
-                        <RoomForm locale={locale} projectId={id} company={company} t={t} tCommon={tCommon} />
-                      </Disclosure>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Disclosure label={tCommon('edit')} title={localized(company, 'name', locale)}>
+                          <RoomForm locale={locale} projectId={id} company={company} t={t} tCommon={tCommon} />
+                        </Disclosure>
+                        {company.is_hidden ? (
+                          <ActionForm
+                            action={setRoomDeletedAction}
+                            submitLabel={t('companies.restore')}
+                            variant="secondary"
+                            className="space-y-0"
+                          >
+                            <input type="hidden" name="locale" value={locale} />
+                            <input type="hidden" name="project_id" value={id} />
+                            <input type="hidden" name="company_id" value={company.id} />
+                            <input type="hidden" name="deleted" value="false" />
+                          </ActionForm>
+                        ) : (
+                          <ConfirmForm
+                            action={setRoomDeletedAction}
+                            trigger={t('companies.delete')}
+                            title={t('companies.deleteTitle')}
+                            body={t('companies.deleteBody')}
+                            confirmLabel={t('companies.delete')}
+                          >
+                            <input type="hidden" name="locale" value={locale} />
+                            <input type="hidden" name="project_id" value={id} />
+                            <input type="hidden" name="company_id" value={company.id} />
+                            <input type="hidden" name="deleted" value="true" />
+                          </ConfirmForm>
+                        )}
+                      </div>
                     ) : null}
 
                     <Disclosure label={t('companies.acceptedPhones')}>

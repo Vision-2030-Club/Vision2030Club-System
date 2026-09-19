@@ -769,7 +769,12 @@
       "noAcceptedPhones": "No phone numbers accepted yet.",
       "addPhones": "Add phone numbers",
       "addPhonesHint": "One per line. Anyone who logs in on the room link with one of these numbers sees the available times right away.",
-      "roomDay": "Day"
+      "roomDay": "Day",
+      "deleted": "Deleted",
+      "delete": "Delete room",
+      "deleteTitle": "Delete this room?",
+      "deleteBody": "Its candidate link stops working and it disappears from this list, but nothing is erased — its bookings and history stay exactly as they are, including on the live Google Sheet. You can restore it any time.",
+      "restore": "Restore room"
     },
     "people": {
       "add": "Add",

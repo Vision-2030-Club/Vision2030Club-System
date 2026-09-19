@@ -27,7 +27,9 @@ export default async function RoomPage({
 
   const { data } = await db.from('companies').select('*').eq('candidate_token', token).maybeSingle();
   const company = data as Company | null;
-  if (!company) notFound();
+  // is_hidden doubles as "deleted" for a room (setRoomDeletedAction) — a
+  // deleted room's link stops working, even though its data is untouched.
+  if (!company || company.is_hidden) notFound();
 
   return (
     <>
