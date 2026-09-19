@@ -284,9 +284,10 @@ export async function loadFreeSlots(
  * Every slot of one company, free, already held, or already past — what the
  * room picker (0005) shows, so a candidate always sees the room's whole
  * scheduled range (e.g. 2-8) rather than it shrinking from the start as the
- * day goes on. The caller marks a slot "taken" for display the same way
- * whether it is booked or simply in the past; book_slot still refuses a
- * past one server-side regardless of what the client shows.
+ * day goes on. The caller marks a slot "taken" for display when it is
+ * booked or closed; a past one is shown open, and book_slot decides
+ * (0009): refused once the edition is active, allowed while it is a draft
+ * being tried out against today's date.
  */
 export async function loadAllSlots(
   db: SupabaseClient,

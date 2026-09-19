@@ -235,13 +235,16 @@ export async function renameRoomAction(
   const companyId = requiredText(formData, 'company_id');
   const name = requiredText(formData, 'name');
   const companyName = text(formData, 'company_name') || name;
+  // The Arabic name falls back to the English one, never the other way: the
+  // candidate pages show whichever matches their language.
+  const companyNameAr = text(formData, 'company_name_ar') || companyName;
   const logoUrl = text(formData, 'logo_url') ?? '';
 
   const db = createInterviewsClient();
   const { error: companyError } = await db.rpc('upsert_company', {
     p_edition: g.access.edition.id,
     p_company: companyId,
-    p_payload: { name_en: companyName, name_ar: companyName, logo_url: logoUrl },
+    p_payload: { name_en: companyName, name_ar: companyNameAr, logo_url: logoUrl },
     p_actor: g.access.actor,
   });
   if (companyError) return fromPostgrest(companyError);
@@ -399,6 +402,7 @@ export async function createRoomAction(
 
   const name = requiredText(formData, 'name');
   const companyName = text(formData, 'company_name') || name;
+  const companyNameAr = text(formData, 'company_name_ar') || companyName;
   const logoUrl = text(formData, 'logo_url') ?? '';
   const day = requiredText(formData, 'day');
   const startTime = requiredText(formData, 'start_time');
@@ -418,7 +422,7 @@ export async function createRoomAction(
     p_company: null,
     p_payload: {
       name_en: companyName,
-      name_ar: companyName,
+      name_ar: companyNameAr,
       logo_url: logoUrl,
       access_token: newToken(),
       candidate_token: newToken(),

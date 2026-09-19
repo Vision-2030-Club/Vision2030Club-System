@@ -71,9 +71,9 @@ export default async function StudentPage({
   const active = bookings.filter((b) => !b.cancelled_at);
 
   // Every slot of each accepted company — open and booked alike, so the
-  // picker always shows the room's whole scheduled range. Past times are
-  // bookable too, by design (see book_slot/move_booking, 0008): this
-  // project's rooms are made and tested well before the real event runs.
+  // picker always shows the room's whole scheduled range. A past time is
+  // offered too; book_slot refuses it once the edition is active and allows
+  // it while the edition is a draft being tried out (0009).
   const slotsByCompany = new Map<string, PickableSlot[]>();
   await Promise.all(
     accepted.map(async (company) => {

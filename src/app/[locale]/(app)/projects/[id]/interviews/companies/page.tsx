@@ -23,6 +23,7 @@ import {
   acceptPhonesAction,
   createRoomAction,
   renameRoomAction,
+  rotateCompanyTokenAction,
   setRoomDeletedAction,
   unacceptPhoneAction,
 } from '../actions';
@@ -33,9 +34,12 @@ import {
  * createRoomAction (0005) — but named separately: the room is its booth
  * label ("Room 1", shown as the card's heading), the company is whoever is
  * sitting in it that day ("KPMG", shown underneath and in the floor sheet's
- * own Company column). The interviewer-facing side of a company
- * (access_token, PIN, the multi-company apply form) is a different,
- * unrelated feature this project does not use, so none of it is shown here.
+ * own Company column). Each card also keeps the company's INTERVIEWER side
+ * — the secret link and PIN the company's HR opens to select applicants and
+ * follow their day — behind a disclosure, so the apply-form flow the club
+ * decided on in September stays manageable next to the room flow. Which of
+ * the two the club runs on the day is an open decision (HANDOFF.md); the
+ * page supports both until it is taken.
  */
 export default async function InterviewsCompaniesPage({
   params,
@@ -84,6 +88,7 @@ export default async function InterviewsCompaniesPage({
   const decide = can.decide(role);
   const candidateLinkFor = (company: Company) =>
     company.candidate_token ? `${siteUrl()}/${locale}/interviews/room/${company.candidate_token}` : null;
+  const interviewerLinkFor = (company: Company) => `${siteUrl()}/${locale}/interviews/c/${company.access_token}`;
 
   return (
     <div className="space-y-4">
@@ -100,6 +105,10 @@ export default async function InterviewsCompaniesPage({
               <div>
                 <Label htmlFor="new-room-company">{t('companies.companyName')}</Label>
                 <Input id="new-room-company" name="company_name" placeholder={t('companies.companyNameHint')} />
+              </div>
+              <div>
+                <Label htmlFor="new-room-company-ar">{t('companies.companyNameAr')}</Label>
+                <Input id="new-room-company-ar" name="company_name_ar" dir="rtl" />
               </div>
               <div>
                 <Label htmlFor="new-room-logo">{t('companies.logoUrl')}</Label>
@@ -192,6 +201,31 @@ export default async function InterviewsCompaniesPage({
                         tCommon={tCommon}
                       />
                     </Disclosure>
+
+                    {manage ? (
+                      <Disclosure label={t('companies.interviewerSide')}>
+                        <div className="space-y-3">
+                          <CopyField label={t('companies.interviewerLink')} value={interviewerLinkFor(company)} />
+                          <p className="text-xs text-ink-muted">
+                            {company.access_pin
+                              ? t('companies.pinIs', { pin: company.access_pin })
+                              : t('companies.noPin')}
+                          </p>
+                          <ConfirmForm
+                            action={rotateCompanyTokenAction}
+                            trigger={t('companies.rotate')}
+                            title={t('companies.rotateTitle')}
+                            body={t('companies.rotateBody')}
+                            confirmLabel={t('companies.rotate')}
+                            variant="secondary"
+                          >
+                            <input type="hidden" name="locale" value={locale} />
+                            <input type="hidden" name="project_id" value={id} />
+                            <input type="hidden" name="company_id" value={company.id} />
+                          </ConfirmForm>
+                        </div>
+                      </Disclosure>
+                    ) : null}
                   </div>
                 ) : null}
               </Card>
@@ -258,6 +292,10 @@ function RoomForm({
         <div>
           <Label htmlFor={`${company.id}-company_name`}>{t('companies.companyName')}</Label>
           <Input id={`${company.id}-company_name`} name="company_name" defaultValue={company.name_en} />
+        </div>
+        <div>
+          <Label htmlFor={`${company.id}-company_name_ar`}>{t('companies.companyNameAr')}</Label>
+          <Input id={`${company.id}-company_name_ar`} name="company_name_ar" dir="rtl" defaultValue={company.name_ar} />
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor={`${company.id}-logo_url`}>{t('companies.logoUrl')}</Label>
