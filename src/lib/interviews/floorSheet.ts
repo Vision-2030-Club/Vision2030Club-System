@@ -107,7 +107,16 @@ async function buildRoomBlock(
     [...COLUMNS, ''],
   ];
 
+  // Every slot the room's session generated gets a row, booked or not — a
+  // fixed 2pm-8pm-shaped grid instead of one that only grows with bookings.
+  // Nothing but Time and Company (both known up front, independent of who
+  // books) is filled in for an empty slot; the rest stays blank until
+  // someone actually books it.
   for (const slot of slots) {
+    if (!slot.booking_id) {
+      rows.push([fmtTime(slot.starts_at, zone), companyName, '', '', '', '', '']);
+      continue;
+    }
     const cvPath = slot.application_id ? cvPathByApplication.get(slot.application_id) : null;
     const cvUrl = cvPath ? await signCvLong(db, cvPath) : null;
     rows.push([
@@ -117,7 +126,7 @@ async function buildRoomBlock(
       slot.student_phone ?? '',
       cvUrl ? `=HYPERLINK("${cvUrl}", "View CV")` : '',
       slot.stage ? STAGE_LABELS[slot.stage] : '',
-      slot.booking_id ?? '',
+      slot.booking_id,
     ]);
   }
 
@@ -371,7 +380,7 @@ async function loadFloorData(db: ReturnType<typeof createInterviewsClient>, edit
   const [rooms, sessions, { data: slotRows }] = await Promise.all([
     loadRooms(db, editionId),
     loadSessions(db, editionId),
-    db.from('slot_status').select('*').eq('edition_id', editionId).not('booking_id', 'is', null).order('starts_at'),
+    db.from('slot_status').select('*').eq('edition_id', editionId).order('starts_at'),
   ]);
   return { rooms, sessions, slots: (slotRows ?? []) as SlotStatus[] };
 }

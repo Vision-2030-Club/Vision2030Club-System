@@ -129,9 +129,14 @@ async function conditionalFormatCount(spreadsheetId: string, sheetId: number): P
  * computing a minimal diff would cost more than just resending everything —
  * this is at most a few hundred cells.
  *
- * Old merges and conditional-format rules are cleared first: `values.clear`
- * touches neither, and re-adding a Stage colour rule on every sync without
- * clearing the last sync's copy would just keep piling up duplicates.
+ * Old merges, background/text formatting and conditional-format rules are
+ * all cleared first: `values.clear` touches none of them, so a row that
+ * carried a coral or navy fill in a previous sync (a room block that has
+ * since shrunk, a layout that gained a title row and shifted everything
+ * down) would otherwise keep that colour forever, bleeding into whatever
+ * the new sync puts there. Re-adding a Stage colour rule on every sync
+ * without clearing the last sync's copy would likewise just keep piling up
+ * duplicates.
  *
  * `USER_ENTERED` rather than `RAW` so a `=HYPERLINK(...)` cell (the CV
  * column) actually evaluates instead of showing as literal formula text.
@@ -156,6 +161,13 @@ export async function writeTab(
       requests: [
         ...Array.from({ length: oldFormatCount }, () => ({ deleteConditionalFormatRule: { sheetId, index: 0 } })),
         { unmergeCells: { range: { sheetId } } },
+        {
+          repeatCell: {
+            range: { sheetId, startRowIndex: 0, endRowIndex: 1000, startColumnIndex: 0, endColumnIndex: 26 },
+            cell: { userEnteredFormat: {} },
+            fields: 'userEnteredFormat',
+          },
+        },
       ],
     }),
   });
