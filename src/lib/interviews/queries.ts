@@ -281,9 +281,12 @@ export async function loadFreeSlots(
 }
 
 /**
- * Every future slot of one company, free or already held — what the room
- * picker (0005) shows, so a candidate sees the whole day's shape rather than
- * gaps where a taken time used to be.
+ * Every slot of one company, free, already held, or already past — what the
+ * room picker (0005) shows, so a candidate always sees the room's whole
+ * scheduled range (e.g. 2-8) rather than it shrinking from the start as the
+ * day goes on. The caller marks a slot "taken" for display the same way
+ * whether it is booked or simply in the past; book_slot still refuses a
+ * past one server-side regardless of what the client shows.
  */
 export async function loadAllSlots(
   db: SupabaseClient,
@@ -293,7 +296,6 @@ export async function loadAllSlots(
     .from('slot_status')
     .select('*')
     .eq('company_id', companyId)
-    .gt('starts_at', new Date().toISOString())
     .order('starts_at');
   return (data ?? []) as SlotStatus[];
 }

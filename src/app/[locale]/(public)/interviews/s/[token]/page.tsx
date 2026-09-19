@@ -70,8 +70,9 @@ export default async function StudentPage({
     .filter((c): c is NonNullable<typeof c> => Boolean(c));
   const active = bookings.filter((b) => !b.cancelled_at);
 
-  // Every future slot of each accepted company — open and taken alike, so
-  // the picker can show the day's whole shape instead of just its gaps.
+  // Every slot of each accepted company — open, booked and past alike, so
+  // the picker always shows the room's whole scheduled range instead of it
+  // shrinking away from the start as the day goes on.
   const slotsByCompany = new Map<string, PickableSlot[]>();
   await Promise.all(
     accepted.map(async (company) => {
@@ -81,7 +82,7 @@ export default async function StudentPage({
         slots.map((s) => ({
           id: s.id,
           timeLabel: `${formatTime(s.starts_at, locale)} – ${formatTime(s.ends_at, locale)}`,
-          taken: s.is_closed || s.booking_id !== null,
+          taken: s.is_closed || s.booking_id !== null || new Date(s.starts_at).getTime() <= now,
         })),
       );
     }),
