@@ -6,7 +6,7 @@ import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { signCvLong } from '@/lib/interviews/cv';
 import type { Actor } from '@/lib/interviews/access';
 import type { Edition, Room, SlotStatus, Stage } from '@/lib/interviews/types';
-import { loadRooms, loadSessions, sessionDays } from '@/lib/interviews/queries';
+import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/interviews/queries';
 
 /**
  * Mostly a mirror — this database → the sheet — with one door back the other
@@ -25,12 +25,14 @@ import { loadRooms, loadSessions, sessionDays } from '@/lib/interviews/queries';
  * repeated down one column. The date is read straight off sessions.day —
  * add a room for today and its tab is named today's date automatically.
  * Within a tab, two rooms per row, each its own block: a merged, centred,
- * navy title bar naming the room, a navy Name/Time/Phone/CV/Stage header
- * row, that room's bookings in time order. A room never names its own
- * company — here a room and its company are the same booth (0005).
+ * navy title bar naming the ROOM (its booth label, e.g. "Room 1") — not
+ * the company — and a navy Time/Company/Name/Phone/CV/Stage header row,
+ * that room's bookings in time order. Company is its own column, resolved
+ * from whichever company that room's session belongs to, since a room's
+ * booth label and the company sitting in it are named separately now.
  *
- * The sixth column of each block, hidden, carries the booking id — nothing
- * else in a row identifies which booking it is, and the id is what
+ * The seventh column of each block, hidden, carries the booking id —
+ * nothing else in a row identifies which booking it is, and the id is what
  * pullFloorSheetStages matches an edited Stage cell back to.
  */
 
@@ -52,9 +54,10 @@ const STAGE_COLORS: Record<string, { bg: { red: number; green: number; blue: num
   'No Show': { bg: { red: 1, green: 0.89, blue: 0.89 }, fg: { red: 0.6, green: 0.11, blue: 0.11 } },
 };
 
-const COLUMNS = ['Name', 'Time', 'Phone', 'CV', 'Stage'];
+const COLUMNS = ['Time', 'Company', 'Name', 'Phone', 'CV', 'Stage'];
+const STAGE_COL = COLUMNS.indexOf('Stage');
 const VISIBLE_COLS = COLUMNS.length;
-const ID_COL = VISIBLE_COLS; // the hidden 6th column, 0-based index within a block
+const ID_COL = VISIBLE_COLS; // the hidden 7th column, 0-based index within a block
 const BLOCK_COLS = VISIBLE_COLS + 1;
 const PAIR_COLS = BLOCK_COLS * 2 + 1; // two blocks + one gap column between them
 
@@ -82,12 +85,13 @@ function dateKey(iso: string, zone: string): string {
 async function buildRoomBlock(
   db: ReturnType<typeof createInterviewsClient>,
   room: Room,
+  companyName: string,
   slots: SlotStatus[],
   cvPathByApplication: Map<string, string | null>,
   zone: string,
 ): Promise<string[][]> {
   const rows: string[][] = [
-    [room.name, '', '', '', '', ''],
+    [room.name, ...Array(VISIBLE_COLS - 1).fill(''), ''],
     [...COLUMNS, ''],
   ];
 
@@ -95,8 +99,9 @@ async function buildRoomBlock(
     const cvPath = slot.application_id ? cvPathByApplication.get(slot.application_id) : null;
     const cvUrl = cvPath ? await signCvLong(db, cvPath) : null;
     rows.push([
-      slot.student_name ?? '',
       `${fmtTime(slot.starts_at, zone)}–${fmtTime(slot.ends_at, zone)}`,
+      companyName,
+      slot.student_name ?? '',
       slot.student_phone ?? '',
       cvUrl ? `=HYPERLINK("${cvUrl}", "View CV")` : '',
       slot.stage ? STAGE_LABELS[slot.stage] : '',
@@ -140,8 +145,8 @@ function blockFormatting(sheetId: number, startRow: number, startCol: number, bl
           sheetId,
           startRowIndex: startRow + 2,
           endRowIndex: startRow + 2 + dataRows,
-          startColumnIndex: startCol + 4,
-          endColumnIndex: startCol + 5,
+          startColumnIndex: startCol + STAGE_COL,
+          endColumnIndex: startCol + STAGE_COL + 1,
         },
         rule: {
           condition: {
@@ -167,8 +172,8 @@ function blockFormatting(sheetId: number, startRow: number, startCol: number, bl
                 sheetId,
                 startRowIndex: startRow + 2,
                 endRowIndex: startRow + 2 + dataRows,
-                startColumnIndex: startCol + 4,
-                endColumnIndex: startCol + 5,
+                startColumnIndex: startCol + STAGE_COL,
+                endColumnIndex: startCol + STAGE_COL + 1,
               },
             ],
             booleanRule: {
@@ -186,7 +191,8 @@ function blockFormatting(sheetId: number, startRow: number, startCol: number, bl
 
 /** Column widths and the hidden booking-id column, set once per tab. */
 function columnLayoutRequests(sheetId: number): object[] {
-  const widths = [170, 140, 120, 100, 110];
+  // Time, Company, Name, Phone, CV, Stage
+  const widths = [140, 130, 170, 120, 100, 110];
   const requests: object[] = [];
   for (const startCol of [0, BLOCK_COLS + 1]) {
     widths.forEach((pixelSize, i) => {
@@ -224,6 +230,7 @@ async function syncDayTab(
   sheetTitle: string,
   dayRooms: Room[],
   slotsByRoom: Map<string, SlotStatus[]>,
+  companyNameByRoom: Map<string, string>,
   cvPathByApplication: Map<string, string | null>,
   zone: string,
 ): Promise<void> {
@@ -235,9 +242,23 @@ async function syncDayTab(
     const left = dayRooms[i];
     const right = dayRooms[i + 1] as Room | undefined;
 
-    const leftRows = await buildRoomBlock(db, left, slotsByRoom.get(left.id) ?? [], cvPathByApplication, zone);
+    const leftRows = await buildRoomBlock(
+      db,
+      left,
+      companyNameByRoom.get(left.id) ?? '',
+      slotsByRoom.get(left.id) ?? [],
+      cvPathByApplication,
+      zone,
+    );
     const rightRows = right
-      ? await buildRoomBlock(db, right, slotsByRoom.get(right.id) ?? [], cvPathByApplication, zone)
+      ? await buildRoomBlock(
+          db,
+          right,
+          companyNameByRoom.get(right.id) ?? '',
+          slotsByRoom.get(right.id) ?? [],
+          cvPathByApplication,
+          zone,
+        )
       : [];
 
     const height = Math.max(leftRows.length, rightRows.length);
@@ -326,6 +347,18 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
   const { rooms, sessions, slots } = await loadFloorData(db, editionId);
   const roomById = new Map(rooms.map((r) => [r.id, r]));
 
+  // Room and company are named separately now — the room is a booth label
+  // ("Room 1"), the company is whoever's session is scheduled in it, read
+  // through sessions rather than assumed equal to the room's own name.
+  const companies = await loadCompanies(db, editionId);
+  const companyById = new Map(companies.map((c) => [c.id, c]));
+  const companyNameByRoom = new Map<string, string>();
+  for (const session of sessions) {
+    if (companyNameByRoom.has(session.room_id)) continue;
+    const company = companyById.get(session.company_id);
+    if (company) companyNameByRoom.set(session.room_id, company.name_en);
+  }
+
   const applicationIds = [...new Set(slots.map((s) => s.application_id).filter((v): v is string => Boolean(v)))];
   const { data: applicationRows } = applicationIds.length
     ? await db.from('applications').select('id, cv_path').in('id', applicationIds)
@@ -367,7 +400,7 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
 
     const sheetId = await ensureDayTab(spreadsheetId, tabs, claimed, label);
     keepIds.add(sheetId);
-    await syncDayTab(db, spreadsheetId, sheetId, label, dayRooms, slotsByRoom, cvPathByApplication, zone);
+    await syncDayTab(db, spreadsheetId, sheetId, label, dayRooms, slotsByRoom, companyNameByRoom, cvPathByApplication, zone);
   }
 
   if (keepIds.size > 0) await deleteOtherTabs(spreadsheetId, keepIds);
@@ -403,7 +436,7 @@ export async function pullFloorSheetStages(
     for (const row of rows) {
       for (const startCol of [0, BLOCK_COLS + 1]) {
         const bookingId = row[startCol + ID_COL];
-        const stageLabel = row[startCol + 4];
+        const stageLabel = row[startCol + STAGE_COL];
         if (!bookingId || !stageLabel) continue;
 
         const stage = LABEL_TO_STAGE.get(stageLabel);

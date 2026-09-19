@@ -776,7 +776,9 @@
       "restore": "استعادة الغرفة",
       "roomStart": "يبدأ",
       "roomEnd": "ينتهي",
-      "deletedSection": "الغرف المحذوفة ({count})"
+      "deletedSection": "الغرف المحذوفة ({count})",
+      "companyName": "اسم الشركة",
+      "companyNameHint": "يستخدم اسم الغرفة تلقائيًا إن تُرك فارغًا"
     },
     "people": {
       "add": "إضافة",

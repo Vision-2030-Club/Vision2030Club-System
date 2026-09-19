@@ -7,8 +7,15 @@ import { Card, EmptyState, Input, Label, Textarea } from '@/components/ui';
 import { localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { siteUrl } from '@/lib/interviews/email';
-import { loadAcceptedPhones, loadCompanies, loadCounters, type AcceptedPhone } from '@/lib/interviews/queries';
-import type { Company } from '@/lib/interviews/types';
+import {
+  loadAcceptedPhones,
+  loadCompanies,
+  loadCounters,
+  loadRooms,
+  loadSessions,
+  type AcceptedPhone,
+} from '@/lib/interviews/queries';
+import type { Company, Room } from '@/lib/interviews/types';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { toDateInput } from '@/lib/time';
 import { CopyField } from '../CopyField';
@@ -23,7 +30,10 @@ import {
 /**
  * One room per card: a booth a candidate books into, with its own link.
  * "Room" here is a company + a physical room created together by
- * createRoomAction (0005) — the interviewer-facing side of a company
+ * createRoomAction (0005) — but named separately: the room is its booth
+ * label ("Room 1", shown as the card's heading), the company is whoever is
+ * sitting in it that day ("KPMG", shown underneath and in the floor sheet's
+ * own Company column). The interviewer-facing side of a company
  * (access_token, PIN, the multi-company apply form) is a different,
  * unrelated feature this project does not use, so none of it is shown here.
  */
@@ -43,9 +53,11 @@ export default async function InterviewsCompaniesPage({
   const tCommon = await getTranslations('common');
   const db = createInterviewsClient();
 
-  const [companies, counters] = await Promise.all([
+  const [companies, counters, rooms, sessions] = await Promise.all([
     loadCompanies(db, edition.id),
     loadCounters(db, edition.id),
+    loadRooms(db, edition.id),
+    loadSessions(db, edition.id),
   ]);
   const acceptedPhonesByCompany = new Map(
     await Promise.all(
@@ -57,6 +69,16 @@ export default async function InterviewsCompaniesPage({
   // the section below, but the everyday view stays just the live rooms.
   const activeCompanies = companies.filter((c) => !c.is_hidden);
   const deletedCompanies = companies.filter((c) => c.is_hidden);
+
+  // The room (booth label, e.g. "Room 1") and the company sitting in it
+  // (e.g. "KPMG") are separate names now — found through the session that
+  // links them, the same lookup renameRoomAction and setRoomDeletedAction use.
+  const roomById = new Map(rooms.map((r) => [r.id, r]));
+  const roomIdByCompany = new Map(sessions.map((s) => [s.company_id, s.room_id]));
+  const roomFor = (company: Company): Room | undefined => {
+    const roomId = roomIdByCompany.get(company.id);
+    return roomId ? roomById.get(roomId) : undefined;
+  };
 
   const manage = can.manage(role);
   const decide = can.decide(role);
@@ -74,6 +96,10 @@ export default async function InterviewsCompaniesPage({
               <div>
                 <Label htmlFor="new-room-name">{t('companies.roomName')}</Label>
                 <Input id="new-room-name" name="name" required />
+              </div>
+              <div>
+                <Label htmlFor="new-room-company">{t('companies.companyName')}</Label>
+                <Input id="new-room-company" name="company_name" placeholder={t('companies.companyNameHint')} />
               </div>
               <div>
                 <Label htmlFor="new-room-logo">{t('companies.logoUrl')}</Label>
@@ -103,6 +129,7 @@ export default async function InterviewsCompaniesPage({
         <div className="grid gap-3 md:grid-cols-2">
           {activeCompanies.map((company) => {
             const c = counters.get(company.id);
+            const room = roomFor(company);
             return (
               <Card key={company.id}>
                 <div className="flex flex-wrap items-start gap-3">
@@ -119,7 +146,8 @@ export default async function InterviewsCompaniesPage({
                     />
                   ) : null}
                   <div className="min-w-0 flex-1">
-                    <span className="font-semibold">{localized(company, 'name', locale)}</span>
+                    <span className="font-semibold">{room?.name ?? localized(company, 'name', locale)}</span>
+                    <p className="text-sm text-ink-muted">{localized(company, 'name', locale)}</p>
                     <p className="mt-1 text-xs text-ink-muted">
                       {t('decision.accepted')}: <span className="ltr-nums">{c?.accepted ?? 0}</span> ·{' '}
                       {t('overview.bookedOfSlots')}:{' '}
@@ -136,8 +164,8 @@ export default async function InterviewsCompaniesPage({
 
                     {manage ? (
                       <div className="flex flex-wrap items-center gap-2">
-                        <Disclosure label={tCommon('edit')} title={localized(company, 'name', locale)}>
-                          <RoomForm locale={locale} projectId={id} company={company} t={t} tCommon={tCommon} />
+                        <Disclosure label={tCommon('edit')} title={room?.name ?? localized(company, 'name', locale)}>
+                          <RoomForm locale={locale} projectId={id} company={company} room={room} t={t} tCommon={tCommon} />
                         </Disclosure>
                         <ConfirmForm
                           action={setRoomDeletedAction}
@@ -201,17 +229,19 @@ export default async function InterviewsCompaniesPage({
 type T = Awaited<ReturnType<typeof getTranslations<'interviews'>>>;
 type TCommon = Awaited<ReturnType<typeof getTranslations<'common'>>>;
 
-/** Renames a room and its logo — the company and physical room stay in sync. */
+/** Edits a room's booth label and the company sitting in it, separately. */
 function RoomForm({
   locale,
   projectId,
   company,
+  room,
   t,
   tCommon,
 }: {
   locale: string;
   projectId: string;
   company: Company;
+  room?: Room;
   t: T;
   tCommon: TCommon;
 }) {
@@ -223,9 +253,13 @@ function RoomForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label htmlFor={`${company.id}-name`}>{t('companies.roomName')}</Label>
-          <Input id={`${company.id}-name`} name="name" defaultValue={company.name_en} required />
+          <Input id={`${company.id}-name`} name="name" defaultValue={room?.name ?? company.name_en} required />
         </div>
         <div>
+          <Label htmlFor={`${company.id}-company_name`}>{t('companies.companyName')}</Label>
+          <Input id={`${company.id}-company_name`} name="company_name" defaultValue={company.name_en} />
+        </div>
+        <div className="sm:col-span-2">
           <Label htmlFor={`${company.id}-logo_url`}>{t('companies.logoUrl')}</Label>
           <Input
             id={`${company.id}-logo_url`}

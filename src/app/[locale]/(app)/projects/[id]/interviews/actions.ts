@@ -218,8 +218,9 @@ export async function exportNowAction(
 // -----------------------------------------------------------------------------
 
 /**
- * Renames a room created by createRoomAction: the company (name + logo) and
- * its paired physical room together, so the two never drift apart. The pair
+ * Edits a room created by createRoomAction: the room's own booth label
+ * (`name`), and the company sitting in it — its display name and logo —
+ * kept as two separate fields now rather than one shared value. The pair
  * is found through any session already scheduled for the company — the only
  * place the two are linked — rather than a new column, since createRoomAction
  * always creates both at once.
@@ -233,13 +234,14 @@ export async function renameRoomAction(
 
   const companyId = requiredText(formData, 'company_id');
   const name = requiredText(formData, 'name');
+  const companyName = text(formData, 'company_name') || name;
   const logoUrl = text(formData, 'logo_url') ?? '';
 
   const db = createInterviewsClient();
   const { error: companyError } = await db.rpc('upsert_company', {
     p_edition: g.access.edition.id,
     p_company: companyId,
-    p_payload: { name_en: name, name_ar: name, logo_url: logoUrl },
+    p_payload: { name_en: companyName, name_ar: companyName, logo_url: logoUrl },
     p_actor: g.access.actor,
   });
   if (companyError) return fromPostgrest(companyError);
@@ -396,6 +398,7 @@ export async function createRoomAction(
   if ('error' in g) return fail(g.error);
 
   const name = requiredText(formData, 'name');
+  const companyName = text(formData, 'company_name') || name;
   const logoUrl = text(formData, 'logo_url') ?? '';
   const day = requiredText(formData, 'day');
   const startTime = requiredText(formData, 'start_time');
@@ -414,8 +417,8 @@ export async function createRoomAction(
     p_edition: g.access.edition.id,
     p_company: null,
     p_payload: {
-      name_en: name,
-      name_ar: name,
+      name_en: companyName,
+      name_ar: companyName,
       logo_url: logoUrl,
       access_token: newToken(),
       candidate_token: newToken(),

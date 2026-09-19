@@ -776,7 +776,9 @@
       "restore": "Restore room",
       "roomStart": "Starts",
       "roomEnd": "Ends",
-      "deletedSection": "Deleted rooms ({count})"
+      "deletedSection": "Deleted rooms ({count})",
+      "companyName": "Company name",
+      "companyNameHint": "Defaults to the room name if left blank"
     },
     "people": {
       "add": "Add",
