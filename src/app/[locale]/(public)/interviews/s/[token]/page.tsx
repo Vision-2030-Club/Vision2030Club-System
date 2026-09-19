@@ -70,9 +70,10 @@ export default async function StudentPage({
     .filter((c): c is NonNullable<typeof c> => Boolean(c));
   const active = bookings.filter((b) => !b.cancelled_at);
 
-  // Every slot of each accepted company — open, booked and past alike, so
-  // the picker always shows the room's whole scheduled range instead of it
-  // shrinking away from the start as the day goes on.
+  // Every slot of each accepted company — open and booked alike, so the
+  // picker always shows the room's whole scheduled range. Past times are
+  // bookable too, by design (see book_slot/move_booking, 0008): this
+  // project's rooms are made and tested well before the real event runs.
   const slotsByCompany = new Map<string, PickableSlot[]>();
   await Promise.all(
     accepted.map(async (company) => {
@@ -82,7 +83,7 @@ export default async function StudentPage({
         slots.map((s) => ({
           id: s.id,
           timeLabel: `${formatTime(s.starts_at, locale)} – ${formatTime(s.ends_at, locale)}`,
-          taken: s.is_closed || s.booking_id !== null || new Date(s.starts_at).getTime() <= now,
+          taken: s.is_closed || s.booking_id !== null,
         })),
       );
     }),
