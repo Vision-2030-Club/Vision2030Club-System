@@ -24,16 +24,19 @@ import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/inter
  * so a day is naturally a whole separate sheet of rooms, not a label
  * repeated down one column. The date is read straight off sessions.day —
  * add a room for today and its tab is named today's date automatically.
+ * A plain centred date line ("April 19") sits above the grid itself.
+ *
  * Within a tab, two rooms per row, each its own block: a merged, centred,
- * navy title bar naming the ROOM (its booth label, e.g. "Room 1") — not
- * the company — and a navy Time/Company/Name/Phone/CV/Stage header row,
- * that room's bookings in time order. Company is its own column, resolved
- * from whichever company that room's session belongs to, since a room's
- * booth label and the company sitting in it are named separately now.
+ * CORAL title bar naming the ROOM (its booth label, e.g. "Room 1") — not
+ * the company — a NAVY Time/Company/Student Name/Student Phone
+ * Number/CV/Status header row, then that room's bookings in time order.
+ * Company is its own column, resolved from whichever company that room's
+ * session belongs to, since a room's booth label and the company sitting
+ * in it are named separately now.
  *
  * The seventh column of each block, hidden, carries the booking id —
  * nothing else in a row identifies which booking it is, and the id is what
- * pullFloorSheetStages matches an edited Stage cell back to.
+ * pullFloorSheetStages matches an edited Status cell back to.
  */
 
 const STAGE_LABELS: Record<Stage, string> = {
@@ -54,13 +57,14 @@ const STAGE_COLORS: Record<string, { bg: { red: number; green: number; blue: num
   'No Show': { bg: { red: 1, green: 0.89, blue: 0.89 }, fg: { red: 0.6, green: 0.11, blue: 0.11 } },
 };
 
-const COLUMNS = ['Time', 'Company', 'Name', 'Phone', 'CV', 'Stage'];
-const STAGE_COL = COLUMNS.indexOf('Stage');
+const COLUMNS = ['Time', 'Company', 'Student Name', 'Student Phone Number', 'CV', 'Status'];
+const STAGE_COL = COLUMNS.length - 1; // "Status" is always the last visible column
 const VISIBLE_COLS = COLUMNS.length;
 const ID_COL = VISIBLE_COLS; // the hidden 7th column, 0-based index within a block
 const BLOCK_COLS = VISIBLE_COLS + 1;
 const PAIR_COLS = BLOCK_COLS * 2 + 1; // two blocks + one gap column between them
 
+const CORAL = { red: 0.906, green: 0.42, blue: 0.353 };
 const NAVY = { red: 0.11, green: 0.23, blue: 0.39 };
 const WHITE = { red: 1, green: 1, blue: 1 };
 
@@ -68,8 +72,9 @@ function blankRow(): string[] {
   return Array(BLOCK_COLS).fill('');
 }
 
+/** "2:00 PM" — one point in time, not a range: the next row's start is the end. */
 function fmtTime(iso: string, zone: string): string {
-  return new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', hour12: false }).format(
+  return new Intl.DateTimeFormat('en-US', { timeZone: zone, hour: 'numeric', minute: '2-digit', hour12: true }).format(
     new Date(iso),
   );
 }
@@ -78,6 +83,13 @@ function fmtTime(iso: string, zone: string): string {
 function dateKey(iso: string, zone: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(
     new Date(iso),
+  );
+}
+
+/** "April 19" — the plain date line drawn above each day's grid. */
+function dayTitle(day: string): string {
+  return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric' }).format(
+    new Date(`${day}T12:00:00Z`),
   );
 }
 
@@ -99,7 +111,7 @@ async function buildRoomBlock(
     const cvPath = slot.application_id ? cvPathByApplication.get(slot.application_id) : null;
     const cvUrl = cvPath ? await signCvLong(db, cvPath) : null;
     rows.push([
-      `${fmtTime(slot.starts_at, zone)}–${fmtTime(slot.ends_at, zone)}`,
+      fmtTime(slot.starts_at, zone),
       companyName,
       slot.student_name ?? '',
       slot.student_phone ?? '',
@@ -112,13 +124,26 @@ async function buildRoomBlock(
   return rows;
 }
 
-/** The navy title bar (merged + centred), the navy header row, and a dropdown on Stage. */
+/** The coral title bar (merged + centred) and the navy column-header row, plus a dropdown on Status. */
 function blockFormatting(sheetId: number, startRow: number, startCol: number, blockLen: number): object[] {
   if (blockLen === 0) return [];
   const requests: object[] = [
     {
       repeatCell: {
-        range: { sheetId, startRowIndex: startRow, endRowIndex: startRow + 2, startColumnIndex: startCol, endColumnIndex: startCol + BLOCK_COLS },
+        range: { sheetId, startRowIndex: startRow, endRowIndex: startRow + 1, startColumnIndex: startCol, endColumnIndex: startCol + BLOCK_COLS },
+        cell: {
+          userEnteredFormat: {
+            backgroundColor: CORAL,
+            textFormat: { bold: true, foregroundColor: WHITE },
+            horizontalAlignment: 'CENTER',
+          },
+        },
+        fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
+      },
+    },
+    {
+      repeatCell: {
+        range: { sheetId, startRowIndex: startRow + 1, endRowIndex: startRow + 2, startColumnIndex: startCol, endColumnIndex: startCol + BLOCK_COLS },
         cell: {
           userEnteredFormat: {
             backgroundColor: NAVY,
@@ -191,8 +216,8 @@ function blockFormatting(sheetId: number, startRow: number, startCol: number, bl
 
 /** Column widths and the hidden booking-id column, set once per tab. */
 function columnLayoutRequests(sheetId: number): object[] {
-  // Time, Company, Name, Phone, CV, Stage
-  const widths = [140, 130, 170, 120, 100, 110];
+  // Time, Company, Student Name, Student Phone Number, CV, Status
+  const widths = [90, 110, 180, 160, 100, 140];
   const requests: object[] = [];
   for (const startCol of [0, BLOCK_COLS + 1]) {
     widths.forEach((pixelSize, i) => {
@@ -228,15 +253,31 @@ async function syncDayTab(
   spreadsheetId: string,
   sheetId: number,
   sheetTitle: string,
+  titleText: string,
   dayRooms: Room[],
   slotsByRoom: Map<string, SlotStatus[]>,
   companyNameByRoom: Map<string, string>,
   cvPathByApplication: Map<string, string | null>,
   zone: string,
 ): Promise<void> {
-  const values: string[][] = [];
-  const formatRequests: object[] = columnLayoutRequests(sheetId);
-  let cursorRow = 0;
+  const values: string[][] = [[titleText, ...Array(PAIR_COLS - 1).fill('')], Array(PAIR_COLS).fill('')];
+  const formatRequests: object[] = [
+    ...columnLayoutRequests(sheetId),
+    {
+      repeatCell: {
+        range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: PAIR_COLS },
+        cell: { userEnteredFormat: { textFormat: { bold: true, fontSize: 12 }, horizontalAlignment: 'CENTER' } },
+        fields: 'userEnteredFormat(textFormat,horizontalAlignment)',
+      },
+    },
+    {
+      mergeCells: {
+        range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: PAIR_COLS },
+        mergeType: 'MERGE_ALL',
+      },
+    },
+  ];
+  let cursorRow = 2;
 
   for (let i = 0; i < dayRooms.length; i += 2) {
     const left = dayRooms[i];
@@ -417,7 +458,8 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
 
     const sheetId = await ensureDayTab(spreadsheetId, tabs, claimed, label);
     keepIds.add(sheetId);
-    await syncDayTab(db, spreadsheetId, sheetId, label, dayRooms, slotsByRoom, companyNameByRoom, cvPathByApplication, zone);
+    const titleText = `Day ${i + 1} ${dayTitle(day)}`;
+    await syncDayTab(db, spreadsheetId, sheetId, label, titleText, dayRooms, slotsByRoom, companyNameByRoom, cvPathByApplication, zone);
   }
 
   await deleteOtherTabs(spreadsheetId, keepIds);
