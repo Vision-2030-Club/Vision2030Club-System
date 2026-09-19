@@ -3,7 +3,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { ActionForm } from '@/components/ActionForm';
 import { ConfirmForm } from '@/components/ConfirmForm';
 import { Disclosure } from '@/components/Disclosure';
-import { Badge, Card, EmptyState, Input, Label, Textarea } from '@/components/ui';
+import { Card, EmptyState, Input, Label, Textarea } from '@/components/ui';
 import { localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { siteUrl } from '@/lib/interviews/email';
@@ -52,6 +52,11 @@ export default async function InterviewsCompaniesPage({
       companies.map(async (c): Promise<[string, AcceptedPhone[]]> => [c.id, await loadAcceptedPhones(db, c.id)]),
     ),
   );
+  // Deleted (setRoomDeletedAction) rooms drop off this list entirely rather
+  // than showing a "Deleted" badge in it — restoring one is a click away in
+  // the section below, but the everyday view stays just the live rooms.
+  const activeCompanies = companies.filter((c) => !c.is_hidden);
+  const deletedCompanies = companies.filter((c) => c.is_hidden);
 
   const manage = can.manage(role);
   const decide = can.decide(role);
@@ -78,17 +83,25 @@ export default async function InterviewsCompaniesPage({
                 <Label htmlFor="new-room-day">{t('companies.roomDay')}</Label>
                 <Input id="new-room-day" name="day" type="date" dir="ltr" defaultValue={toDateInput(new Date())} required />
               </div>
+              <div>
+                <Label htmlFor="new-room-start">{t('companies.roomStart')}</Label>
+                <Input id="new-room-start" name="start_time" type="time" dir="ltr" step={300} defaultValue="14:00" required />
+              </div>
+              <div>
+                <Label htmlFor="new-room-end">{t('companies.roomEnd')}</Label>
+                <Input id="new-room-end" name="end_time" type="time" dir="ltr" step={300} defaultValue="20:00" required />
+              </div>
             </div>
             <p className="text-xs text-ink-muted">{t('companies.addRoomHint')}</p>
           </ActionForm>
         </Disclosure>
       ) : null}
 
-      {companies.length === 0 ? (
+      {activeCompanies.length === 0 ? (
         <EmptyState>{t('companies.empty')}</EmptyState>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
-          {companies.map((company) => {
+          {activeCompanies.map((company) => {
             const c = counters.get(company.id);
             return (
               <Card key={company.id}>
@@ -106,10 +119,7 @@ export default async function InterviewsCompaniesPage({
                     />
                   ) : null}
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold">{localized(company, 'name', locale)}</span>
-                      {company.is_hidden ? <Badge tone="danger">{t('companies.deleted')}</Badge> : null}
-                    </div>
+                    <span className="font-semibold">{localized(company, 'name', locale)}</span>
                     <p className="mt-1 text-xs text-ink-muted">
                       {t('decision.accepted')}: <span className="ltr-nums">{c?.accepted ?? 0}</span> ·{' '}
                       {t('overview.bookedOfSlots')}:{' '}
@@ -129,32 +139,18 @@ export default async function InterviewsCompaniesPage({
                         <Disclosure label={tCommon('edit')} title={localized(company, 'name', locale)}>
                           <RoomForm locale={locale} projectId={id} company={company} t={t} tCommon={tCommon} />
                         </Disclosure>
-                        {company.is_hidden ? (
-                          <ActionForm
-                            action={setRoomDeletedAction}
-                            submitLabel={t('companies.restore')}
-                            variant="secondary"
-                            className="space-y-0"
-                          >
-                            <input type="hidden" name="locale" value={locale} />
-                            <input type="hidden" name="project_id" value={id} />
-                            <input type="hidden" name="company_id" value={company.id} />
-                            <input type="hidden" name="deleted" value="false" />
-                          </ActionForm>
-                        ) : (
-                          <ConfirmForm
-                            action={setRoomDeletedAction}
-                            trigger={t('companies.delete')}
-                            title={t('companies.deleteTitle')}
-                            body={t('companies.deleteBody')}
-                            confirmLabel={t('companies.delete')}
-                          >
-                            <input type="hidden" name="locale" value={locale} />
-                            <input type="hidden" name="project_id" value={id} />
-                            <input type="hidden" name="company_id" value={company.id} />
-                            <input type="hidden" name="deleted" value="true" />
-                          </ConfirmForm>
-                        )}
+                        <ConfirmForm
+                          action={setRoomDeletedAction}
+                          trigger={t('companies.delete')}
+                          title={t('companies.deleteTitle')}
+                          body={t('companies.deleteBody')}
+                          confirmLabel={t('companies.delete')}
+                        >
+                          <input type="hidden" name="locale" value={locale} />
+                          <input type="hidden" name="project_id" value={id} />
+                          <input type="hidden" name="company_id" value={company.id} />
+                          <input type="hidden" name="deleted" value="true" />
+                        </ConfirmForm>
                       </div>
                     ) : null}
 
@@ -175,6 +171,29 @@ export default async function InterviewsCompaniesPage({
           })}
         </div>
       )}
+
+      {manage && deletedCompanies.length > 0 ? (
+        <Disclosure label={t('companies.deletedSection', { count: deletedCompanies.length })}>
+          <ul className="space-y-2">
+            {deletedCompanies.map((company) => (
+              <li key={company.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2">
+                <span className="text-sm text-ink-muted">{localized(company, 'name', locale)}</span>
+                <ActionForm
+                  action={setRoomDeletedAction}
+                  submitLabel={t('companies.restore')}
+                  variant="secondary"
+                  className="space-y-0"
+                >
+                  <input type="hidden" name="locale" value={locale} />
+                  <input type="hidden" name="project_id" value={id} />
+                  <input type="hidden" name="company_id" value={company.id} />
+                  <input type="hidden" name="deleted" value="false" />
+                </ActionForm>
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
+      ) : null}
     </div>
   );
 }

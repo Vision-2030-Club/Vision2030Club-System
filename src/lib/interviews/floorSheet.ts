@@ -19,9 +19,11 @@ import { loadRooms, loadSessions, sessionDays } from '@/lib/interviews/queries';
  * (syncFloorSheetAction/pullFloorSheetAction in the interviews actions),
  * which only ever run because someone clicked a button.
  *
- * One TAB per day ("Day 1", "Day 2", …) rather than a day column: rooms are
- * now made one per day (0005's createRoomAction), so a day is naturally a
- * whole separate sheet of rooms, not a label repeated down one column.
+ * One TAB per day, named by its actual date ("9/19", "9/20", …) rather than
+ * a day column: rooms are now made one per day (0005's createRoomAction),
+ * so a day is naturally a whole separate sheet of rooms, not a label
+ * repeated down one column. The date is read straight off sessions.day —
+ * add a room for today and its tab is named today's date automatically.
  * Within a tab, two rooms per row, each its own block: a merged, centred,
  * navy title bar naming the room, a navy Name/Time/Phone/CV/Stage header
  * row, that room's bookings in time order. A room never names its own
@@ -270,10 +272,11 @@ async function ensureFloorSheet(
 }
 
 /**
- * The tab for "Day N": reuses one already named that, otherwise claims the
- * spreadsheet's leftover default tab (its very first sync), otherwise adds
- * a fresh one. `claimed` tracks which existing tabs this run has already
- * spoken for, so two days never fight over the same unclaimed default.
+ * The tab for one day, named by its date (e.g. "9/19"): reuses one already
+ * named that, otherwise claims the spreadsheet's leftover default tab (its
+ * very first sync), otherwise adds a fresh one. `claimed` tracks which
+ * existing tabs this run has already spoken for, so two days never fight
+ * over the same unclaimed default.
  */
 async function ensureDayTab(
   spreadsheetId: string,
@@ -341,7 +344,10 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
 
   for (let i = 0; i < days.length; i++) {
     const day = days[i];
-    const label = `Day ${i + 1}`;
+    // day is already 'YYYY-MM-DD' on the edition's own clock (sessions.day) —
+    // no Date/timezone conversion needed, just reformat it as "9/19".
+    const [, month, dayOfMonth] = day.split('-');
+    const label = `${Number(month)}/${Number(dayOfMonth)}`;
 
     const roomIds = [...new Set(sessions.filter((s) => s.day === day).map((s) => s.room_id))];
     const dayRooms = roomIds

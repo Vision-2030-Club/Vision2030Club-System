@@ -378,16 +378,14 @@ export async function upsertCompanyAction(
 /**
  * The simplified "room" flow (0005): one button creates the room, the
  * company behind it (with its own candidate-facing link), and that one
- * day's 2pm–8pm/15-minute session, so nothing further needs scheduling by
- * hand. One room per day is the intended use (hence the picker rather than
- * a fixed range): the candidate booking page shows a room's slots flat,
- * with no day tabs, on the assumption there is only ever one day to show.
- * Each step is its own transaction; if a later step fails the earlier ones
- * stand, same as every other admin form here that is not meant to be
- * re-run under load.
+ * day's 15-minute-slot session for the chosen hours, so nothing further
+ * needs scheduling by hand. One room per day is the intended use (hence a
+ * day picker rather than a fixed range): the candidate booking page shows
+ * a room's slots flat, with no day tabs, on the assumption there is only
+ * ever one day to show. Each step is its own transaction; if a later step
+ * fails the earlier ones stand, same as every other admin form here that
+ * is not meant to be re-run under load.
  */
-const ROOM_SLOT_START = '14:00';
-const ROOM_SLOT_END = '20:00';
 const ROOM_SLOT_MINUTES = 15;
 
 export async function createRoomAction(
@@ -400,6 +398,8 @@ export async function createRoomAction(
   const name = requiredText(formData, 'name');
   const logoUrl = text(formData, 'logo_url') ?? '';
   const day = requiredText(formData, 'day');
+  const startTime = requiredText(formData, 'start_time');
+  const endTime = requiredText(formData, 'end_time');
   const db = createInterviewsClient();
 
   const { data: room, error: roomError } = await db.rpc('upsert_room', {
@@ -430,8 +430,8 @@ export async function createRoomAction(
       company_id: company.id,
       room_id: room.id,
       day,
-      start_time: ROOM_SLOT_START,
-      end_time: ROOM_SLOT_END,
+      start_time: startTime,
+      end_time: endTime,
       slot_minutes: ROOM_SLOT_MINUTES,
     },
     p_actor: g.access.actor,
