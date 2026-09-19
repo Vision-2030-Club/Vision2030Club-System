@@ -304,13 +304,15 @@ export async function upsertCompanyAction(
 
 /**
  * The simplified "room" flow (0005): one button creates the room, the
- * company behind it (with its own candidate-facing link), and a full week of
- * 2pm–8pm/15-minute sessions — Oct 12–16, 2026 — so nothing further needs
- * scheduling by hand. Each step is its own transaction in the database; if a
- * later step fails the earlier ones stand, same as every other admin form
- * here that is not meant to be re-run under load.
+ * company behind it (with its own candidate-facing link), and that one
+ * day's 2pm–8pm/15-minute session, so nothing further needs scheduling by
+ * hand. One room per day is the intended use (hence the picker rather than
+ * a fixed range): the candidate booking page shows a room's slots flat,
+ * with no day tabs, on the assumption there is only ever one day to show.
+ * Each step is its own transaction; if a later step fails the earlier ones
+ * stand, same as every other admin form here that is not meant to be
+ * re-run under load.
  */
-const ROOM_EVENT_DAYS = ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16'];
 const ROOM_SLOT_START = '14:00';
 const ROOM_SLOT_END = '20:00';
 const ROOM_SLOT_MINUTES = 15;
@@ -324,6 +326,7 @@ export async function createRoomAction(
 
   const name = requiredText(formData, 'name');
   const logoUrl = text(formData, 'logo_url') ?? '';
+  const day = requiredText(formData, 'day');
   const db = createInterviewsClient();
 
   const { data: room, error: roomError } = await db.rpc('upsert_room', {
@@ -348,21 +351,19 @@ export async function createRoomAction(
   });
   if (companyError) return fromPostgrest(companyError);
 
-  for (const day of ROOM_EVENT_DAYS) {
-    const { error: sessionError } = await db.rpc('create_session', {
-      p_edition: g.access.edition.id,
-      p_payload: {
-        company_id: company.id,
-        room_id: room.id,
-        day,
-        start_time: ROOM_SLOT_START,
-        end_time: ROOM_SLOT_END,
-        slot_minutes: ROOM_SLOT_MINUTES,
-      },
-      p_actor: g.access.actor,
-    });
-    if (sessionError) return fromPostgrest(sessionError);
-  }
+  const { error: sessionError } = await db.rpc('create_session', {
+    p_edition: g.access.edition.id,
+    p_payload: {
+      company_id: company.id,
+      room_id: room.id,
+      day,
+      start_time: ROOM_SLOT_START,
+      end_time: ROOM_SLOT_END,
+      slot_minutes: ROOM_SLOT_MINUTES,
+    },
+    p_actor: g.access.actor,
+  });
+  if (sessionError) return fromPostgrest(sessionError);
 
   revalidate(g.locale, g.projectId);
   return ok('created');

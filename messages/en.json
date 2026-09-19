@@ -759,13 +759,14 @@
       "pinNew": "Generate",
       "pinTyped": "Use this:",
       "addRoom": "Add room",
-      "addRoomHint": "Creates the room and its own booking link, with Oct 12–16 2026, 2pm–8pm in 15-minute slots ready to book.",
+      "addRoomHint": "Creates the room and its own booking link, with that one day’s 2pm–8pm slots in 15-minute steps ready to book.",
       "roomName": "Room name",
       "candidateLink": "Candidate link",
       "acceptedPhones": "Accepted phone numbers",
       "noAcceptedPhones": "No phone numbers accepted yet.",
       "addPhones": "Add phone numbers",
-      "addPhonesHint": "One per line. Anyone who logs in on the room link with one of these numbers sees the available times right away."
+      "addPhonesHint": "One per line. Anyone who logs in on the room link with one of these numbers sees the available times right away.",
+      "roomDay": "Day"
     },
     "people": {
       "add": "Add",

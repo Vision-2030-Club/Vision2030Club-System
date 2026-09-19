@@ -9,6 +9,7 @@ import { siteUrl } from '@/lib/interviews/email';
 import { loadAcceptedPhones, loadCompanies, loadCounters, type AcceptedPhone } from '@/lib/interviews/queries';
 import type { Company } from '@/lib/interviews/types';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
+import { toDateInput } from '@/lib/time';
 import { CopyField } from '../CopyField';
 import { acceptPhonesAction, createRoomAction, renameRoomAction, unacceptPhoneAction } from '../actions';
 
@@ -57,7 +58,7 @@ export default async function InterviewsCompaniesPage({
           <ActionForm action={createRoomAction} submitLabel={tCommon('create')}>
             <input type="hidden" name="locale" value={locale} />
             <input type="hidden" name="project_id" value={id} />
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
               <div>
                 <Label htmlFor="new-room-name">{t('companies.roomName')}</Label>
                 <Input id="new-room-name" name="name" required />
@@ -65,6 +66,10 @@ export default async function InterviewsCompaniesPage({
               <div>
                 <Label htmlFor="new-room-logo">{t('companies.logoUrl')}</Label>
                 <Input id="new-room-logo" name="logo_url" type="url" dir="ltr" />
+              </div>
+              <div>
+                <Label htmlFor="new-room-day">{t('companies.roomDay')}</Label>
+                <Input id="new-room-day" name="day" type="date" dir="ltr" defaultValue={toDateInput(new Date())} required />
               </div>
             </div>
             <p className="text-xs text-ink-muted">{t('companies.addRoomHint')}</p>
