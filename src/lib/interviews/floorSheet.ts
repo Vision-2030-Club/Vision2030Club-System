@@ -40,21 +40,21 @@ import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/inter
  */
 
 const STAGE_LABELS: Record<Stage, string> = {
-  scheduled: 'Not Arrived',
-  arrived: 'Arrived',
-  in_interview: 'In Interview',
-  done: 'Finished',
-  no_show: 'No Show',
+  scheduled: 'لم يصل',
+  arrived: 'وصل بالانتظار',
+  in_interview: 'في المقابلة',
+  done: 'تمت المقابلة',
+  no_show: 'متأخر',
 };
 const LABEL_TO_STAGE = new Map(Object.entries(STAGE_LABELS).map(([stage, label]) => [label, stage as Stage]));
 
 /** Same tones as STAGE_TONES (lib/interviews/ui.ts) in the app itself, as literal RGB for the Sheets API. */
 const STAGE_COLORS: Record<string, { bg: { red: number; green: number; blue: number }; fg: { red: number; green: number; blue: number } }> = {
-  'Not Arrived': { bg: { red: 0.9, green: 0.91, blue: 0.93 }, fg: { red: 0.29, green: 0.33, blue: 0.39 } },
-  'Arrived': { bg: { red: 0.86, green: 0.92, blue: 0.99 }, fg: { red: 0.12, green: 0.25, blue: 0.69 } },
-  'In Interview': { bg: { red: 1, green: 0.95, blue: 0.78 }, fg: { red: 0.57, green: 0.25, blue: 0.05 } },
-  'Finished': { bg: { red: 0.86, green: 0.99, blue: 0.91 }, fg: { red: 0.09, green: 0.4, blue: 0.2 } },
-  'No Show': { bg: { red: 1, green: 0.89, blue: 0.89 }, fg: { red: 0.6, green: 0.11, blue: 0.11 } },
+  [STAGE_LABELS.scheduled]: { bg: { red: 0.9, green: 0.91, blue: 0.93 }, fg: { red: 0.29, green: 0.33, blue: 0.39 } },
+  [STAGE_LABELS.arrived]: { bg: { red: 0.86, green: 0.92, blue: 0.99 }, fg: { red: 0.12, green: 0.25, blue: 0.69 } },
+  [STAGE_LABELS.in_interview]: { bg: { red: 1, green: 0.95, blue: 0.78 }, fg: { red: 0.57, green: 0.25, blue: 0.05 } },
+  [STAGE_LABELS.done]: { bg: { red: 0.86, green: 0.99, blue: 0.91 }, fg: { red: 0.09, green: 0.4, blue: 0.2 } },
+  [STAGE_LABELS.no_show]: { bg: { red: 1, green: 0.89, blue: 0.89 }, fg: { red: 0.6, green: 0.11, blue: 0.11 } },
 };
 
 const COLUMNS = ['Time', 'Company', 'Student Name', 'Student Phone Number', 'CV', 'Status'];
@@ -67,6 +67,9 @@ const PAIR_COLS = BLOCK_COLS * 2 + 1; // two blocks + one gap column between the
 const CORAL = { red: 0.906, green: 0.42, blue: 0.353 };
 const NAVY = { red: 0.11, green: 0.23, blue: 0.39 };
 const WHITE = { red: 1, green: 1, blue: 1 };
+const EMPTY_ROW_GREY = { red: 0.93, green: 0.93, blue: 0.93 };
+const COMPANY_BLUE = { red: 0.06, green: 0.33, blue: 0.8 };
+const COMPANY_COL = COLUMNS.indexOf('Company');
 
 function blankRow(): string[] {
   return Array(BLOCK_COLS).fill('');
@@ -133,8 +136,19 @@ async function buildRoomBlock(
   return rows;
 }
 
-/** The coral title bar (merged + centred) and the navy column-header row, plus a dropdown on Status. */
-function blockFormatting(sheetId: number, startRow: number, startCol: number, blockLen: number): object[] {
+/**
+ * The coral title bar (merged + centred) and the navy column-header row,
+ * a dropdown + colour rule on Status, grey fill on every still-empty slot
+ * row (so an open slot reads as open at a glance) and the Company column
+ * in blue, matching the reference sheet.
+ */
+function blockFormatting(
+  sheetId: number,
+  startRow: number,
+  startCol: number,
+  blockLen: number,
+  bookedFlags: boolean[] = [],
+): object[] {
   if (blockLen === 0) return [];
   const requests: object[] = [
     {
@@ -217,6 +231,46 @@ function blockFormatting(sheetId: number, startRow: number, startCol: number, bl
           },
         },
       });
+    }
+
+    requests.push({
+      repeatCell: {
+        range: {
+          sheetId,
+          startRowIndex: startRow + 2,
+          endRowIndex: startRow + 2 + dataRows,
+          startColumnIndex: startCol + COMPANY_COL,
+          endColumnIndex: startCol + COMPANY_COL + 1,
+        },
+        cell: { userEnteredFormat: { textFormat: { foregroundColor: COMPANY_BLUE, underline: true } } },
+        fields: 'userEnteredFormat.textFormat(foregroundColor,underline)',
+      },
+    });
+
+    // Grey out every slot nobody has booked yet, in contiguous runs — a
+    // free slot should read as free at a glance, same as the reference.
+    let row = 0;
+    while (row < dataRows) {
+      if (bookedFlags[row]) {
+        row++;
+        continue;
+      }
+      let end = row;
+      while (end < dataRows && !bookedFlags[end]) end++;
+      requests.push({
+        repeatCell: {
+          range: {
+            sheetId,
+            startRowIndex: startRow + 2 + row,
+            endRowIndex: startRow + 2 + end,
+            startColumnIndex: startCol,
+            endColumnIndex: startCol + BLOCK_COLS,
+          },
+          cell: { userEnteredFormat: { backgroundColor: EMPTY_ROW_GREY } },
+          fields: 'userEnteredFormat.backgroundColor',
+        },
+      });
+      row = end;
     }
   }
 
@@ -316,8 +370,10 @@ async function syncDayTab(
       values.push([...(leftRows[r] ?? blankRow()), '', ...(rightRows[r] ?? blankRow())]);
     }
 
-    formatRequests.push(...blockFormatting(sheetId, cursorRow, 0, leftRows.length));
-    formatRequests.push(...blockFormatting(sheetId, cursorRow, BLOCK_COLS + 1, rightRows.length));
+    const leftBooked = (slotsByRoom.get(left.id) ?? []).map((s) => Boolean(s.booking_id));
+    const rightBooked = right ? (slotsByRoom.get(right.id) ?? []).map((s) => Boolean(s.booking_id)) : [];
+    formatRequests.push(...blockFormatting(sheetId, cursorRow, 0, leftRows.length, leftBooked));
+    formatRequests.push(...blockFormatting(sheetId, cursorRow, BLOCK_COLS + 1, rightRows.length, rightBooked));
 
     cursorRow += height;
     values.push(Array(PAIR_COLS).fill(''));
