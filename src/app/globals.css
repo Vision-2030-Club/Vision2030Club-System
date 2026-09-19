@@ -19,6 +19,9 @@
 
   --color-surface: #ffffff;
   --color-surface-muted: #f6f8f9;
+  /* The page behind everything. The club's is the muted grey; the
+     interviews world paints it deep teal and floats mint cards on it. */
+  --color-canvas: #f6f8f9;
   --color-ink: #0f172a;
   --color-ink-muted: #64748b;
   --color-line: #e2e8f0;
@@ -50,7 +53,7 @@ html[lang="en"] {
 }
 
 body {
-  background: var(--color-surface-muted);
+  background: var(--color-canvas);
   color: var(--color-ink);
 }
 
@@ -113,7 +116,12 @@ html[dir="rtl"] .tv-ticker {
 @property --color-brand-800 { syntax: '<color>'; inherits: true; initial-value: #0b4f5f; }
 @property --color-brand-900 { syntax: '<color>'; inherits: true; initial-value: #0e4251; }
 @property --color-brand-950 { syntax: '<color>'; inherits: true; initial-value: #052a35; }
+@property --color-surface { syntax: '<color>'; inherits: true; initial-value: #ffffff; }
 @property --color-surface-muted { syntax: '<color>'; inherits: true; initial-value: #f6f8f9; }
+@property --color-canvas { syntax: '<color>'; inherits: true; initial-value: #f6f8f9; }
+@property --color-ink { syntax: '<color>'; inherits: true; initial-value: #0f172a; }
+@property --color-ink-muted { syntax: '<color>'; inherits: true; initial-value: #64748b; }
+@property --color-line { syntax: '<color>'; inherits: true; initial-value: #e2e8f0; }
 
 html[data-theme="interviews"] {
   /* افترض: deep teal #0e5a67 with the mint #a6eddd as its light end. */
@@ -128,7 +136,16 @@ html[data-theme="interviews"] {
   --color-brand-800: #093b44;
   --color-brand-900: #072d34;
   --color-brand-950: #041c21;
-  --color-surface-muted: #e9f8f3;
+  /* The page is the deep teal itself; the boxes on it are the mint. Inset
+     areas inside a box (table heads, chips, hovers) go a shade deeper. */
+  --color-canvas: #0e5a67;
+  --color-surface: #a6eddd;
+  --color-surface-muted: #8fe3d0;
+  --color-line: #6fcdb9;
+  /* Text that sits straight on the teal page is light; every box below
+     restores the dark ink for what is written inside it. */
+  --color-ink: #f2fbf8;
+  --color-ink-muted: #bfe6dc;
   /* The brand's typeface, for both scripts; digits and Latin fall back
      glyph by glyph where the cut lacks them. */
   font-family: var(--font-interviews), var(--font-arabic), system-ui, sans-serif;
@@ -138,6 +155,14 @@ html[data-theme="interviews"][lang="en"] {
   font-family: var(--font-interviews), var(--font-latin), var(--font-arabic), system-ui, sans-serif;
 }
 
+/* Inside any mint box — cards, the header, menus, inputs, table heads — the
+   ink is dark again. Custom properties inherit, so one rule covers every
+   `text-ink` / `text-ink-muted` utility underneath. */
+html[data-theme="interviews"] :is(.bg-surface, .bg-surface-muted, .bg-white) {
+  --color-ink: #0f172a;
+  --color-ink-muted: #3f5a63;
+}
+
 html.theme-animate {
   transition:
     --color-brand-50 700ms ease-in-out, --color-brand-100 700ms ease-in-out,
@@ -145,7 +170,10 @@ html.theme-animate {
     --color-brand-400 700ms ease-in-out, --color-brand-500 700ms ease-in-out,
     --color-brand-600 700ms ease-in-out, --color-brand-700 700ms ease-in-out,
     --color-brand-800 700ms ease-in-out, --color-brand-900 700ms ease-in-out,
-    --color-brand-950 700ms ease-in-out, --color-surface-muted 700ms ease-in-out;
+    --color-brand-950 700ms ease-in-out, --color-surface-muted 700ms ease-in-out,
+    --color-surface 700ms ease-in-out, --color-canvas 700ms ease-in-out,
+    --color-ink 700ms ease-in-out, --color-ink-muted 700ms ease-in-out,
+    --color-line 700ms ease-in-out;
 }
 
 /* The sidebar's list is replaced when the world changes; the new one settles in. */

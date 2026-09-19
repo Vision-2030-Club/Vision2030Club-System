@@ -22,7 +22,7 @@ export default async function PublicLayout({
   const t = await getTranslations('app');
 
   return (
-    <div className="min-h-dvh bg-surface-muted">
+    <div className="min-h-dvh bg-canvas">
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-3xl items-center gap-4 px-4 py-3">
           <InterviewsLogo name={t('name')} className="h-9" />
