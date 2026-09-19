@@ -372,6 +372,23 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
 
   const spreadsheetId = await ensureFloorSheet(db, edition);
   const tabs = await listTabs(spreadsheetId);
+
+  if (days.length === 0) {
+    // Nothing scheduled at all (e.g. everything was just wiped for a fresh
+    // test run). deleteOtherTabs never empties a spreadsheet completely —
+    // Google requires at least one sheet — so the loop below would leave
+    // every old tab behind with no day left to reclaim it. Keep exactly one,
+    // cleared and neutrally named, and drop the rest explicitly here.
+    const placeholder = 'No rooms yet';
+    const keep = tabs[0];
+    if (keep) {
+      if (keep.title !== placeholder) await renameTab(spreadsheetId, keep.sheetId, placeholder);
+      await writeTab(spreadsheetId, keep.sheetId, placeholder, [['No rooms are scheduled yet.']]);
+      await deleteOtherTabs(spreadsheetId, new Set([keep.sheetId]));
+    }
+    return;
+  }
+
   const claimed = new Set<number>();
   const keepIds = new Set<number>();
 
@@ -403,7 +420,7 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
     await syncDayTab(db, spreadsheetId, sheetId, label, dayRooms, slotsByRoom, companyNameByRoom, cvPathByApplication, zone);
   }
 
-  if (keepIds.size > 0) await deleteOtherTabs(spreadsheetId, keepIds);
+  await deleteOtherTabs(spreadsheetId, keepIds);
 }
 
 /**
