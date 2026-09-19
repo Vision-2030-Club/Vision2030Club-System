@@ -126,6 +126,7 @@ export default async function AdminGooglePage({
               </dl>
 
               <p className="mt-3 text-xs text-ink-muted">{t('calendarNote')}</p>
+              <p className="mt-2 text-xs text-ink-muted">{t('reconnectNote')}</p>
 
               <div className="mt-4 flex flex-wrap gap-3 border-t border-line pt-4">
                 <ActionForm

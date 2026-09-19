@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { fail, fromPostgrest, ok, requiredText, text, type ActionResult } from '@/lib/actions';
 import { kickEmailDelivery } from '@/lib/interviews/email';
+import { kickFloorSheetSync } from '@/lib/interviews/floorSheet';
 import { isToken } from '@/lib/interviews/tokens';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 
@@ -14,6 +15,12 @@ import { createInterviewsClient } from '@/lib/supabase/interviews';
 
 function page(locale: string, token: string) {
   return `/${locale}/interviews/s/${token}`;
+}
+
+/** The one extra thing a booking change needs beyond what the RPC already resolves. */
+async function editionIdFor(db: ReturnType<typeof createInterviewsClient>, token: string) {
+  const { data } = await db.from('applications').select('edition_id').eq('personal_token', token).maybeSingle();
+  return (data?.edition_id as string | undefined) ?? null;
 }
 
 export async function bookAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -29,6 +36,8 @@ export async function bookAction(_previous: ActionResult, formData: FormData): P
   if (error) return fromPostgrest(error);
 
   kickEmailDelivery();
+  const editionId = await editionIdFor(db, token);
+  if (editionId) kickFloorSheetSync(editionId);
   revalidatePath(page(locale, token));
   return ok('created');
 }
@@ -47,6 +56,8 @@ export async function moveAction(_previous: ActionResult, formData: FormData): P
   if (error) return fromPostgrest(error);
 
   kickEmailDelivery();
+  const editionId = await editionIdFor(db, token);
+  if (editionId) kickFloorSheetSync(editionId);
   revalidatePath(page(locale, token));
   return ok();
 }
@@ -65,6 +76,8 @@ export async function cancelAction(_previous: ActionResult, formData: FormData):
   if (error) return fromPostgrest(error);
 
   kickEmailDelivery();
+  const editionId = await editionIdFor(db, token);
+  if (editionId) kickFloorSheetSync(editionId);
   revalidatePath(page(locale, token));
   return ok();
 }

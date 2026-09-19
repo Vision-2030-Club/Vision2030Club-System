@@ -30,7 +30,7 @@ export function isEmailConfigured(): boolean {
 
 /** Where the links in an email point. The deployment, unless told otherwise. */
 export function siteUrl(): string {
-  return (process.env.SITE_URL ?? 'https://vision2030club-system.vercel.app').replace(/\/$/, '');
+  return (process.env.SITE_URL ?? 'https://vision2030-club-system.vercel.app').replace(/\/$/, '');
 }
 
 export type EmailReport = {

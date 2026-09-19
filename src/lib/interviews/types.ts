@@ -29,6 +29,8 @@ export type Edition = {
   booking_closes_at: string | null;
   time_zone: string;
   tv_token: string | null;
+  floor_sheet_id: string | null;
+  floor_sheet_url: string | null;
   settings: Partial<EditionSettings>;
   created_at: string;
   updated_at: string;
@@ -56,6 +58,7 @@ export type Company = {
   access_token: string;
   access_pin: string | null;
   token_rotated_at: string | null;
+  candidate_token: string | null;
 };
 
 export type Decision = 'pending' | 'accepted' | 'rejected';
@@ -63,7 +66,7 @@ export type Decision = 'pending' | 'accepted' | 'rejected';
 export type Application = {
   id: string;
   edition_id: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   name: string;
   is_club_member: boolean | null;

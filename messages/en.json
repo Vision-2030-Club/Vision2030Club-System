@@ -542,7 +542,7 @@
   },
   "google": {
     "title": "Google connection",
-    "subtitle": "One shared account creates every Meet link and sends every invitation.",
+    "subtitle": "One shared account creates every Meet link, sends every invitation, and keeps the Mock Interviews floor sheet in sync.",
     "status": "Connection",
     "linked": "Connected",
     "notLinked": "No Google account is connected yet, so confirmed online meetings will not get a Meet link.",
@@ -566,7 +566,8 @@
     "redirectLabel": "Redirect URL",
     "pending": "Waiting for a link",
     "pendingHint": "Confirmed online meetings whose Meet link could not be created yet — usually because Google was unreachable at the time.",
-    "retry": "Try these again"
+    "retry": "Try these again",
+    "reconnectNote": "Already connected from before this was added? Press Reconnect once so Google grants the extra permission the floor sheet needs."
   },
   "push": {
     "title": "Notifications",
@@ -598,7 +599,7 @@
     "tabs": {
       "overview": "Overview",
       "applicants": "Applicants",
-      "companies": "Companies",
+      "companies": "Rooms",
       "schedule": "Schedule",
       "floor": "Floor",
       "bookings": "Bookings",
@@ -729,11 +730,18 @@
       "exportNow": "Take a copy now",
       "download": "Download JSON",
       "notes": "How this works",
-      "notesBody": "Applications and booking follow the windows above. A student who applies twice with the same email updates their form until HR decides or they book. Organizers move students through the stages on the Floor tab. Every change is logged with who made it; nothing is ever deleted."
+      "notesBody": "Applications and booking follow the windows above. A student who applies twice with the same email updates their form until HR decides or they book. Organizers move students through the stages on the Floor tab. Every change is logged with who made it; nothing is ever deleted.",
+      "floorSheet": "Live Google Sheet",
+      "floorSheetHint": "A mirror of every booked slot, across every room and day, kept in sync automatically. The Stage column is editable in the Sheet — press “Pull from Sheet” to bring those changes back in. Requires the club's Google account to be connected under Admin → Google.",
+      "floorSheetNone": "Not created yet — it appears the first time the floor changes, or press Sync now.",
+      "floorSheetSync": "Sync now",
+      "floorSheetPull": "Pull from Sheet",
+      "floorSheetPulled": "Stage changes from the Sheet were applied, and the Sheet was refreshed to match.",
+      "floorSheetPullHint": "Reads the Stage column of every day tab and applies any changes (Not Arrived / Arrived / In Interview / Finished / No Show) to the matching booking. Nothing happens automatically — only when this is pressed."
     },
     "companies": {
       "new": "New company",
-      "empty": "No companies yet.",
+      "empty": "No rooms yet.",
       "hidden": "Hidden from form",
       "interviewerLink": "Interviewer link",
       "pinIs": "PIN: {pin}",
@@ -753,7 +761,25 @@
       "pinKeep": "Keep",
       "pinNone": "No PIN",
       "pinNew": "Generate",
-      "pinTyped": "Use this:"
+      "pinTyped": "Use this:",
+      "addRoom": "Add room",
+      "addRoomHint": "Creates the room and its own booking link, with that one day’s 2pm–8pm slots in 15-minute steps ready to book.",
+      "roomName": "Room name",
+      "candidateLink": "Candidate link",
+      "acceptedPhones": "Accepted phone numbers",
+      "noAcceptedPhones": "No phone numbers accepted yet.",
+      "addPhones": "Add phone numbers",
+      "addPhonesHint": "One per line. Anyone who logs in on the room link with one of these numbers sees the available times right away.",
+      "roomDay": "Day",
+      "delete": "Delete room",
+      "deleteTitle": "Delete this room?",
+      "deleteBody": "Its candidate link stops working and it disappears from this list, but nothing is erased — its bookings and history stay exactly as they are, including on the live Google Sheet. You can restore it any time.",
+      "restore": "Restore room",
+      "roomStart": "Starts",
+      "roomEnd": "Ends",
+      "deletedSection": "Deleted rooms ({count})",
+      "companyName": "Company name",
+      "companyNameHint": "Defaults to the room name if left blank"
     },
     "people": {
       "add": "Add",
@@ -920,7 +946,9 @@
       "already_cancelled": "That booking was already cancelled.",
       "archived": "This edition is closed.",
       "wrong_pin": "Wrong PIN.",
-      "feedback_sent": "This feedback has already been sent to the student."
+      "feedback_sent": "This feedback has already been sent to the student.",
+      "missing_phone": "Enter a phone number.",
+      "closed": "This room is no longer open."
     },
     "student": {
       "hello": "Hello, {name}.",
@@ -975,6 +1003,15 @@
       "next": "Next",
       "idle": "Free",
       "quiet": "Waiting for the next interview"
+    },
+    "room": {
+      "intro": "Enter your name and phone number, and attach your CV, to see whether you have been accepted here.",
+      "name": "Name",
+      "phone": "Phone number",
+      "cvFile": "CV (PDF, up to 5 MB)",
+      "cvHint": "Optional if you already sent one — attaching a new one replaces it.",
+      "submit": "Continue",
+      "notAccepted": "You have not been accepted for this company yet. Check back later, or contact the club."
     }
   }
 }

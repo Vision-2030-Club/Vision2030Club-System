@@ -13,6 +13,7 @@ import {
 } from '@/lib/interviews/access';
 import { newPin, newToken } from '@/lib/interviews/tokens';
 import { deliverPendingEmails, kickEmailDelivery } from '@/lib/interviews/email';
+import { kickFloorSheetSync, pullFloorSheetStages, syncFloorSheet } from '@/lib/interviews/floorSheet';
 import { takeExport } from '@/lib/interviews/export';
 import type { Stage } from '@/lib/interviews/types';
 import { fromClubWallClock } from '@/lib/time';
@@ -131,6 +132,52 @@ export async function rotateTvTokenAction(
   return ok();
 }
 
+/**
+ * A manual trigger for the floor sheet (floorSheet.ts): creates it on first
+ * use rather than waiting for the next real booking change, and gives the
+ * button a moment people can point at when they ask "is it working".
+ */
+export async function syncFloorSheetAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  try {
+    await syncFloorSheet(g.access.edition.id);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Sync failed.');
+  }
+
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
+/**
+ * The one place a Sheet edit reaches back into the app: reads every day
+ * tab's Stage column and applies whatever it finds, then re-syncs so the
+ * sheet reflects the result — canonical labels back in cells that had a
+ * typo or an unrecognised value, and the just-applied changes confirmed
+ * rather than left to the next unrelated booking event to redraw them.
+ */
+export async function pullFloorSheetAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  try {
+    const { updated, skipped } = await pullFloorSheetStages(g.access.edition.id, g.access.actor);
+    await syncFloorSheet(g.access.edition.id);
+    revalidate(g.locale, g.projectId);
+    return ok('saved', { updated: String(updated), skipped: String(skipped) });
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Pull failed.');
+  }
+}
+
 export async function releaseFeedbackAction(
   _previous: ActionResult,
   formData: FormData,
@@ -169,6 +216,105 @@ export async function exportNowAction(
 // -----------------------------------------------------------------------------
 // Rooms and companies
 // -----------------------------------------------------------------------------
+
+/**
+ * Edits a room created by createRoomAction: the room's own booth label
+ * (`name`), and the company sitting in it — its display name and logo —
+ * kept as two separate fields now rather than one shared value. The pair
+ * is found through any session already scheduled for the company — the only
+ * place the two are linked — rather than a new column, since createRoomAction
+ * always creates both at once.
+ */
+export async function renameRoomAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const companyId = requiredText(formData, 'company_id');
+  const name = requiredText(formData, 'name');
+  const companyName = text(formData, 'company_name') || name;
+  const logoUrl = text(formData, 'logo_url') ?? '';
+
+  const db = createInterviewsClient();
+  const { error: companyError } = await db.rpc('upsert_company', {
+    p_edition: g.access.edition.id,
+    p_company: companyId,
+    p_payload: { name_en: companyName, name_ar: companyName, logo_url: logoUrl },
+    p_actor: g.access.actor,
+  });
+  if (companyError) return fromPostgrest(companyError);
+
+  const { data: session } = await db
+    .from('sessions')
+    .select('room_id')
+    .eq('company_id', companyId)
+    .limit(1)
+    .maybeSingle();
+
+  if (session?.room_id) {
+    const { error: roomError } = await db.rpc('upsert_room', {
+      p_edition: g.access.edition.id,
+      p_room: session.room_id,
+      p_payload: { name },
+      p_actor: g.access.actor,
+    });
+    if (roomError) return fromPostgrest(roomError);
+  }
+
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
+/**
+ * "Delete" a room — a soft delete, on purpose. It hides the company from
+ * this grid and marks the room inactive (so its candidate link stops
+ * working, per room/[token]/page.tsx), but touches nothing else: the
+ * sessions, slots and bookings stay exactly as they are. The floor sheet
+ * reads that same live data, so a deleted room's history keeps showing
+ * there — nothing to resync or preserve specially, because nothing about
+ * the underlying data changed. `deleted: 'false'` reverses it.
+ */
+export async function setRoomDeletedAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const companyId = requiredText(formData, 'company_id');
+  const deleted = text(formData, 'deleted') !== 'false';
+
+  const db = createInterviewsClient();
+  const { error: companyError } = await db.rpc('upsert_company', {
+    p_edition: g.access.edition.id,
+    p_company: companyId,
+    p_payload: { is_hidden: deleted },
+    p_actor: g.access.actor,
+  });
+  if (companyError) return fromPostgrest(companyError);
+
+  const { data: session } = await db
+    .from('sessions')
+    .select('room_id')
+    .eq('company_id', companyId)
+    .limit(1)
+    .maybeSingle();
+
+  if (session?.room_id) {
+    const { error: roomError } = await db.rpc('upsert_room', {
+      p_edition: g.access.edition.id,
+      p_room: session.room_id,
+      p_payload: { is_active: !deleted },
+      p_actor: g.access.actor,
+    });
+    if (roomError) return fromPostgrest(roomError);
+  }
+
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
 
 export async function upsertRoomAction(
   _previous: ActionResult,
@@ -229,6 +375,130 @@ export async function upsertCompanyAction(
 
   revalidate(g.locale, g.projectId);
   return ok();
+}
+
+/**
+ * The simplified "room" flow (0005): one button creates the room, the
+ * company behind it (with its own candidate-facing link), and that one
+ * day's 15-minute-slot session for the chosen hours, so nothing further
+ * needs scheduling by hand. One room per day is the intended use (hence a
+ * day picker rather than a fixed range): the candidate booking page shows
+ * a room's slots flat, with no day tabs, on the assumption there is only
+ * ever one day to show. Each step is its own transaction; if a later step
+ * fails the earlier ones stand, same as every other admin form here that
+ * is not meant to be re-run under load.
+ */
+const ROOM_SLOT_MINUTES = 15;
+
+export async function createRoomAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const name = requiredText(formData, 'name');
+  const companyName = text(formData, 'company_name') || name;
+  const logoUrl = text(formData, 'logo_url') ?? '';
+  const day = requiredText(formData, 'day');
+  const startTime = requiredText(formData, 'start_time');
+  const endTime = requiredText(formData, 'end_time');
+  const db = createInterviewsClient();
+
+  const { data: room, error: roomError } = await db.rpc('upsert_room', {
+    p_edition: g.access.edition.id,
+    p_room: null,
+    p_payload: { name },
+    p_actor: g.access.actor,
+  });
+  if (roomError) return fromPostgrest(roomError);
+
+  const { data: company, error: companyError } = await db.rpc('upsert_company', {
+    p_edition: g.access.edition.id,
+    p_company: null,
+    p_payload: {
+      name_en: companyName,
+      name_ar: companyName,
+      logo_url: logoUrl,
+      access_token: newToken(),
+      candidate_token: newToken(),
+    },
+    p_actor: g.access.actor,
+  });
+  if (companyError) return fromPostgrest(companyError);
+
+  const { error: sessionError } = await db.rpc('create_session', {
+    p_edition: g.access.edition.id,
+    p_payload: {
+      company_id: company.id,
+      room_id: room.id,
+      day,
+      start_time: startTime,
+      end_time: endTime,
+      slot_minutes: ROOM_SLOT_MINUTES,
+    },
+    p_actor: g.access.actor,
+  });
+  if (sessionError) return fromPostgrest(sessionError);
+
+  revalidate(g.locale, g.projectId);
+  return ok('created');
+}
+
+/** HR's pre-approval list for one room: phone numbers, one per line. */
+export async function acceptPhonesAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.decide);
+  if ('error' in g) return fail(g.error);
+
+  const companyId = requiredText(formData, 'company_id');
+  const phones = Array.from(
+    new Set(
+      (text(formData, 'phones') ?? '')
+        .split(/[\s,]+/)
+        .map((p) => p.trim())
+        .filter(Boolean),
+    ),
+  );
+  if (phones.length === 0) return fail('Enter at least one phone number.');
+
+  const db = createInterviewsClient();
+  for (const phone of phones) {
+    const { error } = await db.rpc('accept_phone', {
+      p_edition: g.access.edition.id,
+      p_company: companyId,
+      p_phone: phone,
+      p_token: newToken(),
+      p_actor: g.access.actor,
+    });
+    if (error) return fromPostgrest(error);
+  }
+
+  revalidate(g.locale, g.projectId);
+  return ok('saved', { count: String(phones.length) });
+}
+
+/**
+ * A plain form action (no useActionState, no per-row error UI) — same shape
+ * as signOutAction in the app layout. Removing a phone from an "accepted"
+ * list is low-stakes and reversible by pasting it back in, so it does not
+ * need a confirmation dialog or its own feedback state.
+ */
+export async function unacceptPhoneAction(formData: FormData): Promise<void> {
+  const g = await guard(formData, can.decide);
+  if ('error' in g) return;
+
+  const db = createInterviewsClient();
+  await db.rpc('unaccept_phone', {
+    p_edition: g.access.edition.id,
+    p_company: requiredText(formData, 'company_id'),
+    p_phone: requiredText(formData, 'phone'),
+    p_actor: g.access.actor,
+  });
+
+  revalidate(g.locale, g.projectId);
 }
 
 export async function rotateCompanyTokenAction(
@@ -442,6 +712,7 @@ export async function stageAction(input: {
   });
   if (error) return fromPostgrest(error);
 
+  if (access.edition) kickFloorSheetSync(access.edition.id);
   revalidate(input.locale, input.projectId);
   return ok();
 }
@@ -466,6 +737,7 @@ export async function staffBookAction(
   if (error) return fromPostgrest(error);
 
   kickEmailDelivery();
+  kickFloorSheetSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok('created');
 }
@@ -486,6 +758,7 @@ export async function staffMoveAction(
   if (error) return fromPostgrest(error);
 
   kickEmailDelivery();
+  kickFloorSheetSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
 }
@@ -506,6 +779,7 @@ export async function staffCancelAction(
   if (error) return fromPostgrest(error);
 
   kickEmailDelivery();
+  kickFloorSheetSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
 }

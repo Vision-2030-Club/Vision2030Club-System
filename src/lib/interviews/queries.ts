@@ -129,6 +129,17 @@ export async function loadCounters(
   return new Map(((data ?? []) as CompanyCounter[]).map((row) => [row.company_id, row]));
 }
 
+export type AcceptedPhone = { phone: string; name: string; decided_at: string | null };
+
+/** HR's pre-approval list (0005) for one company/room's candidate link. */
+export async function loadAcceptedPhones(
+  db: SupabaseClient,
+  companyId: string,
+): Promise<AcceptedPhone[]> {
+  const { data } = await db.rpc('accepted_phones', { p_company: companyId });
+  return (data ?? []) as AcceptedPhone[];
+}
+
 export async function countApplications(db: SupabaseClient, editionId: string): Promise<number> {
   const { count } = await db
     .from('applications')
@@ -265,6 +276,26 @@ export async function loadFreeSlots(
     .eq('is_closed', false)
     .is('booking_id', null)
     .gt('starts_at', new Date().toISOString())
+    .order('starts_at');
+  return (data ?? []) as SlotStatus[];
+}
+
+/**
+ * Every slot of one company, free, already held, or already past — what the
+ * room picker (0005) shows, so a candidate always sees the room's whole
+ * scheduled range (e.g. 2-8) rather than it shrinking from the start as the
+ * day goes on. The caller marks a slot "taken" for display the same way
+ * whether it is booked or simply in the past; book_slot still refuses a
+ * past one server-side regardless of what the client shows.
+ */
+export async function loadAllSlots(
+  db: SupabaseClient,
+  companyId: string,
+): Promise<SlotStatus[]> {
+  const { data } = await db
+    .from('slot_status')
+    .select('*')
+    .eq('company_id', companyId)
     .order('starts_at');
   return (data ?? []) as SlotStatus[];
 }
