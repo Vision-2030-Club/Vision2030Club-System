@@ -136,14 +136,12 @@ html[data-theme="interviews"] {
   --color-brand-800: #093b44;
   --color-brand-900: #072d34;
   --color-brand-950: #041c21;
-  /* The page is the mint; the boxes on it are the deep teal itself. Inset
+  /* The page is the mint; the boxes on it are the lavender accent. Inset
      areas inside a box (table heads, chips, hovers) go a shade deeper. */
   --color-canvas: #a6eddd;
-  --color-surface: #0e5a67;
-  --color-surface-muted: #0b4a55;
-  --color-line: #2f8a92;
-  /* Text that sits straight on the mint page keeps the dark ink; every box
-     below turns it light for what is written inside. */
+  --color-surface: #c2b7ef;
+  --color-surface-muted: #b1a4e6;
+  --color-line: #9d8fdc;
   --color-ink-muted: #3f5a63;
   /* The brand's typeface, for both scripts; digits and Latin fall back
      glyph by glyph where the cut lacks them. */
@@ -154,40 +152,10 @@ html[data-theme="interviews"][lang="en"] {
   font-family: var(--font-interviews), var(--font-latin), var(--font-arabic), system-ui, sans-serif;
 }
 
-/* Inside any teal box — cards, the header, menus, inputs, table heads — the
-   ink turns light, and the colours the pages use for emphasis on white are
-   remapped so they still show on deep teal: the strong brand steps (links,
-   the primary button) become mint, the pale brand tints (badges, alerts,
-   the active nav link) become a deeper teal, the status colours brighten,
-   and the primary button's white text becomes deep teal on its mint face.
-   Custom properties inherit, so these rules cover every utility underneath
-   without the pages carrying theme-specific classes. */
+/* Inside a lavender box the muted ink leans violet instead of teal-grey, so
+   secondary text reads as part of the box rather than of the page. */
 html[data-theme="interviews"] :is(.bg-surface, .bg-surface-muted) {
-  --color-ink: #f2fbf8;
-  --color-ink-muted: #bfe6dc;
-  --color-brand-50: #145f6b;
-  --color-brand-100: #1a6e7a;
-  --color-brand-200: #2a8a92;
-  --color-brand-300: #3fb2a6;
-  --color-brand-400: #5cc9b8;
-  --color-brand-500: #78d9c8;
-  --color-brand-600: #8fe3d0;
-  --color-brand-700: #a6eddd;
-  --color-brand-800: #c4f4e8;
-  --color-brand-900: #d9f8f0;
-  --color-brand-950: #eefaf6;
-  --color-ok: #7fe3a5;
-  --color-warn: #fcd34d;
-  --color-danger: #fca5a5;
-}
-
-html[data-theme="interviews"] :is(.bg-surface, .bg-surface-muted) .text-white {
-  color: #0e5a67;
-}
-
-/* The mark is one flat deep teal, so on a teal box it is shown white. */
-html[data-theme="interviews"] :is(.bg-surface, .bg-surface-muted) .interviews-logo {
-  filter: brightness(0) invert(1);
+  --color-ink-muted: #4a4370;
 }
 
 html.theme-animate {

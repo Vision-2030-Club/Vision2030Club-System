@@ -6,8 +6,7 @@ import { cx } from '@/components/ui';
  * the club supplied it — deep teal on nothing. `tone="white"` inverts it for
  * the dark waiting-area screen; the artwork is one flat colour, so a filter
  * gives a faithful white version without a second file. The `interviews-logo`
- * class lets globals.css apply the same filter wherever the mark sits on a
- * teal box inside the component's theme.
+ * class is a hook for globals.css should a theme need to restyle the mark.
  */
 export function InterviewsLogo({
   name,
