@@ -112,6 +112,13 @@ export async function deleteOtherTabs(spreadsheetId: string, keepIds: Set<number
  * `USER_ENTERED` rather than `RAW` so a `=HYPERLINK(...)` cell (the CV
  * column) actually evaluates instead of showing as literal formula text.
  */
+/** Reads back one tab's cells — for pulling Stage edits (floorSheet.ts). */
+export async function readTab(spreadsheetId: string, sheetTitle: string): Promise<string[][]> {
+  const range = `${quoted(sheetTitle)}!A1:Z10000`;
+  const data = await googleFetch(SHEETS_API, `/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`);
+  return (data.values ?? []) as string[][];
+}
+
 export async function writeTab(
   spreadsheetId: string,
   sheetId: number,

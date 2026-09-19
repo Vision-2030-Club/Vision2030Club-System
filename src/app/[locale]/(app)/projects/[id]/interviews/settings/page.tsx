@@ -10,6 +10,7 @@ import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { CopyField } from '../CopyField';
 import {
   exportNowAction,
+  pullFloorSheetAction,
   releaseFeedbackAction,
   rotateTvTokenAction,
   syncFloorSheetAction,
@@ -195,10 +196,23 @@ export default async function InterviewsSettingsPage({
           ) : (
             <p className="mb-3 text-sm text-ink-muted">{t('settings.floorSheetNone')}</p>
           )}
-          <ActionForm action={syncFloorSheetAction} submitLabel={t('settings.floorSheetSync')} variant="secondary" className="space-y-0">
-            <input type="hidden" name="locale" value={locale} />
-            <input type="hidden" name="project_id" value={id} />
-          </ActionForm>
+          <div className="flex flex-wrap gap-2">
+            <ActionForm action={syncFloorSheetAction} submitLabel={t('settings.floorSheetSync')} variant="secondary" className="space-y-0">
+              <input type="hidden" name="locale" value={locale} />
+              <input type="hidden" name="project_id" value={id} />
+            </ActionForm>
+            <ActionForm
+              action={pullFloorSheetAction}
+              submitLabel={t('settings.floorSheetPull')}
+              successText={t('settings.floorSheetPulled')}
+              variant="secondary"
+              className="space-y-0"
+            >
+              <input type="hidden" name="locale" value={locale} />
+              <input type="hidden" name="project_id" value={id} />
+            </ActionForm>
+          </div>
+          <p className="mt-2 text-xs text-ink-muted">{t('settings.floorSheetPullHint')}</p>
         </Card>
 
         <Card>

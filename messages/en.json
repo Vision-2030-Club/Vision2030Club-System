@@ -731,9 +731,12 @@
       "notes": "How this works",
       "notesBody": "Applications and booking follow the windows above. A student who applies twice with the same email updates their form until HR decides or they book. Organizers move students through the stages on the Floor tab. Every change is logged with who made it; nothing is ever deleted.",
       "floorSheet": "Live Google Sheet",
-      "floorSheetHint": "A read-only mirror of every booked slot, across every room and day, kept in sync automatically. Requires the club's Google account to be connected under Admin → Google.",
+      "floorSheetHint": "A mirror of every booked slot, across every room and day, kept in sync automatically. The Stage column is editable in the Sheet — press “Pull from Sheet” to bring those changes back in. Requires the club's Google account to be connected under Admin → Google.",
       "floorSheetNone": "Not created yet — it appears the first time the floor changes, or press Sync now.",
-      "floorSheetSync": "Sync now"
+      "floorSheetSync": "Sync now",
+      "floorSheetPull": "Pull from Sheet",
+      "floorSheetPulled": "Stage changes from the Sheet were applied, and the Sheet was refreshed to match.",
+      "floorSheetPullHint": "Reads the Stage column of every day tab and applies any changes (Not Arrived / Arrived / In Interview / Finished / No Show) to the matching booking. Nothing happens automatically — only when this is pressed."
     },
     "companies": {
       "new": "New company",

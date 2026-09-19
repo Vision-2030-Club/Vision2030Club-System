@@ -1,32 +1,50 @@
 import 'server-only';
 import { after } from 'next/server';
 import { GoogleNotConnectedError, isGoogleConfigured } from '@/lib/google/auth';
-import { addTab, createFloorSheet, deleteOtherTabs, listTabs, renameTab, writeTab } from '@/lib/google/sheets';
+import { addTab, createFloorSheet, deleteOtherTabs, listTabs, readTab, renameTab, writeTab } from '@/lib/google/sheets';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { signCvLong } from '@/lib/interviews/cv';
-import type { Edition, Room, SlotStatus } from '@/lib/interviews/types';
+import type { Actor } from '@/lib/interviews/access';
+import type { Edition, Room, SlotStatus, Stage } from '@/lib/interviews/types';
 import { loadRooms, loadSessions, sessionDays } from '@/lib/interviews/queries';
 
 /**
- * A one-way mirror: this database → the sheet, never the other way.
- *
- * A cell a person edited by hand would be silently overwritten by the next
- * sync anyway (writeTab always rewrites the whole tab), and reading the
- * sheet back in would mean trusting arbitrary text as a booking change —
- * bypassing every constraint that keeps two people out of one slot. Read-only
- * is not a missing feature here; it is what makes the mirror safe.
+ * Mostly a mirror — this database → the sheet — with one door back the other
+ * way: the Stage column. Everything else here is regenerated wholesale on
+ * every sync, so a hand-edited name or time would just be overwritten; Stage
+ * is the one column worth editing by hand (an organizer at the door ticking
+ * people off) and the one place `advance_stage` already refuses anything
+ * that isn't a real stage, so there is a guardrail to lean on. Nothing pulls
+ * automatically, though — see pullFloorSheetStages and its caller
+ * (syncFloorSheetAction/pullFloorSheetAction in the interviews actions),
+ * which only ever run because someone clicked a button.
  *
  * One TAB per day ("Day 1", "Day 2", …) rather than a day column: rooms are
  * now made one per day (0005's createRoomAction), so a day is naturally a
  * whole separate sheet of rooms, not a label repeated down one column.
  * Within a tab, two rooms per row, each its own block: a merged, centred,
- * navy title bar naming the room, a navy Name/Time/Phone/CV header row,
- * that room's bookings in time order. A room never names its own company —
- * here a room and its company are the same booth (0005).
+ * navy title bar naming the room, a navy Name/Time/Phone/CV/Stage header
+ * row, that room's bookings in time order. A room never names its own
+ * company — here a room and its company are the same booth (0005).
+ *
+ * The sixth column of each block, hidden, carries the booking id — nothing
+ * else in a row identifies which booking it is, and the id is what
+ * pullFloorSheetStages matches an edited Stage cell back to.
  */
 
-const COLUMNS = ['Name', 'Time', 'Phone', 'CV'];
-const BLOCK_COLS = COLUMNS.length;
+const STAGE_LABELS: Record<Stage, string> = {
+  scheduled: 'Not Arrived',
+  arrived: 'Arrived',
+  in_interview: 'In Interview',
+  done: 'Finished',
+  no_show: 'No Show',
+};
+const LABEL_TO_STAGE = new Map(Object.entries(STAGE_LABELS).map(([stage, label]) => [label, stage as Stage]));
+
+const COLUMNS = ['Name', 'Time', 'Phone', 'CV', 'Stage'];
+const VISIBLE_COLS = COLUMNS.length;
+const ID_COL = VISIBLE_COLS; // the hidden 6th column, 0-based index within a block
+const BLOCK_COLS = VISIBLE_COLS + 1;
 const PAIR_COLS = BLOCK_COLS * 2 + 1; // two blocks + one gap column between them
 
 const NAVY = { red: 0.11, green: 0.23, blue: 0.39 };
@@ -57,7 +75,10 @@ async function buildRoomBlock(
   cvPathByApplication: Map<string, string | null>,
   zone: string,
 ): Promise<string[][]> {
-  const rows: string[][] = [[room.name, '', '', ''], [...COLUMNS]];
+  const rows: string[][] = [
+    [room.name, '', '', '', '', ''],
+    [...COLUMNS, ''],
+  ];
 
   for (const slot of slots) {
     const cvPath = slot.application_id ? cvPathByApplication.get(slot.application_id) : null;
@@ -67,40 +88,68 @@ async function buildRoomBlock(
       `${fmtTime(slot.starts_at, zone)}–${fmtTime(slot.ends_at, zone)}`,
       slot.student_phone ?? '',
       cvUrl ? `=HYPERLINK("${cvUrl}", "View CV")` : '',
+      slot.stage ? STAGE_LABELS[slot.stage] : '',
+      slot.booking_id ?? '',
     ]);
   }
 
   return rows;
 }
 
-/** The navy title bar (merged + centred) and navy column-header row for one block. */
+/** The navy title bar (merged + centred), the navy header row, and a dropdown on Stage. */
 function blockFormatting(sheetId: number, startRow: number, startCol: number, blockLen: number): object[] {
   if (blockLen === 0) return [];
-  const headerFill = {
-    repeatCell: {
-      range: { sheetId, startRowIndex: startRow, endRowIndex: startRow + 2, startColumnIndex: startCol, endColumnIndex: startCol + BLOCK_COLS },
-      cell: {
-        userEnteredFormat: {
-          backgroundColor: NAVY,
-          textFormat: { bold: true, foregroundColor: WHITE },
-          horizontalAlignment: 'CENTER',
+  const requests: object[] = [
+    {
+      repeatCell: {
+        range: { sheetId, startRowIndex: startRow, endRowIndex: startRow + 2, startColumnIndex: startCol, endColumnIndex: startCol + BLOCK_COLS },
+        cell: {
+          userEnteredFormat: {
+            backgroundColor: NAVY,
+            textFormat: { bold: true, foregroundColor: WHITE },
+            horizontalAlignment: 'CENTER',
+          },
+        },
+        fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
+      },
+    },
+    {
+      mergeCells: {
+        range: { sheetId, startRowIndex: startRow, endRowIndex: startRow + 1, startColumnIndex: startCol, endColumnIndex: startCol + BLOCK_COLS },
+        mergeType: 'MERGE_ALL',
+      },
+    },
+  ];
+
+  const dataRows = blockLen - 2;
+  if (dataRows > 0) {
+    requests.push({
+      setDataValidation: {
+        range: {
+          sheetId,
+          startRowIndex: startRow + 2,
+          endRowIndex: startRow + 2 + dataRows,
+          startColumnIndex: startCol + 4,
+          endColumnIndex: startCol + 5,
+        },
+        rule: {
+          condition: {
+            type: 'ONE_OF_LIST',
+            values: Object.values(STAGE_LABELS).map((label) => ({ userEnteredValue: label })),
+          },
+          showCustomUi: true,
+          strict: true,
         },
       },
-      fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
-    },
-  };
-  const mergeTitle = {
-    mergeCells: {
-      range: { sheetId, startRowIndex: startRow, endRowIndex: startRow + 1, startColumnIndex: startCol, endColumnIndex: startCol + BLOCK_COLS },
-      mergeType: 'MERGE_ALL',
-    },
-  };
-  return [headerFill, mergeTitle];
+    });
+  }
+
+  return requests;
 }
 
-/** Column widths, set once per tab — the same four columns repeat in every pair. */
-function columnWidthRequests(sheetId: number): object[] {
-  const widths = [170, 140, 120, 100];
+/** Column widths and the hidden booking-id column, set once per tab. */
+function columnLayoutRequests(sheetId: number): object[] {
+  const widths = [170, 140, 120, 100, 110];
   const requests: object[] = [];
   for (const startCol of [0, BLOCK_COLS + 1]) {
     widths.forEach((pixelSize, i) => {
@@ -111,6 +160,13 @@ function columnWidthRequests(sheetId: number): object[] {
           fields: 'pixelSize',
         },
       });
+    });
+    requests.push({
+      updateDimensionProperties: {
+        range: { sheetId, dimension: 'COLUMNS', startIndex: startCol + ID_COL, endIndex: startCol + ID_COL + 1 },
+        properties: { hiddenByUser: true },
+        fields: 'hiddenByUser',
+      },
     });
   }
   requests.push({
@@ -135,7 +191,7 @@ async function syncDayTab(
   zone: string,
 ): Promise<void> {
   const values: string[][] = [];
-  const formatRequests: object[] = columnWidthRequests(sheetId);
+  const formatRequests: object[] = columnLayoutRequests(sheetId);
   let cursorRow = 0;
 
   for (let i = 0; i < dayRooms.length; i += 2) {
@@ -210,6 +266,16 @@ async function ensureDayTab(
   return sheetId;
 }
 
+/** Everything a full rebuild needs about the edition's current floor. */
+async function loadFloorData(db: ReturnType<typeof createInterviewsClient>, editionId: string) {
+  const [rooms, sessions, { data: slotRows }] = await Promise.all([
+    loadRooms(db, editionId),
+    loadSessions(db, editionId),
+    db.from('slot_status').select('*').eq('edition_id', editionId).not('booking_id', 'is', null).order('starts_at'),
+  ]);
+  return { rooms, sessions, slots: (slotRows ?? []) as SlotStatus[] };
+}
+
 /** Rebuilds one edition's floor sheet from scratch. Call via kickFloorSheetSync. */
 export async function syncFloorSheet(editionId: string): Promise<void> {
   if (!isGoogleConfigured()) return;
@@ -219,12 +285,7 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
   const edition = editionRow as Edition | null;
   if (!edition) return;
 
-  const [rooms, sessions, { data: slotRows }] = await Promise.all([
-    loadRooms(db, editionId),
-    loadSessions(db, editionId),
-    db.from('slot_status').select('*').eq('edition_id', editionId).not('booking_id', 'is', null).order('starts_at'),
-  ]);
-  const slots = (slotRows ?? []) as SlotStatus[];
+  const { rooms, sessions, slots } = await loadFloorData(db, editionId);
   const roomById = new Map(rooms.map((r) => [r.id, r]));
 
   const applicationIds = [...new Set(slots.map((s) => s.application_id).filter((v): v is string => Boolean(v)))];
@@ -269,6 +330,60 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
   }
 
   if (keepIds.size > 0) await deleteOtherTabs(spreadsheetId, keepIds);
+}
+
+/**
+ * Reads every day tab's Stage column back and applies whatever it finds to
+ * the matching booking — the one door back the other way (see the file
+ * note). `advance_stage` is the same function the floor board's own buttons
+ * call, `p_as_manager: true` so a jump straight from "Not Arrived" to
+ * "Finished" is accepted the way a manager's own override already is. A row
+ * whose Stage cell is blank, unrecognised, or already matches is simply not
+ * counted — this never errors on a row, only reports what it did.
+ *
+ * Never called automatically: only from pullFloorSheetAction, when someone
+ * presses the button. Nothing else in this file reads a cell.
+ */
+export async function pullFloorSheetStages(
+  editionId: string,
+  actor: Actor,
+): Promise<{ updated: number; skipped: number }> {
+  const db = createInterviewsClient();
+  const { data: editionRow } = await db.from('editions').select('*').eq('id', editionId).maybeSingle();
+  const edition = editionRow as Edition | null;
+  if (!edition?.floor_sheet_id) return { updated: 0, skipped: 0 };
+
+  const tabs = await listTabs(edition.floor_sheet_id);
+  let updated = 0;
+  let skipped = 0;
+
+  for (const tab of tabs) {
+    const rows = await readTab(edition.floor_sheet_id, tab.title);
+    for (const row of rows) {
+      for (const startCol of [0, BLOCK_COLS + 1]) {
+        const bookingId = row[startCol + ID_COL];
+        const stageLabel = row[startCol + 4];
+        if (!bookingId || !stageLabel) continue;
+
+        const stage = LABEL_TO_STAGE.get(stageLabel);
+        if (!stage) {
+          skipped++;
+          continue;
+        }
+
+        const { error } = await db.rpc('advance_stage', {
+          p_booking: bookingId,
+          p_to: stage,
+          p_actor: actor,
+          p_as_manager: true,
+        });
+        if (error) skipped++;
+        else updated++;
+      }
+    }
+  }
+
+  return { updated, skipped };
 }
 
 /**

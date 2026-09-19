@@ -13,7 +13,7 @@ import {
 } from '@/lib/interviews/access';
 import { newPin, newToken } from '@/lib/interviews/tokens';
 import { deliverPendingEmails, kickEmailDelivery } from '@/lib/interviews/email';
-import { kickFloorSheetSync, syncFloorSheet } from '@/lib/interviews/floorSheet';
+import { kickFloorSheetSync, pullFloorSheetStages, syncFloorSheet } from '@/lib/interviews/floorSheet';
 import { takeExport } from '@/lib/interviews/export';
 import type { Stage } from '@/lib/interviews/types';
 import { fromClubWallClock } from '@/lib/time';
@@ -152,6 +152,30 @@ export async function syncFloorSheetAction(
 
   revalidate(g.locale, g.projectId);
   return ok();
+}
+
+/**
+ * The one place a Sheet edit reaches back into the app: reads every day
+ * tab's Stage column and applies whatever it finds, then re-syncs so the
+ * sheet reflects the result — canonical labels back in cells that had a
+ * typo or an unrecognised value, and the just-applied changes confirmed
+ * rather than left to the next unrelated booking event to redraw them.
+ */
+export async function pullFloorSheetAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  try {
+    const { updated, skipped } = await pullFloorSheetStages(g.access.edition.id, g.access.actor);
+    await syncFloorSheet(g.access.edition.id);
+    revalidate(g.locale, g.projectId);
+    return ok('saved', { updated: String(updated), skipped: String(skipped) });
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Pull failed.');
+  }
 }
 
 export async function releaseFeedbackAction(
