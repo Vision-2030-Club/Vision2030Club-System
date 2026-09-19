@@ -50,47 +50,47 @@ export async function createFloorSheet(title: string): Promise<{ id: string; url
 }
 
 /**
- * Replaces the sheet's whole content with `rows`. A full rewrite rather than
- * a patch: the floor's row count and order change constantly (a cancelled
- * booking, a moved one, a room added), and computing a minimal diff would
- * cost more than just resending everything — this is at most a few hundred
- * cells.
+ * Replaces the sheet's whole content with `rows`, then applies `formatRequests`
+ * — raw Sheets API batchUpdate requests (repeatCell, mergeCells, …) the
+ * caller already built. A full rewrite rather than a patch: the floor's row
+ * count and layout change constantly (a cancelled booking, a room added),
+ * and computing a minimal diff would cost more than just resending
+ * everything — this is at most a few hundred cells.
  *
- * `boldRows` (0-based) are bolded afterwards — the room and column headers
- * that mark each block. `USER_ENTERED` rather than `RAW` so a
- * `=HYPERLINK(...)` cell (the CV column) actually evaluates instead of
- * showing as literal formula text.
+ * Old merges are cleared first: `values.clear` does not touch merges left
+ * over from a previous sync, and a merge from a wider layout can make a
+ * narrower one silently fail to apply.
+ *
+ * `USER_ENTERED` rather than `RAW` so a `=HYPERLINK(...)` cell (the CV
+ * column) actually evaluates instead of showing as literal formula text.
  */
 export async function writeFloorSheet(
   spreadsheetId: string,
   rows: string[][],
-  boldRows: number[] = [],
+  formatRequests: object[] = [],
 ): Promise<void> {
   const range = 'A1:Z10000';
   await googleFetch(SHEETS_API, `/spreadsheets/${spreadsheetId}/values/${range}:clear`, {
     method: 'POST',
     body: JSON.stringify({}),
   });
+
+  // The default sheet of a spreadsheet just created by spreadsheets.create
+  // always has sheetId 0 — nothing here ever creates a second sheet.
+  await googleFetch(SHEETS_API, `/spreadsheets/${spreadsheetId}:batchUpdate`, {
+    method: 'POST',
+    body: JSON.stringify({ requests: [{ unmergeCells: { range: { sheetId: 0 } } }] }),
+  });
+
   await googleFetch(
     SHEETS_API,
     `/spreadsheets/${spreadsheetId}/values/A1?valueInputOption=USER_ENTERED`,
     { method: 'PUT', body: JSON.stringify({ values: rows }) },
   );
 
-  if (boldRows.length === 0) return;
-
-  // The default sheet of a spreadsheet just created by spreadsheets.create
-  // always has sheetId 0 — nothing here ever creates a second sheet.
+  if (formatRequests.length === 0) return;
   await googleFetch(SHEETS_API, `/spreadsheets/${spreadsheetId}:batchUpdate`, {
     method: 'POST',
-    body: JSON.stringify({
-      requests: boldRows.map((row) => ({
-        repeatCell: {
-          range: { sheetId: 0, startRowIndex: row, endRowIndex: row + 1 },
-          cell: { userEnteredFormat: { textFormat: { bold: true } } },
-          fields: 'userEnteredFormat.textFormat.bold',
-        },
-      })),
-    }),
+    body: JSON.stringify({ requests: formatRequests }),
   });
 }

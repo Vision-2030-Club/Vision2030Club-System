@@ -16,14 +16,24 @@ import { loadRooms } from '@/lib/interviews/queries';
  * bypassing every constraint that keeps two people out of one slot. Read-only
  * is not a missing feature here; it is what makes the mirror safe.
  *
- * Laid out as one block per room rather than one flat table: a room's own
- * header row, a column header row (Name, Time, Phone, CV), its bookings in
- * time order, then a blank row before the next room. companyName is loaded
- * only to resolve a slot's room — the block itself never names the company,
- * since here a room and its company are the same booth (0005).
+ * Laid out two rooms per row, each its own block: a merged, centred, navy
+ * title bar naming the room, a navy Name/Time/Phone/CV header row, that
+ * room's bookings in time order, then blanks padding it level with its
+ * neighbour. A room never names its own company — here a room and its
+ * company are the same booth (0005) — and a blank spacer row separates
+ * each pair of rooms from the next.
  */
 
 const COLUMNS = ['Name', 'Time', 'Phone', 'CV'];
+const BLOCK_COLS = COLUMNS.length;
+const PAIR_COLS = BLOCK_COLS * 2 + 1; // two blocks + one gap column between them
+
+const NAVY = { red: 0.11, green: 0.23, blue: 0.39 };
+const WHITE = { red: 1, green: 1, blue: 1 };
+
+function blankRow(): string[] {
+  return Array(BLOCK_COLS).fill('');
+}
 
 function fmtSlotTime(startsAt: string, endsAt: string, zone: string): string {
   const day = new Intl.DateTimeFormat('en-GB', { timeZone: zone, day: '2-digit', month: 'short' }).format(
@@ -36,6 +46,82 @@ function fmtSlotTime(startsAt: string, endsAt: string, zone: string): string {
     new Date(endsAt),
   );
   return `${day} · ${start}–${end}`;
+}
+
+type RoomForSheet = { id: string; name: string };
+
+/** Title row, header row, then one row per booking — always BLOCK_COLS wide. */
+async function buildRoomBlock(
+  db: ReturnType<typeof createInterviewsClient>,
+  room: RoomForSheet,
+  slots: SlotStatus[],
+  cvPathByApplication: Map<string, string | null>,
+  zone: string,
+): Promise<string[][]> {
+  const rows: string[][] = [[room.name, '', '', ''], [...COLUMNS]];
+
+  for (const slot of slots) {
+    const cvPath = slot.application_id ? cvPathByApplication.get(slot.application_id) : null;
+    const cvUrl = cvPath ? await signCvLong(db, cvPath) : null;
+    rows.push([
+      slot.student_name ?? '',
+      fmtSlotTime(slot.starts_at, slot.ends_at, zone),
+      slot.student_phone ?? '',
+      cvUrl ? `=HYPERLINK("${cvUrl}", "View CV")` : '',
+    ]);
+  }
+
+  return rows;
+}
+
+/** The navy title bar (merged + centred) and navy column-header row for one block. */
+function blockFormatting(startRow: number, startCol: number, blockLen: number): object[] {
+  if (blockLen === 0) return [];
+  const headerFill = {
+    repeatCell: {
+      range: { sheetId: 0, startRowIndex: startRow, endRowIndex: startRow + 2, startColumnIndex: startCol, endColumnIndex: startCol + BLOCK_COLS },
+      cell: {
+        userEnteredFormat: {
+          backgroundColor: NAVY,
+          textFormat: { bold: true, foregroundColor: WHITE },
+          horizontalAlignment: 'CENTER',
+        },
+      },
+      fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
+    },
+  };
+  const mergeTitle = {
+    mergeCells: {
+      range: { sheetId: 0, startRowIndex: startRow, endRowIndex: startRow + 1, startColumnIndex: startCol, endColumnIndex: startCol + BLOCK_COLS },
+      mergeType: 'MERGE_ALL',
+    },
+  };
+  return [headerFill, mergeTitle];
+}
+
+/** Column widths, set once — the same four columns repeat in every pair. */
+function columnWidthRequests(): object[] {
+  const widths = [170, 140, 120, 100];
+  const requests: object[] = [];
+  for (const startCol of [0, BLOCK_COLS + 1]) {
+    widths.forEach((pixelSize, i) => {
+      requests.push({
+        updateDimensionProperties: {
+          range: { sheetId: 0, dimension: 'COLUMNS', startIndex: startCol + i, endIndex: startCol + i + 1 },
+          properties: { pixelSize },
+          fields: 'pixelSize',
+        },
+      });
+    });
+  }
+  requests.push({
+    updateDimensionProperties: {
+      range: { sheetId: 0, dimension: 'COLUMNS', startIndex: BLOCK_COLS, endIndex: BLOCK_COLS + 1 },
+      properties: { pixelSize: 24 },
+      fields: 'pixelSize',
+    },
+  });
+  return requests;
 }
 
 async function ensureFloorSheet(
@@ -82,38 +168,45 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
   );
 
   const zone = edition.time_zone;
+  // Every room, not just ones already holding a booking — an empty room
+  // still shows its block, same as the reference layout's Room 5.
   const roomsSorted = [...rooms].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
 
   const values: string[][] = [];
-  const boldRows: number[] = [];
+  const formatRequests: object[] = columnWidthRequests();
+  let cursorRow = 0;
 
-  for (const room of roomsSorted) {
-    const roomSlots = slots
-      .filter((s) => s.room_id === room.id)
-      .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
-    if (roomSlots.length === 0) continue;
+  for (let i = 0; i < roomsSorted.length; i += 2) {
+    const left = roomsSorted[i];
+    const right = roomsSorted[i + 1] as typeof left | undefined;
 
-    boldRows.push(values.length);
-    values.push([room.name, '', '', '']);
-    boldRows.push(values.length);
-    values.push(COLUMNS);
+    const leftSlots = slots.filter((s) => s.room_id === left.id).sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+    const leftRows = await buildRoomBlock(db, left, leftSlots, cvPathByApplication, zone);
+    const rightRows = right
+      ? await buildRoomBlock(
+          db,
+          right,
+          slots.filter((s) => s.room_id === right.id).sort((a, b) => a.starts_at.localeCompare(b.starts_at)),
+          cvPathByApplication,
+          zone,
+        )
+      : [];
 
-    for (const slot of roomSlots) {
-      const cvPath = slot.application_id ? cvPathByApplication.get(slot.application_id) : null;
-      const cvUrl = cvPath ? await signCvLong(db, cvPath) : null;
-      values.push([
-        slot.student_name ?? '',
-        fmtSlotTime(slot.starts_at, slot.ends_at, zone),
-        slot.student_phone ?? '',
-        cvUrl ? `=HYPERLINK("${cvUrl}", "View CV")` : '',
-      ]);
+    const height = Math.max(leftRows.length, rightRows.length);
+    for (let r = 0; r < height; r++) {
+      values.push([...(leftRows[r] ?? blankRow()), '', ...(rightRows[r] ?? blankRow())]);
     }
 
-    values.push(['', '', '', '']);
+    formatRequests.push(...blockFormatting(cursorRow, 0, leftRows.length));
+    formatRequests.push(...blockFormatting(cursorRow, BLOCK_COLS + 1, rightRows.length));
+
+    cursorRow += height;
+    values.push(Array(PAIR_COLS).fill(''));
+    cursorRow += 1;
   }
 
   const spreadsheetId = await ensureFloorSheet(db, edition);
-  await writeFloorSheet(spreadsheetId, values, boldRows);
+  await writeFloorSheet(spreadsheetId, values, formatRequests);
 }
 
 /**
