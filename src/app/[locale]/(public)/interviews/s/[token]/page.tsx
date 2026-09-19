@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Alert, Badge, Card } from '@/components/ui';
-import { formatDate, formatDateTime, formatTime, localized } from '@/lib/format';
+import { formatDateTime, formatTime, localized } from '@/lib/format';
 import {
   loadAllSlots,
   loadBookingsOf,
@@ -13,7 +13,6 @@ import { isToken } from '@/lib/interviews/tokens';
 import type { Application, Edition, EditionSettings } from '@/lib/interviews/types';
 import { STAGE_TONES } from '@/lib/interviews/ui';
 import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/interviews';
-import { toDateInput } from '@/lib/time';
 import { CancelForm, SlotPicker, type PickableSlot } from './SlotPicker';
 
 /**
@@ -81,8 +80,6 @@ export default async function StudentPage({
         company.id,
         slots.map((s) => ({
           id: s.id,
-          day: toDateInput(new Date(s.starts_at)),
-          dayLabel: formatDate(toDateInput(new Date(s.starts_at)) + 'T12:00:00Z', locale),
           timeLabel: `${formatTime(s.starts_at, locale)} – ${formatTime(s.ends_at, locale)}`,
           taken: s.is_closed || s.booking_id !== null,
         })),

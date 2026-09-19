@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useMemo, useState } from 'react';
+import { useActionState, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Alert, Button, Input, cx } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
@@ -8,9 +8,6 @@ import { bookAction, cancelAction, moveAction } from './actions';
 
 export type PickableSlot = {
   id: string;
-  /** Grouping key for the day tabs — sorts correctly, unlike the display label. */
-  day: string;
-  dayLabel: string;
   timeLabel: string;
   taken: boolean;
 };
@@ -26,9 +23,11 @@ function useRefusal() {
 }
 
 /**
- * One company's schedule: a day at a time (a tab per day), every slot shown
- * as its own rectangle — open ones pick-able, taken ones shown but greyed
- * and inert, so the day's shape is visible instead of just its gaps.
+ * One company's schedule, every slot its own rectangle — open ones
+ * pick-able, taken ones shown but greyed and inert, so the day's shape is
+ * visible instead of just its gaps. No day tabs: a room is one day's worth
+ * of slots (a separate room is made per day), so there is only ever one
+ * day here to show.
  */
 export function SlotPicker({
   token,
@@ -52,10 +51,6 @@ export function SlotPicker({
     mode === 'book' ? bookAction : moveAction,
     { ok: false },
   );
-
-  const days = useMemo(() => [...new Set(slots.map((s) => s.day))].sort(), [slots]);
-  const [selectedDay, setSelectedDay] = useState(days[0]);
-  const day = selectedDay && days.includes(selectedDay) ? selectedDay : days[0];
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
 
   if (!open) {
@@ -67,7 +62,6 @@ export function SlotPicker({
   }
 
   const error = refusal(state);
-  const dayLabel = new Map(slots.map((s) => [s.day, s.dayLabel]));
 
   return (
     <form action={formAction} className="w-full space-y-3">
@@ -79,51 +73,29 @@ export function SlotPicker({
 
       <p className="text-sm font-medium">{mode === 'book' ? t('student.chooseTime') : t('student.chooseNewTime')}</p>
 
-      {days.length > 1 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {days.map((d) => (
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {slots.map((slot) => {
+          const selected = selectedSlotId === slot.id;
+          return (
             <button
-              key={d}
+              key={slot.id}
               type="button"
-              onClick={() => setSelectedDay(d)}
+              disabled={slot.taken}
+              onClick={() => setSelectedSlotId(slot.id)}
+              aria-pressed={selected}
               className={cx(
-                'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
-                d === day
-                  ? 'bg-brand-600 text-white'
-                  : 'border border-line text-ink-muted hover:bg-surface-muted',
+                'ltr-nums rounded-lg border px-3 py-2.5 text-center text-sm font-medium transition-colors',
+                slot.taken
+                  ? 'cursor-not-allowed border-line/60 bg-surface-muted text-ink-muted/40 line-through'
+                  : selected
+                    ? 'border-brand-600 bg-brand-600 text-white'
+                    : 'border-line text-ink hover:border-brand-400 hover:bg-brand-50',
               )}
             >
-              {dayLabel.get(d)}
+              {slot.timeLabel}
             </button>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {slots
-          .filter((s) => s.day === day)
-          .map((slot) => {
-            const selected = selectedSlotId === slot.id;
-            return (
-              <button
-                key={slot.id}
-                type="button"
-                disabled={slot.taken}
-                onClick={() => setSelectedSlotId(slot.id)}
-                aria-pressed={selected}
-                className={cx(
-                  'ltr-nums rounded-lg border px-3 py-2.5 text-center text-sm font-medium transition-colors',
-                  slot.taken
-                    ? 'cursor-not-allowed border-line/60 bg-surface-muted text-ink-muted/40 line-through'
-                    : selected
-                      ? 'border-brand-600 bg-brand-600 text-white'
-                      : 'border-line text-ink hover:border-brand-400 hover:bg-brand-50',
-                )}
-              >
-                {slot.timeLabel}
-              </button>
-            );
-          })}
+          );
+        })}
       </div>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
