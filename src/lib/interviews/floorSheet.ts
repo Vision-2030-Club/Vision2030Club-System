@@ -394,7 +394,7 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
   const edition = editionRow as Edition | null;
   if (!edition) return;
 
-  const { rooms, sessions, slots } = await loadFloorData(db, editionId);
+  const { rooms, sessions: allSessions, slots } = await loadFloorData(db, editionId);
   const roomById = new Map(rooms.map((r) => [r.id, r]));
 
   // Room and company are named separately now — the room is a booth label
@@ -402,6 +402,16 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
   // through sessions rather than assumed equal to the room's own name.
   const companies = await loadCompanies(db, editionId);
   const companyById = new Map(companies.map((c) => [c.id, c]));
+
+  // A "deleted" room/company is only soft-deleted (is_active/is_hidden) so
+  // the sheet's past history survives — but a rebuilt sheet should never
+  // show it going forward, same as the app's own Rooms page hides it. Drop
+  // its sessions here, before anything downstream (days, room blocks) ever
+  // sees them.
+  const sessions = allSessions.filter(
+    (s) => roomById.get(s.room_id)?.is_active && !companyById.get(s.company_id)?.is_hidden,
+  );
+
   const companyNameByRoom = new Map<string, string>();
   for (const session of sessions) {
     if (companyNameByRoom.has(session.room_id)) continue;
