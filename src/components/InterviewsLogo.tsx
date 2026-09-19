@@ -5,7 +5,9 @@ import { cx } from '@/components/ui';
  * The افترض mark: the wordmark, its tagline and the linked-badges glyph, as
  * the club supplied it — deep teal on nothing. `tone="white"` inverts it for
  * the dark waiting-area screen; the artwork is one flat colour, so a filter
- * gives a faithful white version without a second file.
+ * gives a faithful white version without a second file. The `interviews-logo`
+ * class lets globals.css apply the same filter wherever the mark sits on a
+ * teal box inside the component's theme.
  */
 export function InterviewsLogo({
   name,
@@ -25,7 +27,7 @@ export function InterviewsLogo({
       height={1049}
       priority
       className={cx(
-        'h-8 w-auto max-w-full object-contain object-left rtl:object-right',
+        'interviews-logo h-8 w-auto max-w-full object-contain object-left rtl:object-right',
         tone === 'white' && 'brightness-0 invert',
         className,
       )}

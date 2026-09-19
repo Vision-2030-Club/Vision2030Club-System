@@ -1023,19 +1023,21 @@ mark (`public/brand/interviews-logo.png`, drawn by `InterviewsLogo`; the TV
 shows it white through a CSS filter), and sets `data-theme="interviews"` on
 `<html>`. That attribute switches the brand colour tokens to the component's
 palette (deep teal `#0e5a67`, mint `#a6eddd`, with lime `#c3f04a` and
-lavender `#c2b7ef` as `accent` / `accent-2`), paints the page itself deep
-teal (`--color-canvas`, what `body` and the public frame sit on) with mint
-boxes (`--color-surface`) floating on it, and switches the typeface to DG Heaven
+lavender `#c2b7ef` as `accent` / `accent-2`), paints the page itself mint
+(`--color-canvas`, what `body` and the public frame sit on) with deep teal
+boxes (`--color-surface`) standing on it, and switches the typeface to DG Heaven
 (`src/fonts/DG-Heaven-Light.ttf`, one Light cut; bolder weights are
 synthesised). The tokens are registered with `@property` in `globals.css`, so
 the colour change is animated (700 ms) rather than cut, and the page and
 sidebar fade in over the typeface swap; the root layout's inline script sets
 the attribute before the first paint on a direct load, and `theme-animate` is
 only added afterwards, so nothing fades in from the club's teal. Text that
-sits straight on the teal page is light; a rule on `.bg-surface` /
-`.bg-surface-muted` / `.bg-white` restores the dark ink inside every box, so
-pages need no theme-specific classes. The public `/interviews` pages carry
-the brand outright.
+sits straight on the mint page keeps the dark ink; a rule on `.bg-surface` /
+`.bg-surface-muted` turns the ink light inside every box and remaps the
+brand steps and status colours there (strong steps become mint, pale tints a
+deeper teal, `.text-white` on the primary button becomes deep teal, the mark
+is filtered white), so pages need no theme-specific classes. The public
+`/interviews` pages carry the brand outright.
 
 ### Setting it up
 
