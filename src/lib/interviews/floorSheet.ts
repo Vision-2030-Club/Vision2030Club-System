@@ -35,10 +35,25 @@ function blankRow(): string[] {
   return Array(BLOCK_COLS).fill('');
 }
 
-function fmtSlotTime(startsAt: string, endsAt: string, zone: string): string {
-  const day = new Intl.DateTimeFormat('en-GB', { timeZone: zone, day: '2-digit', month: 'short' }).format(
-    new Date(startsAt),
+/** `2026-10-12`, sortable and stable across time zones — the day-label key. */
+function dateKey(iso: string, zone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(
+    new Date(iso),
   );
+}
+
+/**
+ * "Day 1" rather than a calendar date: the event's own days, not the
+ * outside world's. Built from whatever dates actually have a booking, so it
+ * never needs updating when the event's real dates change.
+ */
+function dayLabels(slots: SlotStatus[], zone: string): Map<string, string> {
+  const keys = [...new Set(slots.map((s) => dateKey(s.starts_at, zone)))].sort();
+  return new Map(keys.map((key, i) => [key, `Day ${i + 1}`]));
+}
+
+function fmtSlotTime(startsAt: string, endsAt: string, zone: string, dayLabel: Map<string, string>): string {
+  const day = dayLabel.get(dateKey(startsAt, zone)) ?? '';
   const start = new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', hour12: false }).format(
     new Date(startsAt),
   );
@@ -57,6 +72,7 @@ async function buildRoomBlock(
   slots: SlotStatus[],
   cvPathByApplication: Map<string, string | null>,
   zone: string,
+  dayLabel: Map<string, string>,
 ): Promise<string[][]> {
   const rows: string[][] = [[room.name, '', '', ''], [...COLUMNS]];
 
@@ -65,7 +81,7 @@ async function buildRoomBlock(
     const cvUrl = cvPath ? await signCvLong(db, cvPath) : null;
     rows.push([
       slot.student_name ?? '',
-      fmtSlotTime(slot.starts_at, slot.ends_at, zone),
+      fmtSlotTime(slot.starts_at, slot.ends_at, zone, dayLabel),
       slot.student_phone ?? '',
       cvUrl ? `=HYPERLINK("${cvUrl}", "View CV")` : '',
     ]);
@@ -168,6 +184,7 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
   );
 
   const zone = edition.time_zone;
+  const dayLabel = dayLabels(slots, zone);
   // Every room, not just ones already holding a booking — an empty room
   // still shows its block, same as the reference layout's Room 5.
   const roomsSorted = [...rooms].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
@@ -181,7 +198,7 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
     const right = roomsSorted[i + 1] as typeof left | undefined;
 
     const leftSlots = slots.filter((s) => s.room_id === left.id).sort((a, b) => a.starts_at.localeCompare(b.starts_at));
-    const leftRows = await buildRoomBlock(db, left, leftSlots, cvPathByApplication, zone);
+    const leftRows = await buildRoomBlock(db, left, leftSlots, cvPathByApplication, zone, dayLabel);
     const rightRows = right
       ? await buildRoomBlock(
           db,
@@ -189,6 +206,7 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
           slots.filter((s) => s.room_id === right.id).sort((a, b) => a.starts_at.localeCompare(b.starts_at)),
           cvPathByApplication,
           zone,
+          dayLabel,
         )
       : [];
 
