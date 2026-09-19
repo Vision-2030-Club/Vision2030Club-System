@@ -97,21 +97,6 @@ export async function deleteOtherTabs(spreadsheetId: string, keepIds: Set<number
   });
 }
 
-/**
- * Replaces one tab's whole content with `rows`, then applies `formatRequests`
- * — raw Sheets API batchUpdate requests (repeatCell, mergeCells, …) the
- * caller already built, addressed to `sheetId`. A full rewrite rather than a
- * patch: a day's row count and layout change constantly (a cancelled
- * booking, a room added), and computing a minimal diff would cost more than
- * just resending everything — this is at most a few hundred cells.
- *
- * Old merges are cleared first: `values.clear` does not touch merges left
- * over from a previous sync, and a merge from a wider layout can make a
- * narrower one silently fail to apply.
- *
- * `USER_ENTERED` rather than `RAW` so a `=HYPERLINK(...)` cell (the CV
- * column) actually evaluates instead of showing as literal formula text.
- */
 /** Reads back one tab's cells — for pulling Stage edits (floorSheet.ts). */
 export async function readTab(spreadsheetId: string, sheetTitle: string): Promise<string[][]> {
   const range = `${quoted(sheetTitle)}!A1:Z10000`;
@@ -119,6 +104,38 @@ export async function readTab(spreadsheetId: string, sheetTitle: string): Promis
   return (data.values ?? []) as string[][];
 }
 
+/**
+ * How many conditional-format rules a sheet already has — deleting by index
+ * 0 that many times (in writeTab) clears them all, since each deletion
+ * shifts the next rule into index 0.
+ */
+async function conditionalFormatCount(spreadsheetId: string, sheetId: number): Promise<number> {
+  const data = await googleFetch(
+    SHEETS_API,
+    `/spreadsheets/${spreadsheetId}?fields=sheets(properties.sheetId,conditionalFormats)`,
+  );
+  const sheet = ((data.sheets ?? []) as { properties: { sheetId: number }; conditionalFormats?: unknown[] }[]).find(
+    (s) => s.properties.sheetId === sheetId,
+  );
+  return sheet?.conditionalFormats?.length ?? 0;
+}
+
+/**
+ * Replaces one tab's whole content with `rows`, then applies `formatRequests`
+ * — raw Sheets API batchUpdate requests (repeatCell, mergeCells,
+ * addConditionalFormatRule, …) the caller already built, addressed to
+ * `sheetId`. A full rewrite rather than a patch: a day's row count and
+ * layout change constantly (a cancelled booking, a room added), and
+ * computing a minimal diff would cost more than just resending everything —
+ * this is at most a few hundred cells.
+ *
+ * Old merges and conditional-format rules are cleared first: `values.clear`
+ * touches neither, and re-adding a Stage colour rule on every sync without
+ * clearing the last sync's copy would just keep piling up duplicates.
+ *
+ * `USER_ENTERED` rather than `RAW` so a `=HYPERLINK(...)` cell (the CV
+ * column) actually evaluates instead of showing as literal formula text.
+ */
 export async function writeTab(
   spreadsheetId: string,
   sheetId: number,
@@ -132,9 +149,15 @@ export async function writeTab(
     body: JSON.stringify({}),
   });
 
+  const oldFormatCount = await conditionalFormatCount(spreadsheetId, sheetId);
   await googleFetch(SHEETS_API, `/spreadsheets/${spreadsheetId}:batchUpdate`, {
     method: 'POST',
-    body: JSON.stringify({ requests: [{ unmergeCells: { range: { sheetId } } }] }),
+    body: JSON.stringify({
+      requests: [
+        ...Array.from({ length: oldFormatCount }, () => ({ deleteConditionalFormatRule: { sheetId, index: 0 } })),
+        { unmergeCells: { range: { sheetId } } },
+      ],
+    }),
   });
 
   await googleFetch(

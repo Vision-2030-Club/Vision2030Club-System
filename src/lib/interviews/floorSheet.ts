@@ -41,6 +41,15 @@ const STAGE_LABELS: Record<Stage, string> = {
 };
 const LABEL_TO_STAGE = new Map(Object.entries(STAGE_LABELS).map(([stage, label]) => [label, stage as Stage]));
 
+/** Same tones as STAGE_TONES (lib/interviews/ui.ts) in the app itself, as literal RGB for the Sheets API. */
+const STAGE_COLORS: Record<string, { bg: { red: number; green: number; blue: number }; fg: { red: number; green: number; blue: number } }> = {
+  'Not Arrived': { bg: { red: 0.9, green: 0.91, blue: 0.93 }, fg: { red: 0.29, green: 0.33, blue: 0.39 } },
+  'Arrived': { bg: { red: 0.86, green: 0.92, blue: 0.99 }, fg: { red: 0.12, green: 0.25, blue: 0.69 } },
+  'In Interview': { bg: { red: 1, green: 0.95, blue: 0.78 }, fg: { red: 0.57, green: 0.25, blue: 0.05 } },
+  'Finished': { bg: { red: 0.86, green: 0.99, blue: 0.91 }, fg: { red: 0.09, green: 0.4, blue: 0.2 } },
+  'No Show': { bg: { red: 1, green: 0.89, blue: 0.89 }, fg: { red: 0.6, green: 0.11, blue: 0.11 } },
+};
+
 const COLUMNS = ['Name', 'Time', 'Phone', 'CV', 'Stage'];
 const VISIBLE_COLS = COLUMNS.length;
 const ID_COL = VISIBLE_COLS; // the hidden 6th column, 0-based index within a block
@@ -142,6 +151,32 @@ function blockFormatting(sheetId: number, startRow: number, startCol: number, bl
         },
       },
     });
+
+    // One rule per stage, colouring the cell by its text — same tones as
+    // the Badge on the floor board (STAGE_TONES). Recalculates the moment
+    // someone picks a new value from the dropdown, unlike a plain fill.
+    for (const [label, { bg, fg }] of Object.entries(STAGE_COLORS)) {
+      requests.push({
+        addConditionalFormatRule: {
+          index: 0,
+          rule: {
+            ranges: [
+              {
+                sheetId,
+                startRowIndex: startRow + 2,
+                endRowIndex: startRow + 2 + dataRows,
+                startColumnIndex: startCol + 4,
+                endColumnIndex: startCol + 5,
+              },
+            ],
+            booleanRule: {
+              condition: { type: 'TEXT_EQ', values: [{ userEnteredValue: label }] },
+              format: { backgroundColor: bg, textFormat: { foregroundColor: fg, bold: true } },
+            },
+          },
+        },
+      });
+    }
   }
 
   return requests;
