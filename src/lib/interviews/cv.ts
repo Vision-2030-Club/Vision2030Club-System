@@ -12,6 +12,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 export const CV_BUCKET = 'cvs';
 export const MAX_CV_BYTES = 5 * 1024 * 1024;
 const SIGNED_URL_TTL_SECONDS = 10 * 60;
+/** For links that have to keep working without a page reload signing them again — the floor sheet. */
+const LONG_SIGNED_URL_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 export function isPdf(file: File): boolean {
   return file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
@@ -51,5 +53,20 @@ export async function signCv(
 ): Promise<string | null> {
   if (!path) return null;
   const { data } = await db.storage.from(CV_BUCKET).createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+  return data?.signedUrl ?? null;
+}
+
+/**
+ * A URL good for 30 days — for the floor sheet (floorSheet.ts), which is
+ * written once and then just sits there until the next sync. Every sync
+ * re-signs it, so in practice it never goes stale as long as the floor is
+ * still changing; a stale link past that is one "Sync now" away from fresh.
+ */
+export async function signCvLong(
+  db: SupabaseClient,
+  path: string | null | undefined,
+): Promise<string | null> {
+  if (!path) return null;
+  const { data } = await db.storage.from(CV_BUCKET).createSignedUrl(path, LONG_SIGNED_URL_TTL_SECONDS);
   return data?.signedUrl ?? null;
 }
