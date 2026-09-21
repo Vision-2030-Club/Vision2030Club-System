@@ -20,8 +20,10 @@ import type { Edition, EditionSettings } from '@/lib/interviews/types';
  *              company; reads everything else.
  *   organizer  chosen by the project's managers. Moves students through the
  *              stages on the day.
+ *   member     Outreach only (0065): on the project, works its targets.
+ *   viewer     Outreach only: may see the project's KPI, reads the numbers.
  */
-export type ComponentRole = 'manager' | 'hr' | 'organizer';
+export type ComponentRole = 'manager' | 'hr' | 'organizer' | 'member' | 'viewer';
 
 export type ComponentAccess = {
   project_id: string;
@@ -35,6 +37,7 @@ export type ComponentAccess = {
 /** Where each component's pages live, keyed by `project_components.component_key`. */
 export const COMPONENT_ROUTES: Record<string, string> = {
   mock_interviews: 'interviews',
+  outreach: 'outreach',
 };
 
 export function componentHref(projectId: string, componentKey: string): string {

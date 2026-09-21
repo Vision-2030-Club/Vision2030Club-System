@@ -1108,6 +1108,59 @@ connections firing at once; `scripts/component-tests.mjs` covers 0062.
   directory, not local headers — see "Reading .xlsx without a dependency").
   The two older scripts still carry their own copy; they were left alone.
 
+## Hours, the month, and the Outreach component (2026-09-21)
+
+The Development directors asked for the teams' KPI trackers (Design, HR,
+Finance; Shark Tank, Seen) to be simulated in the system. The gap report is
+a Claude doc: https://claude.ai/code/artifact/c2375491-7991-4c54-8367-c57193d7ed74.
+Two things the sheets had and the system lacked were built; the seed comes
+after the migrations are applied.
+
+- **Hours (`0063`).** `tasks.hours` is set by the member on submitting
+  (`submit_task_for_review(…, p_hours)`) and corrected by the confirmer
+  (`confirm_task(…, p_hours)`); the workflow guard refuses any other write.
+  `task_kpi.hours` carries it; `member_month_kpi` is per member per month
+  (Asia/Riyadh, by the date the work was submitted): tasks, completed, not
+  done, pending, hours, average score — with §8's self-exclusion. The KPI
+  page shows the six most recent months. The old three-argument function
+  signatures are dropped, not overloaded: PostgREST cannot pick between a
+  function and one whose arguments extend it.
+- **Importing history (`0064`).** `import_task_history` writes the workflow
+  columns of one task with real dates and a quality, service role only
+  (`auth.role() = 'service_role'`, execute revoked from authenticated). The
+  seed script is its only caller. Never expose it to the app.
+- **Outreach (`0065`).** A second project component, in THIS database:
+  `outreach_types` (per project: shark, sponsor, speaker…),
+  `outreach_targets` (type, name, owner, status new/waiting/meeting/
+  confirmed/rejected, notes), `outreach_status_history` (written by a
+  definer trigger), and the views `outreach_member_summary` /
+  `outreach_type_summary` that reproduce the sheets' summary page.
+  Access is through existing helpers: managers do everything, people on the
+  project add targets and change their own, KPI viewers read. Attaching it
+  from the project page seeds three types. `my_component_access()` returns
+  `member` / `viewer` for this component only; the interviews pages filter by
+  component_key and never see those roles. Pages: `/projects/[id]/outreach`
+  (`src/lib/outreach/`, one page, a self-submitting status select).
+  Unlike Mock Interviews it does not switch the shell or the theme.
+- **The seed** is `npm run kpi:simulate` (`scripts/simulate-kpi.mjs`): reads
+  `simulation-data/kpi-simulation.json` (gitignored — real names and grades;
+  built from the five PDFs on 2026-09-21 with the parser kept in the session
+  scratchpad, rebuild it from the sheets if lost), matches members, teams
+  and projects by name, refuses to write while anything is unmatched, tags
+  every row with `[simulation kpi-sheets-2026-09]`, records ids in
+  `simulation-data/last-run.json`, and `--undo` removes exactly those rows.
+  Dry run by default; `--yes` writes. The sheet names the projects as
+  قروش, افترض, سين, خطى المملكة, الإرشاد المهني and النادي (team-level);
+  the dry run prints which rows it could not place.
+
+**State on 2026-09-21:** code on branch `kpi-simulation` (pull request);
+migrations 0063–0065 NOT yet applied; the seed not yet run. Order: merge,
+apply 0063–0065 in the SQL editor (or `npm run db:push` where 5432 is
+reachable), `npm run kpi:simulate` (dry), fix names, `-- --yes`, then walk
+the directors through the KPI page, each project's Outreach page, and the
+questions at the end of the gap report. Open decision, theirs: whether
+hours are asked on submit or logged as the work happens.
+
 ## Conventions to keep
 
 - Phone numbers are stored as `+9665XXXXXXXX` and nothing else. Use

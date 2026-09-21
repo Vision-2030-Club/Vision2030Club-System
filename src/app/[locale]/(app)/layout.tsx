@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link, redirect } from '@/i18n/navigation';
 import { getMyMember, getMyPermissions } from '@/lib/auth/session';
-import { can, getMyComponentAccess } from '@/lib/interviews/access';
+import { can, componentHref, getMyComponentAccess } from '@/lib/interviews/access';
 import { createClient } from '@/lib/supabase/server';
 import { signAvatar } from '@/lib/avatars';
 import { AppShell, type ComponentShell } from '@/components/AppShell';
@@ -86,13 +86,17 @@ export default async function AppLayout({
    * that component's pages — filtered by the role the club gave this person.
    */
   const componentItems: NavItem[] = components.map((component) => ({
-    href: `/projects/${component.project_id}/interviews`,
+    href: componentHref(component.project_id, component.component_key),
     label: locale === 'ar' ? component.name_ar : component.name_en,
-    icon: 'interviews',
+    icon: component.component_key === 'outreach' ? 'company' : 'interviews',
     show: true,
   }));
 
-  const componentShells: ComponentShell[] = components.map((component) => {
+  // Only Mock Interviews is a world of its own (own pages, own brand).
+  // Outreach is one page inside the club shell.
+  const componentShells: ComponentShell[] = components
+    .filter((component) => component.component_key === 'mock_interviews')
+    .map((component) => {
     const base = `/projects/${component.project_id}/interviews`;
     const role = component.role;
     const label = locale === 'ar' ? component.name_ar : component.name_en;

@@ -132,6 +132,12 @@ export async function TaskCard({
       ) : null}
 
       {/* What was said on delivery, and by the reviewer (0058). */}
+      {task.hours !== null && task.hours !== undefined ? (
+        <p className="mt-2 text-xs text-ink-muted">
+          {t('hours')}: <span className="ltr-nums">{task.hours}</span>
+        </p>
+      ) : null}
+
       {task.submission_note ? (
         <p className="mt-2 text-sm text-ink">
           <span className="text-ink-muted">{t('submissionNote')}: </span>
@@ -222,6 +228,21 @@ export async function TaskCard({
                 <Label htmlFor={`snote-${task.id}`}>{t('submissionNote')}</Label>
                 <Input id={`snote-${task.id}`} name="submission_note" />
               </div>
+              <div>
+                <Label htmlFor={`hours-${task.id}`}>{t('hours')}</Label>
+                <Input
+                  id={`hours-${task.id}`}
+                  name="hours"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={999}
+                  step={0.5}
+                  dir="ltr"
+                  className="w-24"
+                  placeholder="0"
+                />
+              </div>
             </ActionForm>
           ) : null}
 
@@ -251,6 +272,21 @@ export async function TaskCard({
                 <div>
                   <Label htmlFor={`cnote-${task.id}`}>{t('reviewNote')}</Label>
                   <Input id={`cnote-${task.id}`} name="note" />
+                </div>
+                <div>
+                  <Label htmlFor={`chours-${task.id}`}>{t('hours')}</Label>
+                  <Input
+                    id={`chours-${task.id}`}
+                    name="hours"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    max={999}
+                    step={0.5}
+                    dir="ltr"
+                    className="w-24"
+                    defaultValue={task.hours ?? ''}
+                  />
                 </div>
               </ActionForm>
 

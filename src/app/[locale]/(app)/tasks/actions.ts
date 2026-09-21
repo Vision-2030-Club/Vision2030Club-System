@@ -47,6 +47,14 @@ function revalidate(locale: string, projectId?: string | null) {
  * `task_assignees` row each. The table always allowed it; the form used to
  * offer one.
  */
+/** The hours field, when filled: a number with at most one decimal, else null. */
+function hours(formData: FormData): number | null {
+  const raw = text(formData, 'hours');
+  if (raw === null) return null;
+  const value = Number(raw.replace(',', '.'));
+  return Number.isFinite(value) ? Math.round(value * 10) / 10 : null;
+}
+
 export async function createTaskAction(
   _previous: ActionResult,
   formData: FormData,
@@ -139,6 +147,8 @@ export async function submitTaskAction(
     // so, not this action. Any task may carry one, and a comment (0058).
     p_url: text(formData, 'submission_url'),
     p_note: text(formData, 'submission_note'),
+    // Effort, in hours (0063). Optional; the database bounds it.
+    p_hours: hours(formData),
   });
 
   if (error) return fail(error.message);
@@ -164,6 +174,8 @@ export async function confirmTaskAction(
     p_task: requiredText(formData, 'task_id'),
     p_quality: requiredText(formData, 'quality'),
     p_note: text(formData, 'note'),
+    // Blank keeps what the member reported; a number corrects it.
+    p_hours: hours(formData),
   });
 
   if (error) return fail(error.message);

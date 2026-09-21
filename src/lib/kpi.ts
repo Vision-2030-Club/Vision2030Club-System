@@ -74,6 +74,21 @@ export type TaskKpi = {
   /** The reviewer's comment — on confirming, or on sending it back. */
   review_note: string | null;
   created_by: string | null;
+  /** Effort reported on submitting, as corrected by the confirmer (0063). */
+  hours: number | string | null;
+};
+
+/** One member's month: what they finished and how long it took (0063). */
+export type MemberMonthKpi = {
+  member_id: string;
+  /** `YYYY-MM` on the club's clock. */
+  month: string;
+  tasks: number;
+  completed_tasks: number;
+  not_done_tasks: number;
+  pending_tasks: number;
+  hours: number | string;
+  performance: number | string | null;
 };
 
 /**
