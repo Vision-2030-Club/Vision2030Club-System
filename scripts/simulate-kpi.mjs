@@ -324,7 +324,7 @@ async function main() {
       plan.types.push({ project_id: project.id, key, name_en, name_ar });
     }
   }
-  for (const [i, row] of (data.outreach ?? []).entries()) {
+  for (const row of data.outreach ?? []) {
     const project = projectByName.get(row.project);
     if (!project) continue;
     if (/example/i.test(row.target)) continue;
