@@ -263,6 +263,8 @@ export async function attachComponentAction(
       external_ref: null,
       attached_by: me.id,
     });
+    // A project may carry both components (0066), but not the same one twice.
+    if (error?.code === '23505') return fail('This project already has Outreach.');
     if (error) return fail(error.message);
     await supabase.from('outreach_types').upsert(
       [
@@ -385,17 +387,28 @@ export async function detachComponentAction(
   const locale = requiredText(formData, 'locale');
   const supabase = await createClient();
 
+  // Which component to detach — a project may carry two (0066). An older
+  // form that sends none detaches the interviews one, as it always did.
+  const componentKey = text(formData, 'component_key') ?? 'mock_interviews';
+
   const { data: deleted, error } = await supabase
     .from('project_components')
     .delete()
     .eq('project_id', projectId)
-    .select('project_id, external_ref');
+    .eq('component_key', componentKey)
+    .select('project_id, component_key, external_ref');
 
   if (error) return fail(error.message);
   if (!deleted?.length) return fail('Nothing to detach, or you may not manage this project.');
 
   // The edition and its data stay; only the link goes. Clearing the back
   // reference lets another project pick the edition up from the list.
+  // Outreach keeps its rows in this database and has no edition to release.
+  if (deleted[0].component_key !== 'mock_interviews') {
+    revalidatePath(`/${locale}/projects/${projectId}`);
+    return ok();
+  }
+
   const { isInterviewsConfigured, createInterviewsClient } = await import('@/lib/supabase/interviews');
   const editionId = deleted[0].external_ref as string | null;
   if (editionId && isInterviewsConfigured()) {

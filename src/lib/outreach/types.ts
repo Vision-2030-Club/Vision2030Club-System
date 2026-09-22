@@ -3,15 +3,44 @@ import type { Badge } from '@/components/ui';
 
 type Tone = NonNullable<ComponentProps<typeof Badge>['tone']>;
 
-/** Where a conversation with a target stands (0065). */
-export type OutreachStatus = 'new' | 'waiting' | 'meeting' | 'confirmed' | 'rejected';
+/**
+ * Where a conversation with a target stands: the seven steps the teams'
+ * own trackers use, in the order the work flows through them (0066).
+ */
+export type OutreachStatus =
+  | 'new'
+  | 'waiting'
+  | 'in_progress'
+  | 'meeting'
+  | 'on_hold'
+  | 'confirmed'
+  | 'rejected';
 
-export const OUTREACH_STATUSES = ['new', 'waiting', 'meeting', 'confirmed', 'rejected'] as const;
+export const OUTREACH_STATUSES = [
+  'new',
+  'waiting',
+  'in_progress',
+  'meeting',
+  'on_hold',
+  'confirmed',
+  'rejected',
+] as const;
+
+/** Nothing decided either way: still worth chasing. */
+export const OUTREACH_OPEN: readonly OutreachStatus[] = [
+  'new',
+  'waiting',
+  'in_progress',
+  'meeting',
+  'on_hold',
+];
 
 export const OUTREACH_STATUS_TONES: Record<OutreachStatus, Tone> = {
   new: 'neutral',
   waiting: 'warn',
+  in_progress: 'brand',
   meeting: 'brand',
+  on_hold: 'neutral',
   confirmed: 'ok',
   rejected: 'danger',
 };
@@ -44,7 +73,9 @@ export type OutreachMemberSummary = {
   total: number;
   new_count: number;
   waiting: number;
+  in_progress: number;
   meeting: number;
+  on_hold: number;
   confirmed: number;
   rejected: number;
   conversion_pct: number | string | null;

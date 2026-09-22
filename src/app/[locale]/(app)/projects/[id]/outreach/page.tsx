@@ -9,6 +9,7 @@ import { formatScore } from '@/lib/kpi';
 import { localized } from '@/lib/format';
 import { can, getOutreachAccess } from '@/lib/outreach/access';
 import {
+  OUTREACH_OPEN,
   OUTREACH_STATUSES,
   OUTREACH_STATUS_TONES,
   type OutreachMemberSummary,
@@ -87,6 +88,7 @@ export default async function OutreachPage({
   const total = targets.length;
   const confirmed = targets.filter((x) => x.status === 'confirmed').length;
   const rejected = targets.filter((x) => x.status === 'rejected').length;
+  const open = targets.filter((x) => OUTREACH_OPEN.includes(x.status)).length;
   const conversion = total ? Math.round((1000 * confirmed) / total) / 10 : null;
 
   const hidden = (
@@ -121,6 +123,7 @@ export default async function OutreachPage({
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label={t('totalTargets')} value={String(total)} />
+        <StatTile label={t('open')} value={String(open)} />
         <StatTile label={t('statuses.confirmed')} value={String(confirmed)} tone={confirmed > 0 ? 'ok' : undefined} />
         <StatTile label={t('statuses.rejected')} value={String(rejected)} tone={rejected > 0 ? 'danger' : undefined} />
         <StatTile label={t('conversion')} value={conversion === null ? '—' : `${formatScore(conversion)}%`} />
@@ -289,6 +292,7 @@ export default async function OutreachPage({
                 <th className="px-4 py-2.5 text-start font-medium">{t('member')}</th>
                 <th className="px-4 py-2.5 text-start font-medium">{t('total')}</th>
                 <th className="px-4 py-2.5 text-start font-medium">{t('statuses.waiting')}</th>
+                <th className="px-4 py-2.5 text-start font-medium">{t('statuses.in_progress')}</th>
                 <th className="px-4 py-2.5 text-start font-medium">{t('statuses.meeting')}</th>
                 <th className="px-4 py-2.5 text-start font-medium">{t('statuses.confirmed')}</th>
                 <th className="px-4 py-2.5 text-start font-medium">{t('statuses.rejected')}</th>
@@ -304,6 +308,7 @@ export default async function OutreachPage({
                     <td className="px-4 py-2.5 font-medium">{nameOf(row.member_id)}</td>
                     <td className="px-4 py-2.5 tabular-nums">{row.total}</td>
                     <td className="px-4 py-2.5 tabular-nums">{row.waiting}</td>
+                    <td className="px-4 py-2.5 tabular-nums">{row.in_progress}</td>
                     <td className="px-4 py-2.5 tabular-nums">{row.meeting}</td>
                     <td className="px-4 py-2.5 tabular-nums">{row.confirmed}</td>
                     <td className="px-4 py-2.5 tabular-nums">{row.rejected}</td>

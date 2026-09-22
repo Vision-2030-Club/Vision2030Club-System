@@ -192,7 +192,7 @@
     "kpiHidden": "You do not have permission to see this project’s KPI figures.",
     "noPmsAvailable": "Nobody holds the Project Manager role yet — assign it on a member's profile first.",
     "component": "Component",
-    "componentHint": "A whole system this project carries, with its own data: Mock Interviews, or Outreach.",
+    "componentHint": "Whole systems this project carries, with their own data: Mock Interviews, Outreach, or both.",
     "component_mock_interviews": "Mock Interviews",
     "openComponent": "Open →",
     "componentNoAccess": "You are not on this component’s roster.",
@@ -201,7 +201,7 @@
     "componentNone": "No component attached.",
     "detachComponent": "Detach",
     "detachComponentTitle": "Detach this component?",
-    "detachComponentBody": "The button disappears for everyone. Nothing is deleted: attaching it again finds the same edition and its data.",
+    "detachComponentBody": "The button disappears for everyone. Nothing is deleted: attaching it again finds the same data.",
     "componentEdition": "Edition",
     "componentEditionNew": "Start a new edition",
     "component_outreach": "Outreach",
@@ -1048,7 +1048,9 @@
       "waiting": "Waiting for response",
       "meeting": "Meeting scheduled",
       "confirmed": "Confirmed",
-      "rejected": "Rejected"
+      "rejected": "Rejected",
+      "in_progress": "In progress",
+      "on_hold": "On hold"
     },
     "empty": "No targets yet.",
     "noTypes": "Add a type first, under Types below.",
