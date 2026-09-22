@@ -2,9 +2,9 @@ import 'server-only';
 import { getAccessToken } from './auth';
 
 /**
- * A live, read-only mirror of one interview edition's floor: every booked
- * slot, across every room and day, kept as one Google Sheet a link can be
- * shared to — one tab per day. Nothing here reads FROM the sheet — see the
+ * A live mirror of one interview edition's floor: every booked slot, across
+ * every room and day, kept as one Google Sheet — one tab per day — that the
+ * club's Google account owns and shares by name. Nothing here reads FROM the sheet — see the
  * design note in lib/interviews/floorSheet.ts for why this is one-way.
  */
 
@@ -22,7 +22,7 @@ async function googleFetch(base: string, path: string, init: RequestInit = {}) {
     },
   });
 
-  const body = await response.json().catch(() => null);
+  const body = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     const message = body?.error?.message ?? `Google returned ${response.status}`;
     throw new Error(message);
@@ -35,23 +35,44 @@ function quoted(title: string): string {
   return `'${title.replace(/'/g, "''")}'`;
 }
 
-/** Creates a new spreadsheet and makes it viewable by anyone with the link. */
+/**
+ * Creates a new spreadsheet. It belongs to the club's connected Google
+ * account and is shared with NOBODY else by default: the sheet holds every
+ * candidate's name, phone number and a link to their CV, so who may open it
+ * is a decision an organizer makes by name in Google's own Share dialog,
+ * not something a URL grants to whoever forwards it.
+ */
 export async function createFloorSheet(title: string): Promise<{ id: string; url: string }> {
   const created = await googleFetch(SHEETS_API, '/spreadsheets', {
     method: 'POST',
     body: JSON.stringify({ properties: { title } }),
   });
   const id = created.spreadsheetId as string;
-
-  // "Anyone with the link" rather than naming people: the sheet has no
-  // write access either way (see below), and this is what makes sharing it
-  // as simple as pasting the URL.
-  await googleFetch(DRIVE_API, `/files/${encodeURIComponent(id)}/permissions`, {
-    method: 'POST',
-    body: JSON.stringify({ type: 'anyone', role: 'reader' }),
-  });
-
   return { id, url: `https://docs.google.com/spreadsheets/d/${id}/edit` };
+}
+
+/**
+ * Removes any "anyone with the link" permission from a sheet. Sheets created
+ * before this rule were shared that way; every sync calls this, so an old
+ * sheet is closed the first time the floor changes after the deploy, and a
+ * permission someone adds by hand later is undone the same way. Named
+ * people and groups are left alone.
+ */
+export async function revokeLinkSharing(spreadsheetId: string): Promise<void> {
+  const data = await googleFetch(
+    DRIVE_API,
+    `/files/${encodeURIComponent(spreadsheetId)}/permissions?fields=permissions(id,type)`,
+  );
+  const open = ((data.permissions ?? []) as { id: string; type: string }[]).filter(
+    (p) => p.type === 'anyone' || p.type === 'domain',
+  );
+  for (const permission of open) {
+    await googleFetch(
+      DRIVE_API,
+      `/files/${encodeURIComponent(spreadsheetId)}/permissions/${encodeURIComponent(permission.id)}`,
+      { method: 'DELETE' },
+    );
+  }
 }
 
 export type SheetTab = { sheetId: number; title: string };

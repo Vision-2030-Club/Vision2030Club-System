@@ -43,7 +43,9 @@ next-env.d.ts
 
 # Agent skills, installed per-developer rather than shared
 /.agents/
-/.claude/
+# Claude Code: personal settings and local skills stay out; the shared rules go in.
+/.claude/*
+!/.claude/rules/
 /skills-lock.json
 
 # Real member data — national IDs, phones, emails for ~100 people.

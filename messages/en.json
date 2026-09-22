@@ -739,7 +739,7 @@
       "notes": "How this works",
       "notesBody": "Applications and booking follow the windows above. A student who applies twice with the same email updates their form until HR decides or they book. Organizers move students through the stages on the Floor tab. Every change is logged with who made it; nothing is ever deleted.",
       "floorSheet": "Live Google Sheet",
-      "floorSheetHint": "A mirror of every booked slot, across every room and day, kept in sync automatically. The Stage column is editable in the Sheet — press “Pull from Sheet” to bring those changes back in. Requires the club's Google account to be connected under Admin → Google.",
+      "floorSheetHint": "A mirror of every booked slot, across every room and day, kept in sync automatically. The Stage column is editable in the Sheet — press “Pull from Sheet” to bring those changes back in. Requires the club's Google account to be connected under Admin → Google. The sheet holds names, phone numbers and CV links: it is shared with nobody by default, so open it from that account and share it with named people only. Link sharing is switched off again on every sync.",
       "floorSheetNone": "Not created yet — it appears the first time the floor changes, or press Sync now.",
       "floorSheetSync": "Sync now",
       "floorSheetPull": "Pull from Sheet",
@@ -786,7 +786,9 @@
       "roomEnd": "Ends",
       "deletedSection": "Deleted rooms ({count})",
       "companyName": "Company name",
-      "companyNameHint": "Defaults to the room name if left blank"
+      "companyNameHint": "Defaults to the room name if left blank",
+      "companyNameAr": "Company name (Arabic)",
+      "interviewerSide": "Interviewer link and PIN"
     },
     "people": {
       "add": "Add",
@@ -955,6 +957,7 @@
       "wrong_pin": "Wrong PIN.",
       "feedback_sent": "This feedback has already been sent to the student.",
       "missing_phone": "Enter a phone number.",
+      "use_personal_link": "You applied with your email. Use the personal link you were given, not this room link.",
       "closed": "This room is no longer open."
     },
     "student": {
@@ -1016,7 +1019,7 @@
       "name": "Name",
       "phone": "Phone number",
       "cvFile": "CV (PDF, up to 5 MB)",
-      "cvHint": "Optional if you already sent one — attaching a new one replaces it.",
+      "cvHint": "Optional if you already sent one. A CV already on file is kept.",
       "submit": "Continue",
       "notAccepted": "You have not been accepted for this company yet. Check back later, or contact the club."
     }

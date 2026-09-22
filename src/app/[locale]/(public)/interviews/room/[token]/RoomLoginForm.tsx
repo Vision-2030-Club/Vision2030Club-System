@@ -38,7 +38,7 @@ export function RoomLoginForm({ locale, token }: { locale: string; token: string
       </div>
       <div>
         <Label htmlFor="cv">{t('room.cvFile')}</Label>
-        <Input id="cv" name="cv" type="file" accept="application/pdf,.pdf" required />
+        <Input id="cv" name="cv" type="file" accept="application/pdf,.pdf" />
         <p className="mt-1 text-xs text-ink-muted">{t('room.cvHint')}</p>
       </div>
 
