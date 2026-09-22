@@ -1242,9 +1242,16 @@ loaded. What changed:
 - **A project may carry two components.** `project_components` is keyed on
   (project_id, component_key) now. افترض runs Mock Interviews AND its own
   outreach list of 109 companies, sponsors and workshops. The project page
-  lists components rather than showing one, detaching takes a
-  `component_key`, and the sidebar names an outreach button
-  `<project> · Outreach` so two buttons on one project are told apart.
+  lists components rather than showing one, and detaching takes a
+  `component_key`.
+- **The menu lists PROJECTS, not components.** A component is something a
+  project carries, so the way into one is its project's page; a component
+  never puts a button in the sidebar. Every project the viewer may see gets
+  one, ordered active → planned → completed → cancelled and then by name, so
+  the April archive sorts to the bottom instead of vanishing. Which projects
+  come back is the `projects` policy's answer, not a filter in the layout.
+  Mock Interviews still takes over the whole shell inside its own pages —
+  that is driven by the URL, so it is unaffected.
 - **`scripts/lib/xlsx.mjs` had a real bug.** An empty cell is written
   self-closing (`<c r="G1" s="3"/>`), and the cell regex only matched the
   `<c …>…</c>` form, so an empty cell swallowed the next one and every value

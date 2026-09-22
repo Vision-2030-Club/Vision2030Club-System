@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link, redirect } from '@/i18n/navigation';
 import { getMyMember, getMyPermissions } from '@/lib/auth/session';
-import { can, componentHref, getMyComponentAccess } from '@/lib/interviews/access';
+import { can, getMyComponentAccess } from '@/lib/interviews/access';
 import { createClient } from '@/lib/supabase/server';
 import { signAvatar } from '@/lib/avatars';
 import { AppShell, type ComponentShell } from '@/components/AppShell';
@@ -53,11 +53,18 @@ export default async function AppLayout({
    * of every single navigation. `cache()` in lib/auth/session.ts still dedupes
    * them for the page itself.
    */
-  const [member, permissions, components] = await Promise.all([
+  const supabase = await createClient();
+  const [member, permissions, components, { data: projectRows }] = await Promise.all([
     getMyMember(),
     getMyPermissions(),
     // Which project components (Mock Interviews) this person may open.
     getMyComponentAccess(),
+    /*
+     * The projects this person may see — one menu button each. The policy on
+     * `projects` decides which come back, so this needs no filter of its own:
+     * a Member gets the projects they are on, the Presidency gets all of them.
+     */
+    supabase.from('projects').select('id, name_en, name_ar, status').order('name_en'),
   ]);
 
   if (!member) {
@@ -80,26 +87,44 @@ export default async function AppLayout({
   const isProjectManager = member!.role_key === 'project_manager';
 
   /*
-   * A project that carries a component gets its own button, named after the
-   * project, for exactly the people the club database says may enter it
-   * (0062: its managers, its organizers, HR). Inside, the sidebar becomes
-   * that component's pages — filtered by the role the club gave this person.
+   * A button per PROJECT, not per component. A component is something a
+   * project carries, so it is opened from its project's page rather than from
+   * the menu — otherwise a project with two of them takes three lines of the
+   * sidebar and the project itself is the one nobody can find.
+   *
+   * Live work first; an archived edition sorts to the bottom rather than
+   * disappearing, because browsing it is the whole reason it is kept.
    */
-  // A project carrying both components gets two buttons, so the outreach one
-  // says which it is; on its own it would just repeat the project's name.
-  const tOutreach = await getTranslations('outreach');
-  const componentItems: NavItem[] = components.map((component) => {
-    const name = locale === 'ar' ? component.name_ar : component.name_en;
-    return {
-      href: componentHref(component.project_id, component.component_key),
-      label: component.component_key === 'outreach' ? `${name} · ${tOutreach('title')}` : name,
-      icon: component.component_key === 'outreach' ? 'company' : 'interviews',
+  const PROJECT_ORDER: Record<string, number> = {
+    active: 0,
+    planned: 1,
+    completed: 2,
+    cancelled: 3,
+  };
+  const projectItems: NavItem[] = (
+    (projectRows ?? []) as { id: string; name_en: string; name_ar: string; status: string }[]
+  )
+    .slice()
+    .sort(
+      (a, b) =>
+        (PROJECT_ORDER[a.status] ?? 9) - (PROJECT_ORDER[b.status] ?? 9) ||
+        a.name_en.localeCompare(b.name_en),
+    )
+    .map((project) => ({
+      href: `/projects/${project.id}`,
+      label: locale === 'ar' ? project.name_ar : project.name_en,
+      icon: 'projects',
       show: true,
-    };
-  });
+    }));
 
   // Only Mock Interviews is a world of its own (own pages, own brand).
   // Outreach is one page inside the club shell.
+  /*
+   * Mock Interviews is still a world of its own: inside its pages the whole
+   * shell becomes that component's, brand and all. That is driven by the URL
+   * rather than by a menu button, so it keeps working now the buttons are
+   * gone — the way in is the project's page.
+   */
   const componentShells: ComponentShell[] = components
     .filter((component) => component.component_key === 'mock_interviews')
     .map((component) => {
@@ -158,6 +183,7 @@ export default async function AppLayout({
         icon: 'projects',
         show: canDo('projects.view') && !isProjectManager,
       },
+      ...projectItems,
       { href: '/tasks', label: t('tasks'), icon: 'tasks', show: canDo('tasks.view') },
       {
         href: '/requests',
@@ -178,7 +204,6 @@ export default async function AppLayout({
       { href: '/rooms', label: t('rooms'), icon: 'rooms', show: canDo('rooms.book') },
       // §8: View KPI is its own permission — nothing else unlocks this page.
       { href: '/kpi', label: t('kpi'), icon: 'kpi', show: canDo('kpi.view') },
-      ...componentItems,
       {
         href: '/admin',
         label: t('admin'),
