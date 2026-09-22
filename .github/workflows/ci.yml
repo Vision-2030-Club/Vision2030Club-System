@@ -1,0 +1,24 @@
+# Runs on every pull request and on main. Branch protection requires the
+# "checks" job to pass before a pull request can merge. It type-checks and
+# lints; the full build is what Vercel's preview deployment already does for
+# every branch, with the real environment variables.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  checks:
+    name: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
