@@ -1,7 +1,7 @@
 import 'server-only';
 import { after } from 'next/server';
 import { GoogleNotConnectedError, isGoogleConfigured } from '@/lib/google/auth';
-import { addTab, createFloorSheet, deleteOtherTabs, listTabs, readTab, renameTab, writeTab } from '@/lib/google/sheets';
+import { addTab, createFloorSheet, deleteOtherTabs, listTabs, readTab, renameTab, revokeLinkSharing, writeTab } from '@/lib/google/sheets';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { signCvLong } from '@/lib/interviews/cv';
 import type { Actor } from '@/lib/interviews/access';
@@ -487,6 +487,7 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
   const days = sessionDays(sessions); // sorted 'YYYY-MM-DD', one per calendar day with a session
 
   const spreadsheetId = await ensureFloorSheet(db, edition);
+  await revokeLinkSharing(spreadsheetId);
   const tabs = await listTabs(spreadsheetId);
 
   if (days.length === 0) {
@@ -595,6 +596,35 @@ export async function pullFloorSheetStages(
 }
 
 /**
+ * Syncs in flight, per edition, on this server instance. A rebuild is a
+ * dozen Google calls; two bookings seconds apart used to start two rebuilds
+ * that raced each other over the same tabs (both claiming the spare tab,
+ * one deleting what the other had just written). Now a second request that
+ * arrives while one is running only leaves a note, and the running one goes
+ * round once more when it finishes — so the sheet ends up reflecting the
+ * latest state, with at most two rebuilds for any burst.
+ */
+const inFlight = new Map<string, { again: boolean }>();
+
+async function syncCoalesced(editionId: string): Promise<void> {
+  const running = inFlight.get(editionId);
+  if (running) {
+    running.again = true;
+    return;
+  }
+  const state = { again: false };
+  inFlight.set(editionId, state);
+  try {
+    do {
+      state.again = false;
+      await syncFloorSheet(editionId);
+    } while (state.again);
+  } finally {
+    inFlight.delete(editionId);
+  }
+}
+
+/**
  * Fire-and-forget, after the response has gone out — same pattern as
  * kickEmailDelivery. A Google hiccup (not connected yet, a revoked token,
  * a rate limit) must never fail the booking action that triggered it; it is
@@ -603,7 +633,7 @@ export async function pullFloorSheetStages(
 export function kickFloorSheetSync(editionId: string): void {
   after(async () => {
     try {
-      await syncFloorSheet(editionId);
+      await syncCoalesced(editionId);
     } catch (error) {
       if (error instanceof GoogleNotConnectedError) return;
       console.error('[interviews/floorSheet] sync failed', error);

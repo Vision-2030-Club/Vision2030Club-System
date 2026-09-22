@@ -1083,6 +1083,76 @@ can pick it up. Still to do by a person: Resend (API key + verified domain,
 then `RESEND_API_KEY` and `EMAIL_FROM` in Vercel and one more redeploy), and
 the Pro upgrade of the organization.
 
+### The room flow and the floor sheet (merged 2026-09-19, reviewed the same day)
+
+Pull request #1, 23 commits from a teammate's fork, merged straight into
+`main` without review. It adds a SECOND way into the interviews, next to the
+apply form → HR selection → personal link flow decided on 2026-09-16:
+
+- **The room flow (0005).** Each room is a company + a physical room created
+  together by `createRoomAction` (Rooms tab, formerly Companies), with that
+  one day's 15-minute session. The company gets a `candidate_token`, a
+  public link `/interviews/room/<token>` where a candidate types a name, a
+  phone and optionally a CV. HR pastes accepted phone numbers per room
+  (`accept_phone`); a candidate whose phone is on the list is sent to their
+  personal `/interviews/s/<token>` page to book. `applications.email` is
+  nullable now; rooms created this way have `is_hidden` doubling as
+  "deleted" (soft, restorable from the Rooms tab). The slot picker shows a
+  room's whole day, taken times greyed. `rooms(edition_id, name)` is no
+  longer unique (0007).
+- **The floor sheet (0006).** One Google Sheet per edition, rebuilt after
+  every booking/stage change (`kickFloorSheetSync`, fire-and-forget) and on
+  *Sync now* in Settings; one tab per day, two rooms per row, a hidden
+  booking-id column. Its Status column is the one thing read BACK, and only
+  when someone presses *Pull from Sheet*. Needs the club's Google account
+  (Admin → Google) reconnected once for the new `drive.file` scope.
+- **0008 dropped the "cannot book a past time" rule** for testing.
+
+**Review on 2026-09-19 (`0009_room_flow_hardening.sql` + code):**
+
+- Phone numbers are normalised (`app.normalise_phone`: digits only, Saudi
+  international prefixes folded to the local `05…` form) before storing and
+  comparing; the unique index on phone became a plain expression index, so
+  two applications sharing a number, or the April 2026 import, can no longer
+  fail a migration or an apply-form submit with a raw database error.
+  `app.application_by_phone` picks the fullest record (one with an email),
+  then the newest.
+- `room_login` refuses (`use_personal_link`) when the phone belongs to an
+  application that came through the apply form, and never overwrites an
+  existing name or CV — it used to hand out anybody's personal token, name
+  and CV to whoever typed their phone number.
+- The past-time rule is back for **active** editions (`app.refuse_past_slot`);
+  a **draft** edition ignores the clock so rooms can still be tried out
+  against today's date. Set the edition *Active* for the event.
+- The sheet is no longer shared "anyone with the link" (it holds names,
+  phones and 30-day CV links). `revokeLinkSharing` runs on every sync and
+  also closes sheets created before this; share it by name from the club's
+  Google account. Concurrent syncs of one edition are coalesced per server
+  instance (`syncCoalesced`) so two bookings seconds apart no longer race
+  over the same tabs.
+- The Rooms tab again shows each company's interviewer link, PIN and *New
+  link* (behind *Interviewer link and PIN*), and takes an Arabic company
+  name, so the apply-form flow stays manageable.
+
+**Open decision for the club (not taken in code):** run the event on the
+room flow (phone list at the door), on the apply-form flow (HR selects
+applicants, students get a personal link by email), or both. Until it is
+taken both work side by side. The phone-only door is, by design, only as
+safe as HR's list: anyone who knows an accepted person's number can act as
+them there. If the room flow is chosen for real, add a second factor (a
+PIN HR hands out, or an SMS code) before the event.
+
+**Migrations 0005–0009 have NOT been confirmed applied to the interviews
+project `qadhnttgtytnibgumrax`** (this machine cannot reach port 5432, and
+the reviewer had no read access). Until they run, room links 404, the
+accepted-phones lists stay empty, new rooms get no candidate link, and the
+sheet cannot remember its id — nothing crashes, the features just do
+nothing. Apply them in order with `npm run db:push -- --target interviews`
+from a network where 5432 works, or paste each file into the dashboard's
+SQL editor and insert its name into `schema_migrations` as was done for
+0001–0004. The teammate's `scripts/interviews-tests.mjs` coverage was not
+extended; the room flow is untested by script.
+
 ### Verified
 
 The four interviews migrations and every function were driven through an
