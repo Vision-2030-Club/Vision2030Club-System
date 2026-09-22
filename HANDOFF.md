@@ -1146,15 +1146,21 @@ after the migrations are applied.
   `simulation-data/kpi-simulation.json` (gitignored — real names and grades;
   built from the five PDFs on 2026-09-21 with the parser kept in the session
   scratchpad, rebuild it from the sheets if lost), matches members, teams
-  and projects by name, refuses to write while anything is unmatched, tags
-  every row with `[simulation kpi-sheets-2026-09]`, records ids in
+  and projects by name, refuses to write while a TASK's member or project
+  is unmatched (an outreach owner who is not a club member is loaded with
+  no owner and the sheet's name in the notes), tags every row with
+  `[simulation kpi-sheets-2026-09]`, records ids in
   `simulation-data/last-run.json`, and `--undo` removes exactly those rows.
   Dry run by default; `--yes` writes. The sheet names the projects as
   قروش, افترض, سين, خطى المملكة, الإرشاد المهني and النادي (team-level);
   the dry run prints which rows it could not place.
 
-**State on 2026-09-21:** code on branch `kpi-simulation` (pull request);
-migrations 0063–0065 NOT yet applied; the seed not yet run. Order: merge,
+**State on 2026-09-22:** migrations 0063–0065 APPLIED to the club database
+(the lead ran `npm run db:push` from the branch); code on branch
+`kpi-simulation` (pull request #5); the seed's dry run matched all 22 tasks
+and 109 targets — note the sheets' "قروش" is the Arabic name of the Shark
+Tank project itself, and Bayan Alasaaf / Abdullah Alsabti are not club
+members. The write (`-- --yes`) is next. Order: merge,
 apply 0063–0065 in the SQL editor (or `npm run db:push` where 5432 is
 reachable), `npm run kpi:simulate` (dry), fix names, `-- --yes`, then walk
 the directors through the KPI page, each project's Outreach page, and the

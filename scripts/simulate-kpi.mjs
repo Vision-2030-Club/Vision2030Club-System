@@ -240,6 +240,7 @@ async function main() {
   };
 
   const problems = [];
+  const notMembers = new Map();
   const plan = { tasks: [], targets: [], types: [], components: [] };
 
   // ---- tasks -------------------------------------------------------------
@@ -327,13 +328,18 @@ async function main() {
     const project = projectByName.get(row.project);
     if (!project) continue;
     if (/example/i.test(row.target)) continue;
+    // The sheets name people who are not club members (a graduate, a friend
+    // of the project). That is not an error: the target is loaded with no
+    // owner and the sheet's name kept in its notes, so nothing is lost and
+    // a manager can hand it to a member later.
     let owner = null;
+    let ownerNote = '';
     if (row.member) {
       owner = findMember(members, row.member, null);
       if (!owner || owner.ambiguous) {
-        problems.push(`outreach #${i + 1} "${row.target}": member "${row.member}" ${owner?.ambiguous ? 'is ambiguous' : 'not found'}`);
-        if (!SKIP_UNMATCHED) continue;
+        notMembers.set(row.member, (notMembers.get(row.member) ?? 0) + 1);
         owner = null;
+        ownerNote = ` · sheet owner: ${row.member}`;
       }
     }
     plan.targets.push({
@@ -342,7 +348,7 @@ async function main() {
       name: row.target.normalize('NFKC'),
       owner_id: owner?.id ?? null,
       status: row.status ?? 'new',
-      notes: TAG,
+      notes: `${TAG}${ownerNote}`,
       created_by: owner?.id ?? managerOf(project.id)?.id ?? fallback?.id ?? null,
     });
   }
@@ -357,6 +363,11 @@ async function main() {
   const byOwner = new Map();
   for (const x of plan.targets) byOwner.set(x.owner_id, (byOwner.get(x.owner_id) ?? 0) + 1);
   console.log(`  outreach owners: ${[...byOwner.entries()].map(([id, n]) => `${members.find((m) => m.id === id)?.name_en ?? 'nobody'}=${n}`).join(', ')}`);
+  if (notMembers.size) {
+    console.log(
+      `  named in the sheet but not club members (kept in the notes, no owner): ${[...notMembers.entries()].map(([name, n]) => `${name} (${n})`).join(', ')}`,
+    );
+  }
 
   if (problems.length) {
     console.log(`\n${problems.length} rows could not be matched:`);
