@@ -25,6 +25,7 @@
     "db:components": "node --env-file=.env.local scripts/component-tests.mjs",
     "interviews:import": "node --env-file=.env.local scripts/import-mock-interviews.mjs",
     "interviews:cron": "node --env-file=.env.local scripts/interviews-cron-setup.mjs",
+    "kpi:build": "node scripts/build-kpi-simulation.mjs",
     "kpi:simulate": "node --env-file=.env.local scripts/simulate-kpi.mjs"
   },
   "dependencies": {

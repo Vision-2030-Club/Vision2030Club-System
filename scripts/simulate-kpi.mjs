@@ -12,7 +12,8 @@
  *                                            who confirms a task when its team has
  *                                            no Director and its project no manager
  *
- * Input: simulation-data/kpi-simulation.json — built from the five sheet PDFs,
+ * Input: simulation-data/kpi-simulation.json — written by
+ * `npm run kpi:build` from the workbooks in "Development VC2030", and
  * gitignored because it names real people and their grades. Shape:
  *
  *   { "projects": { "<name>": { "types": [[key, name_en, name_ar], …] } },
@@ -115,7 +116,7 @@ const fold = (s) =>
     .trim();
 
 function findMember(members, name, teamKeyHint) {
-  const wanted = fold(name);
+  const wanted = fold(ALIASES[fold(name)] ?? name);
   if (!wanted) return null;
   const parts = wanted.split(' ');
   const scored = members
@@ -169,6 +170,19 @@ const addDays = (day, n) => {
   return d.toISOString().slice(0, 10);
 };
 const QUALITY = { excellent: 'excellent', 'very good': 'very_good', good: 'good', poor: 'poor' };
+
+/*
+ * People the sheets write under a name the club database does not use — a
+ * nickname, a first name spelled the other way, a missing family name. Each
+ * one was checked against the directory by hand before being put here; a
+ * name that is merely similar does NOT belong in this list, because an
+ * assignee is what a KPI score hangs on.
+ */
+const ALIASES = {
+  'sarah albrahim': 'Sara Saleh Albrahim',
+  'masheal bin saeed': 'Mashael Bin saeed',
+  halaa: 'Hala Wael Albuti',
+};
 
 // ---------------------------------------------------------------------------
 // Undo
@@ -251,16 +265,22 @@ async function main() {
       problems.push(`${label}: no team called ${row.team}`);
       continue;
     }
+    /*
+     * A sheet may name somebody the club has no record of — a graduate, a
+     * volunteer, or "HR Team" meaning the team rather than a person. The
+     * task still happened and still counts for its project, so it is loaded
+     * with nobody holding it and the sheet's name kept in the description.
+     * It is then absent from every personal KPI, which is the honest answer:
+     * a score has to belong to someone.
+     */
     let member = null;
+    let memberNote = '';
     if (row.member) {
       member = findMember(members, row.member, team.key);
-      if (!member) {
-        problems.push(`${label}: member "${row.member}" not found`);
-        continue;
-      }
-      if (member.ambiguous) {
-        problems.push(`${label}: "${row.member}" matches several: ${member.ambiguous.map((m) => m.name_en).join(', ')}`);
-        continue;
+      if (!member || member.ambiguous) {
+        notMembers.set(row.member, (notMembers.get(row.member) ?? 0) + 1);
+        member = null;
+        memberNote = ` · sheet member: ${row.member}`;
       }
     }
     let project = null;
@@ -286,13 +306,13 @@ async function main() {
     plan.tasks.push({
       label,
       title: row.title,
-      description: `${TAG} ${row.team} sheet${row.member ? ` · ${row.member}` : ''}`,
+      description: `${TAG} ${row.team} sheet${memberNote}`,
       project_id: project?.id ?? null,
       team_id: project ? null : team.id,
       due_date: due ?? null,
       created_by: confirmer?.id ?? member?.id ?? null,
       // "Not Started" is posted for claiming; anything else is held.
-      assignee: status === 'not started' ? null : member?.id ?? null,
+      assignee: status === 'not started' ? null : (member?.id ?? null),
       history: finished
         ? {
             p_assigned_at: at(row.assigned, 10),
@@ -320,9 +340,11 @@ async function main() {
     }
     projectByName.set(name, project);
     plan.components.push(project.id);
-    for (const [key, name_en, name_ar] of data.projects[name].types) {
-      plan.types.push({ project_id: project.id, key, name_en, name_ar });
-    }
+    // Kept in the order the workbook lists them, not alphabetical: that is
+    // the order the team reads its own sheet in.
+    data.projects[name].types.forEach(([key, name_en, name_ar], i) => {
+      plan.types.push({ project_id: project.id, key, name_en, name_ar, sort_order: (i + 1) * 10 });
+    });
   }
   for (const row of data.outreach ?? []) {
     const project = projectByName.get(row.project);
@@ -365,7 +387,9 @@ async function main() {
   console.log(`  outreach owners: ${[...byOwner.entries()].map(([id, n]) => `${members.find((m) => m.id === id)?.name_en ?? 'nobody'}=${n}`).join(', ')}`);
   if (notMembers.size) {
     console.log(
-      `  named in the sheet but not club members (kept in the notes, no owner): ${[...notMembers.entries()].map(([name, n]) => `${name} (${n})`).join(', ')}`,
+      `
+  named in the sheets but not matched to a club member — loaded with nobody holding them, the name kept in the row:
+    ${[...notMembers.entries()].sort((a, b) => b[1] - a[1]).map(([name, n]) => `${name} (${n})`).join(', ')}`,
     );
   }
 
@@ -402,21 +426,24 @@ async function main() {
   }
   console.log(`  ${created.tasks.length} tasks written`);
 
+  // A project may carry Outreach alongside another component (0066), so the
+  // only thing that stops an attach is Outreach already being there.
   const existingComponents = await get('project_components?select=project_id,component_key');
   for (const project_id of plan.components) {
-    const has = existingComponents.find((c) => c.project_id === project_id);
-    if (has && has.component_key !== 'outreach') {
-      console.log(`  project ${project_id} already carries ${has.component_key}; outreach not attached`);
-      continue;
-    }
-    if (!has) {
-      await post('project_components', { project_id, component_key: 'outreach', attached_by: fallback?.id ?? null }, 'return=minimal');
-      created.components.push(project_id);
-    }
+    const has = existingComponents.some(
+      (c) => c.project_id === project_id && c.component_key === 'outreach',
+    );
+    if (has) continue;
+    await post(
+      'project_components',
+      { project_id, component_key: 'outreach', attached_by: fallback?.id ?? null },
+      'return=minimal',
+    );
+    created.components.push(project_id);
   }
   for (const type of plan.types) {
     try {
-      await post('outreach_types', { ...type, sort_order: 100 }, 'return=minimal');
+      await post('outreach_types', type, 'return=minimal');
       created.types.push({ project_id: type.project_id, key: type.key });
     } catch (error) {
       if (!/duplicate|23505/.test(String(error.message))) throw error;

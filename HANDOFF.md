@@ -1225,17 +1225,62 @@ after the migrations are applied.
   قروش, افترض, سين, خطى المملكة, الإرشاد المهني and النادي (team-level);
   the dry run prints which rows it could not place.
 
-**State on 2026-09-22:** migrations 0063–0065 APPLIED to the club database
-(the lead ran `npm run db:push` from the branch); code on branch
-`kpi-simulation` (pull request #5); the seed's dry run matched all 22 tasks
-and 109 targets — note the sheets' "قروش" is the Arabic name of the Shark
-Tank project itself, and Bayan Alasaaf / Abdullah Alsabti are not club
-members. The write (`-- --yes`) is next. Order: merge,
-apply 0063–0065 in the SQL editor (or `npm run db:push` where 5432 is
-reachable), `npm run kpi:simulate` (dry), fix names, `-- --yes`, then walk
-the directors through the KPI page, each project's Outreach page, and the
-questions at the end of the gap report. Open decision, theirs: whether
-hours are asked on submit or logged as the work happens.
+**State on 2026-09-22 (second pass).** The first pass was built from five of
+the workbooks, uploaded as PDFs from a phone. The folder
+`Development VC2030/` (gitignored) holds THIRTEEN, and the whole set is now
+loaded. What changed:
+
+- **`0066_outreach_pipeline.sql`.** The teams write nine status words; two
+  pairs are one thing spelled twice, and "Contacted" (Career Guidance's
+  dialect) is "Waiting for Response" (everyone else's). What is left is a
+  seven-step pipeline, so `in_progress` and `on_hold` joined the enum, in
+  place, keeping pipeline order. The two summary views are DROPPED and
+  recreated, not replaced: `create or replace view` may append a column but
+  never rename or reorder one. They compare `status::text` because Postgres
+  refuses to use an enum value added in the same transaction, and db-push
+  wraps each migration in one.
+- **A project may carry two components.** `project_components` is keyed on
+  (project_id, component_key) now. افترض runs Mock Interviews AND its own
+  outreach list of 109 companies, sponsors and workshops. The project page
+  lists components rather than showing one, detaching takes a
+  `component_key`, and the sidebar names an outreach button
+  `<project> · Outreach` so two buttons on one project are told apart.
+- **`scripts/lib/xlsx.mjs` had a real bug.** An empty cell is written
+  self-closing (`<c r="G1" s="3"/>`), and the cell regex only matched the
+  `<c …>…</c>` form, so an empty cell swallowed the next one and every value
+  after a blank column shifted left. It read Shark Tank as 8 targets instead
+  of 154. `build-member-csv`, `import-timeline` and `import-mock-interviews`
+  share that reader, so they were reading shifted values too wherever a
+  blank cell sat mid-row. Fixed by matching both forms.
+- **`npm run kpi:build`** (`scripts/build-kpi-simulation.mjs`) turns the
+  thirteen workbooks into `simulation-data/kpi-simulation.json`. A TEAM
+  tracker is one sheet of tasks plus a Task/Hours table in columns Z and AA;
+  a PROJECT tracker is a "Raw Data" sheet of five-column blocks (Source,
+  Member, Target, Status, Type) laid side by side, found by looking for
+  "Source" along row 1. Types are read from every row including the example,
+  so a project whose list is still empty still gets its types — which is why
+  Seen has four types and no targets.
+- **Six of the eight team trackers are the same filled-in template**
+  (Finance, Content, Design, Media, PR, Tech/IT): identical dates, identical
+  Excellent/Good/Poor ladder, only the names swapped. The club chose to load
+  them anyway, so those grades sit on real people. `kpi:build` flags them in
+  its report. Only HR and Development hold logged work.
+- **A name the directory does not know no longer stops the run.** A handful
+  of sheet names are spelling variants of real members and are listed in
+  `ALIASES` in the seed, each checked by hand. The rest — graduates,
+  volunteers, "HR Team" meaning the team — load with nobody holding the row
+  and the sheet's name kept in the description or notes, so the work counts
+  for its project and for nobody's personal score.
+
+**Loaded on 2026-09-22:** 60 tasks (15 confirmed, across 2026-08 and
+2026-09, carrying hours) and 618 outreach targets over five projects —
+Career Fair 304, Shark Tank 154, Mockup Interviews 109, Kingdom Steps 51,
+Seen 0 (its sheet is an untouched template). Every row is tagged
+`[simulation kpi-sheets-2026-09]`; `npm run kpi:simulate -- --undo` removes
+exactly them, reading `simulation-data/last-run.json`.
+
+**Still open, the directors':** whether hours are asked on submit or logged
+as the work happens, and the five questions at the end of the gap report.
 
 ## Conventions to keep
 

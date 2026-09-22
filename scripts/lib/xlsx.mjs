@@ -96,8 +96,16 @@ export function openWorkbook(path) {
     const out = [];
     for (const [, rnum, body] of xml.matchAll(/<row[^>]*r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g)) {
       const cells = {};
-      for (const [, ref, attrs, inner] of body.matchAll(
-        /<c r="([A-Z]+)\d+"([^>]*)>([\s\S]*?)<\/c>/g,
+      /*
+       * Two forms, and both have to be matched here: a cell with a value is
+       * `<c r="B2" t="s"><v>7</v></c>`, an EMPTY one is written self-closing,
+       * `<c r="B2" s="3"/>`. Matching only the first form makes an empty cell
+       * run on until the next `</c>` and swallow the cell after it — so a
+       * blank column silently shifts every value to its left, which is a
+       * wrong answer rather than a missing one.
+       */
+      for (const [, ref, attrs, inner = ''] of body.matchAll(
+        /<c r="([A-Z]+)\d+"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g,
       )) {
         const v = inner.match(/<v>([\s\S]*?)<\/v>/);
         const t = inner.match(/<t[^>]*>([\s\S]*?)<\/t>/);

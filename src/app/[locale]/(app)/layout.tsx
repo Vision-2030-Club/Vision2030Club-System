@@ -85,12 +85,18 @@ export default async function AppLayout({
    * (0062: its managers, its organizers, HR). Inside, the sidebar becomes
    * that component's pages — filtered by the role the club gave this person.
    */
-  const componentItems: NavItem[] = components.map((component) => ({
-    href: componentHref(component.project_id, component.component_key),
-    label: locale === 'ar' ? component.name_ar : component.name_en,
-    icon: component.component_key === 'outreach' ? 'company' : 'interviews',
-    show: true,
-  }));
+  // A project carrying both components gets two buttons, so the outreach one
+  // says which it is; on its own it would just repeat the project's name.
+  const tOutreach = await getTranslations('outreach');
+  const componentItems: NavItem[] = components.map((component) => {
+    const name = locale === 'ar' ? component.name_ar : component.name_en;
+    return {
+      href: componentHref(component.project_id, component.component_key),
+      label: component.component_key === 'outreach' ? `${name} · ${tOutreach('title')}` : name,
+      icon: component.component_key === 'outreach' ? 'company' : 'interviews',
+      show: true,
+    };
+  });
 
   // Only Mock Interviews is a world of its own (own pages, own brand).
   // Outreach is one page inside the club shell.

@@ -73,7 +73,7 @@ export default async function ProjectPage({
     { data: splitMembers },
     { data: kpiRow },
     { data: splitKpis },
-    { data: component },
+    { data: componentRows },
     componentAccess,
   ] = await Promise.all([
     supabase
@@ -112,17 +112,24 @@ export default async function ProjectPage({
     // Empty unless the caller holds kpi.view for this project (§8).
     supabase.from('project_kpi').select('*').eq('project_id', id).maybeSingle(),
     supabase.from('project_split_kpi').select('*').eq('project_id', id),
-    // The component this project carries, if any (0062), and whether the
+    // The components this project carries (0062; two of them since 0066),
+    // and whether the viewer may open them — the button is offered only to
+    // those who can.
     // viewer may open it — the button is offered only to those who can.
     supabase
       .from('project_components')
       .select('component_key, external_ref')
       .eq('project_id', id)
-      .maybeSingle(),
+      .order('component_key'),
     getMyComponentAccess(),
   ]);
 
-  const canOpenComponent = componentAccess.some((row) => row.project_id === id);
+  const components = (componentRows ?? []) as { component_key: string; external_ref: string | null }[];
+  const has = (key: string) => components.some((c) => c.component_key === key);
+  const canOpen = (key: string) =>
+    componentAccess.some((row) => row.project_id === id && row.component_key === key);
+  // Every component the project does not already carry.
+  const attachable = (['mock_interviews', 'outreach'] as const).filter((key) => !has(key));
 
   const managerIds = new Set((managers ?? []).map((m) => m.member_id as string));
   const projectScope = await scopeFor('projects.manage');
@@ -139,7 +146,7 @@ export default async function ProjectPage({
    */
   const tInterviews = await getTranslations('interviews');
   let editionOptions: { id: string; name_en: string; name_ar: string; status: string }[] = [];
-  if (canManage && !component && isInterviewsConfigured()) {
+  if (canManage && !has('mock_interviews') && isInterviewsConfigured()) {
     const { data } = await createInterviewsClient()
       .from('editions')
       .select('id, name_en, name_ar, status')
@@ -360,36 +367,43 @@ export default async function ProjectPage({
           <h2 className="mb-1 font-semibold">{t('component')}</h2>
           <p className="mb-3 text-xs text-ink-muted">{t('componentHint')}</p>
 
-          {component ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge tone="brand">{t(`component_${component.component_key as string}`)}</Badge>
-              {canOpenComponent ? (
-                <Link
-                  href={componentHref(project.id, component.component_key as string)}
-                  className="text-sm font-medium text-brand-600 hover:underline"
-                >
-                  {t('openComponent')}
-                </Link>
-              ) : (
-                <span className="text-sm text-ink-muted">{t('componentNoAccess')}</span>
-              )}
-              {canManage ? (
-                <div className="ms-auto">
-                  <ConfirmForm
-                    action={detachComponentAction}
-                    trigger={t('detachComponent')}
-                    title={t('detachComponentTitle')}
-                    body={t('detachComponentBody')}
-                    confirmLabel={t('detachComponent')}
-                    variant="secondary"
-                  >
-                    <input type="hidden" name="locale" value={locale} />
-                    <input type="hidden" name="project_id" value={project.id} />
-                  </ConfirmForm>
-                </div>
-              ) : null}
-            </div>
-          ) : canManage ? (
+          {components.length ? (
+            <ul className="mb-4 space-y-2">
+              {components.map((component) => (
+                <li key={component.component_key} className="flex flex-wrap items-center gap-3">
+                  <Badge tone="brand">{t(`component_${component.component_key}`)}</Badge>
+                  {canOpen(component.component_key) ? (
+                    <Link
+                      href={componentHref(project.id, component.component_key)}
+                      className="text-sm font-medium text-brand-600 hover:underline"
+                    >
+                      {t('openComponent')}
+                    </Link>
+                  ) : (
+                    <span className="text-sm text-ink-muted">{t('componentNoAccess')}</span>
+                  )}
+                  {canManage ? (
+                    <div className="ms-auto">
+                      <ConfirmForm
+                        action={detachComponentAction}
+                        trigger={t('detachComponent')}
+                        title={t('detachComponentTitle')}
+                        body={t('detachComponentBody')}
+                        confirmLabel={t('detachComponent')}
+                        variant="secondary"
+                      >
+                        <input type="hidden" name="locale" value={locale} />
+                        <input type="hidden" name="project_id" value={project.id} />
+                        <input type="hidden" name="component_key" value={component.component_key} />
+                      </ConfirmForm>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {canManage && attachable.length ? (
             <ActionForm action={attachComponentAction} submitLabel={t('attachComponent')}>
               <input type="hidden" name="locale" value={locale} />
               <input type="hidden" name="project_id" value={project.id} />
@@ -397,8 +411,11 @@ export default async function ProjectPage({
                 <div>
                   <Label htmlFor="component_key">{t('componentPick')}</Label>
                   <Select id="component_key" name="component_key" required>
-                    <option value="mock_interviews">{t('component_mock_interviews')}</option>
-                    <option value="outreach">{t('component_outreach')}</option>
+                    {attachable.map((key) => (
+                      <option key={key} value={key}>
+                        {t(`component_${key}`)}
+                      </option>
+                    ))}
                   </Select>
                 </div>
                 <div>
@@ -415,9 +432,9 @@ export default async function ProjectPage({
                 </div>
               </div>
             </ActionForm>
-          ) : (
+          ) : components.length === 0 ? (
             <p className="text-sm text-ink-muted">{t('componentNone')}</p>
-          )}
+          ) : null}
         </Card>
 
         {/* ---- §3: splits ---- */}
