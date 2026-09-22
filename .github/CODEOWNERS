@@ -1,0 +1,12 @@
+# Pull requests that touch these paths automatically request a review from
+# the people listed. Database migrations and the data layer can lose the
+# club's data if they go wrong, so they always get a second pair of eyes.
+# Add teammates as "@handle" once they are members of the organization.
+
+/supabase/                      @qa7tani
+/src/lib/supabase/              @qa7tani
+/src/lib/interviews/            @qa7tani
+/src/lib/google/                @qa7tani
+/scripts/                       @qa7tani
+/.github/                       @qa7tani
+/HANDOFF.md                     @qa7tani
