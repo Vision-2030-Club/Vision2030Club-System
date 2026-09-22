@@ -398,10 +398,12 @@ export default async function ProjectPage({
                   <Label htmlFor="component_key">{t('componentPick')}</Label>
                   <Select id="component_key" name="component_key" required>
                     <option value="mock_interviews">{t('component_mock_interviews')}</option>
+                    <option value="outreach">{t('component_outreach')}</option>
                   </Select>
                 </div>
                 <div>
                   <Label htmlFor="edition_id">{t('componentEdition')}</Label>
+                  <p className="mb-1 text-xs text-ink-muted">{t('componentEditionHint')}</p>
                   <Select id="edition_id" name="edition_id" defaultValue="new">
                     <option value="new">{t('componentEditionNew')}</option>
                     {editionOptions.map((edition) => (

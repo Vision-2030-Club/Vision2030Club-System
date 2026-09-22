@@ -63,3 +63,6 @@ members-import.csv
 
 # Database backups taken by scripts/reset-for-testing.mjs — real national IDs.
 /backups/
+
+# KPI simulation input: real names and grades, never committed
+/simulation-data/

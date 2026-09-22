@@ -24,7 +24,8 @@
     "db:interviews": "node --env-file=.env.local scripts/interviews-tests.mjs",
     "db:components": "node --env-file=.env.local scripts/component-tests.mjs",
     "interviews:import": "node --env-file=.env.local scripts/import-mock-interviews.mjs",
-    "interviews:cron": "node --env-file=.env.local scripts/interviews-cron-setup.mjs"
+    "interviews:cron": "node --env-file=.env.local scripts/interviews-cron-setup.mjs",
+    "kpi:simulate": "node --env-file=.env.local scripts/simulate-kpi.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

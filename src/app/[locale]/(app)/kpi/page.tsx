@@ -17,6 +17,7 @@ import {
   riskKey,
   stateKey,
   type MemberKpi,
+  type MemberMonthKpi,
   type ProjectKpi,
   type TaskKpi,
 } from '@/lib/kpi';
@@ -69,6 +70,7 @@ export default async function KpiPage({
     { data: members },
     { data: projects },
     { data: teams },
+    { data: monthRows },
   ] = await Promise.all([
     supabase.from('member_kpi').select('*'),
     supabase.from('project_kpi').select('*'),
@@ -83,9 +85,19 @@ export default async function KpiPage({
     supabase.from('members').select('id, name_en, name_ar, team_id'),
     supabase.from('projects').select('id, name_en, name_ar'),
     supabase.from('teams').select('id, name_en, name_ar'),
+    // The month as a unit (0063): what each person finished, and the hours.
+    supabase
+      .from('member_month_kpi')
+      .select('*')
+      .order('month', { ascending: false })
+      .limit(240),
   ]);
 
   const memberKpis = (memberRows ?? []) as MemberKpi[];
+  // The six most recent months that have anything in them.
+  const monthKpis = (monthRows ?? []) as MemberMonthKpi[];
+  const recentMonths = [...new Set(monthKpis.map((m) => m.month))].slice(0, 6);
+  const monthRowsShown = monthKpis.filter((m) => recentMonths.includes(m.month));
   const projectKpis = (projectRows ?? []) as ProjectKpi[];
   const tasks = (taskRows ?? []) as TaskKpi[];
 
@@ -346,6 +358,48 @@ export default async function KpiPage({
           </tbody>
         </table>
       </Card>
+
+      {monthRowsShown.length ? (
+        <Card className="mt-4 overflow-x-auto p-0">
+          <h2 className="px-5 pt-5 font-semibold">{t('byMonth')}</h2>
+          <p className="px-5 pt-1 text-xs text-ink-muted">{t('byMonthHint')}</p>
+          <table className="mt-3 w-full text-sm">
+            <thead className="border-y border-line bg-surface-muted">
+              <tr>
+                <th className="px-4 py-2.5 text-start font-medium">{t('month')}</th>
+                <th className="px-4 py-2.5 text-start font-medium">{t('member')}</th>
+                <th className="px-4 py-2.5 text-start font-medium">{t('tasks')}</th>
+                <th className="px-4 py-2.5 text-start font-medium">{t('completed')}</th>
+                <th className="px-4 py-2.5 text-start font-medium">{t('notDone')}</th>
+                <th className="px-4 py-2.5 text-start font-medium">{t('hours')}</th>
+                <th className="px-4 py-2.5 text-start font-medium">{t('performance')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {monthRowsShown.map((m) => (
+                <tr key={`${m.month}:${m.member_id}`} className="hover:bg-surface-muted">
+                  <td className="px-4 py-2.5 ltr-nums">{m.month}</td>
+                  <td className="px-4 py-2.5">
+                    <MemberLink
+                      id={m.member_id}
+                      viewerId={me?.id}
+                      canOpenAny={canOpenProfiles}
+                      className="font-medium"
+                    >
+                      {memberName.get(m.member_id) ?? m.member_id}
+                    </MemberLink>
+                  </td>
+                  <td className="px-4 py-2.5 tabular-nums">{m.tasks}</td>
+                  <td className="px-4 py-2.5 tabular-nums">{m.completed_tasks}</td>
+                  <td className="px-4 py-2.5 tabular-nums">{m.not_done_tasks}</td>
+                  <td className="px-4 py-2.5 tabular-nums">{Number(m.hours)}</td>
+                  <td className="px-4 py-2.5 font-medium tabular-nums">{formatScore(m.performance)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      ) : null}
 
       <Card className="mt-4 overflow-x-auto p-0">
         <h2 className="px-5 pt-5 font-semibold">{t('byProject')}</h2>

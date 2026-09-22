@@ -400,6 +400,24 @@ async function main() {
     equal(`${quality} scores Quality ${expected}`, (await kpi(dana.token, id)).quality_score, expected);
   }
 
+  // Hours (0063): reported on submit, corrected on confirm, never by a PATCH.
+  const timed = await makeTeamTask('KPITEST hours', { dueInDays: 5, assignee: wael.id });
+  await rpc(wael.token, 'submit_task_for_review', { p_task: timed, p_hours: 2.5 });
+  equal('hours reported on submit are on the task', Number((await kpi(dana.token, timed)).hours), 2.5);
+  const patched = await rest(wael.token, `tasks?id=eq.${timed}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ hours: 40 }),
+  });
+  check('a plain update of hours is refused', !patched.ok || (Array.isArray(patched.body) && patched.body.length === 0), `status ${patched.status}`);
+  await rpc(dana.token, 'confirm_task', { p_task: timed, p_quality: 'good', p_hours: 3 });
+  equal('the confirmer may correct the hours', Number((await kpi(dana.token, timed)).hours), 3);
+  const months = await rest(dana.token, `member_month_kpi?member_id=eq.${wael.id}`);
+  check(
+    'member_month_kpi sums the hours of the month',
+    Array.isArray(months.body) && months.body.some((m) => Number(m.hours) >= 3),
+    JSON.stringify(months.body),
+  );
+
   // The spec's other worked example: Not Done -> 0.
   const notDone = await makeTeamTask('KPITEST not done', { dueInDays: -2, assignee: wael.id });
   const tooEarly = await makeTeamTask('KPITEST future', { dueInDays: 4, assignee: wael.id });

@@ -192,7 +192,7 @@
     "kpiHidden": "You do not have permission to see this project’s KPI figures.",
     "noPmsAvailable": "Nobody holds the Project Manager role yet — assign it on a member's profile first.",
     "component": "Component",
-    "componentHint": "A whole system this project carries, with its own data. Today: Mock Interviews.",
+    "componentHint": "A whole system this project carries, with its own data: Mock Interviews, or Outreach.",
     "component_mock_interviews": "Mock Interviews",
     "openComponent": "Open →",
     "componentNoAccess": "You are not on this component’s roster.",
@@ -203,7 +203,9 @@
     "detachComponentTitle": "Detach this component?",
     "detachComponentBody": "The button disappears for everyone. Nothing is deleted: attaching it again finds the same edition and its data.",
     "componentEdition": "Edition",
-    "componentEditionNew": "Start a new edition"
+    "componentEditionNew": "Start a new edition",
+    "component_outreach": "Outreach",
+    "componentEditionHint": "Mock Interviews only; ignored for Outreach."
   },
   "tasks": {
     "title": "Tasks",
@@ -278,7 +280,8 @@
     "createdBy": "Created by",
     "assignedOn": "Assigned",
     "confirmedOn": "Confirmed",
-    "viewTask": "View task"
+    "viewTask": "View task",
+    "hours": "Hours"
   },
   "requests": {
     "title": "Requests",
@@ -485,7 +488,11 @@
     "totalMembers": "People scored",
     "clubAverage": "Club average",
     "atRiskProjects": "Projects At Risk",
-    "chartRiskHint": "Open tasks by §4 risk tier, recomputed from today’s date."
+    "chartRiskHint": "Open tasks by §4 risk tier, recomputed from today’s date.",
+    "byMonth": "By month",
+    "byMonthHint": "The month the work was submitted, on the club’s clock. Hours are what the member reported on submitting, as corrected by the confirmer.",
+    "month": "Month",
+    "hours": "Hours"
   },
   "rooms": {
     "adminTitle": "Rooms",
@@ -1016,5 +1023,47 @@
       "submit": "Continue",
       "notAccepted": "You have not been accepted for this company yet. Check back later, or contact the club."
     }
+  },
+  "outreach": {
+    "title": "Outreach",
+    "subtitle": "Who the project is chasing, and where each conversation stands.",
+    "backToProject": "Back to the project",
+    "roles": {
+      "manager": "Manager",
+      "member": "Member",
+      "viewer": "Viewer"
+    },
+    "totalTargets": "Targets",
+    "conversion": "Conversion",
+    "addTarget": "Add a target",
+    "name": "Name",
+    "target": "Target",
+    "type": "Type",
+    "owner": "Owner",
+    "unassigned": "Nobody yet",
+    "status": "Status",
+    "notes": "Notes",
+    "statuses": {
+      "new": "Not contacted",
+      "waiting": "Waiting for response",
+      "meeting": "Meeting scheduled",
+      "confirmed": "Confirmed",
+      "rejected": "Rejected"
+    },
+    "empty": "No targets yet.",
+    "noTypes": "Add a type first, under Types below.",
+    "byMember": "By member",
+    "byType": "By type",
+    "member": "Member",
+    "total": "Total",
+    "open": "Open",
+    "deleteTitle": "Delete this target?",
+    "deleteBody": "It disappears from the list and the summaries, with its history. If the conversation is simply over, set the status to Rejected instead.",
+    "types": "Types",
+    "typesHint": "The kinds of target this project chases: sponsors, speakers, venues, sharks. A type in use cannot be removed.",
+    "addType": "Add a type",
+    "typeNameEn": "Name (English)",
+    "typeNameAr": "Name (Arabic)",
+    "sortOrder": "Order"
   }
 }

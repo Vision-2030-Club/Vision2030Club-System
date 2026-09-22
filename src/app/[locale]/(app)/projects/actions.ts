@@ -250,6 +250,32 @@ export async function attachComponentAction(
   const locale = requiredText(formData, 'locale');
   const componentKey = requiredText(formData, 'component_key');
 
+  if (componentKey === 'outreach') {
+    // Outreach (0065) lives in this database: the link row is the whole of
+    // attaching. Three starter types so the page is usable at once; managers
+    // rename or replace them on the page.
+    const me = await getMyMember();
+    if (!me) return fail('Not signed in');
+    const supabase = await createClient();
+    const { error } = await supabase.from('project_components').insert({
+      project_id: projectId,
+      component_key: componentKey,
+      external_ref: null,
+      attached_by: me.id,
+    });
+    if (error) return fail(error.message);
+    await supabase.from('outreach_types').upsert(
+      [
+        { project_id: projectId, key: 'sponsor', name_en: 'Sponsor', name_ar: 'راعٍ', sort_order: 10 },
+        { project_id: projectId, key: 'speaker', name_en: 'Speaker', name_ar: 'متحدث', sort_order: 20 },
+        { project_id: projectId, key: 'venue', name_en: 'Venue', name_ar: 'مكان', sort_order: 30 },
+      ],
+      { onConflict: 'project_id,key', ignoreDuplicates: true },
+    );
+    revalidatePath(`/${locale}/projects/${projectId}`);
+    return ok();
+  }
+
   if (componentKey !== 'mock_interviews') return fail('Unknown component.');
 
   const { isInterviewsConfigured, createInterviewsClient } = await import('@/lib/supabase/interviews');
