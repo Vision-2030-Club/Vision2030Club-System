@@ -80,7 +80,14 @@
     "clubEntry": "فعالية",
     "meeting": "اجتماع",
     "myProjects": "مشاريعي",
-    "noProjects": "لا تدير أي مشروع حتى الآن."
+    "noProjects": "لا تدير أي مشروع حتى الآن.",
+    "semesterWeek": "الأسبوع {week} من {weeks}",
+    "semesterBefore": "يبدأ {date}",
+    "semesterAfter": "انتهى {date}",
+    "semesterTasks": "اكتملت {completed} من {planned} مهمة",
+    "semesterOverdue": "{count, plural, =0 {لا متأخرات} one {مهمة واحدة متأخرة} two {مهمتان متأخرتان} few {# مهام متأخرة} many {# مهمة متأخرة} other {# مهمة متأخرة}}",
+    "semesterNext": "القادم: {title}، {date}",
+    "semesterNoNext": "لا مواعيد نادي متبقية هذا الفصل"
   },
   "members": {
     "title": "الأعضاء",
@@ -445,7 +452,12 @@
     "rooms": "القاعات",
     "roomsHint": "إضافة القاعات وضبط نافذة الحجز وحجب الأوقات.",
     "google": "جوجل",
-    "googleHint": "ربط حساب جوجل الخاص بالنادي لإنشاء روابط Meet وإرسال الدعوات."
+    "googleHint": "ربط حساب جوجل الخاص بالنادي لإنشاء روابط Meet وإرسال الدعوات.",
+    "semester": "الفصل الدراسي",
+    "semesterHint": "سمِّ الفصل الدراسي وحدّد تاريخيه. سطر الفصل في لوحة المعلومات يتبعه.",
+    "semesterName": "اسم الفصل",
+    "semesterStarts": "يبدأ في",
+    "semesterEnds": "ينتهي في"
   },
   "kpi": {
     "title": "مؤشرات الأداء",
