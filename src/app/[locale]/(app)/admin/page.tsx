@@ -1,6 +1,6 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
-import { hasPermission } from '@/lib/auth/session';
+import { hasPermission, scopeFor } from '@/lib/auth/session';
 import { Card, PageHeader } from '@/components/ui';
 
 export default async function AdminPage({
@@ -37,6 +37,14 @@ export default async function AdminPage({
       title: t('rooms'),
       hint: t('roomsHint'),
       show: await hasPermission('rooms.manage'),
+    },
+    {
+      href: '/admin/semester',
+      title: t('semester'),
+      hint: t('semesterHint'),
+      // Club scope on the calendar is what makes club dates yours to set; a
+      // Director holds the same permission for their own team only.
+      show: (await scopeFor('calendar.manage')) === 'all',
     },
     {
       href: '/admin/google',

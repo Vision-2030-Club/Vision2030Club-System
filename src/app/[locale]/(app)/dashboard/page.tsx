@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getMyMember } from '@/lib/auth/session';
 import { Badge, Card, EmptyState, PageHeader, cx } from '@/components/ui';
 import { PushNudge } from '@/components/PushNudge';
+import { SemesterLine } from '@/components/SemesterLine';
 import {
   HEALTH_TONES,
   RISK_CLASSES,
@@ -148,6 +149,10 @@ export default async function DashboardPage({
       />
 
       <PushNudge profileHref={`/members/${member!.id}`} />
+
+      {/* Which semester, how far through it, and this semester's tasks by
+          state — the frame every list below sits in. */}
+      <SemesterLine locale={locale} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* The projects this person runs, in place of a menu entry they would
