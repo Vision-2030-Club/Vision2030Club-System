@@ -20,6 +20,9 @@ type TCommon = Awaited<ReturnType<typeof getTranslations<'common'>>>;
  * questions it asks (lib/interviews/applyFields.ts). The Register tab asks
  * the same questions.
  */
+/** Asked on every form, whatever the settings say; shown so nobody goes looking for them. */
+const ALWAYS_ASKED = ['applicants.name', 'applicants.email', 'apply.cv', 'apply.companies'] as const;
+
 export function ApplicationFormCard({
   locale,
   projectId,
@@ -100,6 +103,11 @@ export function ApplicationFormCard({
         <h3 className="mb-1 text-sm font-semibold">{t('applyForm.questions')}</h3>
         <p className="mb-2 text-xs text-ink-muted">{t('applyForm.alwaysAsked')}</p>
         <div className="mb-3 flex flex-wrap gap-1">
+          {ALWAYS_ASKED.map((key) => (
+            <Badge key={key} tone="brand">
+              {t(key)}
+            </Badge>
+          ))}
           {asked.map((field) => (
             <Badge key={field} tone={fields[field] === 'required' ? 'brand' : 'neutral'}>
               {t(FIELD_LABELS[field])}
@@ -113,6 +121,15 @@ export function ApplicationFormCard({
               <input type="hidden" name="locale" value={locale} />
               <input type="hidden" name="project_id" value={projectId} />
               <div className="space-y-2">
+                {/* Not settings: the database needs these four (applyFields.ts). */}
+                {ALWAYS_ASKED.map((key) => (
+                  <div key={key} className="grid grid-cols-2 items-center gap-3">
+                    <span className="text-sm font-medium text-ink">{t(key)}</span>
+                    <span className="rounded-lg border border-dashed border-line px-3 py-2 text-sm text-ink-muted">
+                      {t('applyForm.mode.always')}
+                    </span>
+                  </div>
+                ))}
                 {APPLY_FIELDS.map((field) => (
                   <div key={field} className="grid grid-cols-2 items-center gap-3">
                     <Label htmlFor={`field_${field}`}>{t(FIELD_LABELS[field])}</Label>

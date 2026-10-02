@@ -972,12 +972,13 @@
       "closedBadge": "Closed",
       "openSettings": "Open Settings",
       "questions": "Questions on the form",
-      "alwaysAsked": "Always asked: name, email, the companies (up to the limit in Settings) and the CV. Also asked:",
+      "alwaysAsked": "Name, email, the CV and the companies (up to the limit in Settings) are always asked and always required. The rest are up to you:",
       "editQuestions": "Edit questions",
       "mode": {
         "off": "Not asked",
         "optional": "Optional",
-        "required": "Required"
+        "required": "Required",
+        "always": "Always asked"
       },
       "sheetHint": "Every application, from the link above or the Register tab, is added here as a row. Only people the club’s Google account shares it with can open it.",
       "openSheet": "Open the sheet"
