@@ -940,8 +940,10 @@ but it is the one piece not yet expressed in club time.
 ### 5. KPI follow-ups the addendum defers
 Per-split/per-PM breakdown **on a member's own profile** (§9 defers it; the
 data model already carries `split_id` on every task, so it needs no schema
-change). No rolling or per-semester KPI window — all-time only. No automatic
-notification when someone is flagged as falling behind.
+change). No rolling or per-semester KPI window — all-time only, though the semester
+itself is now a setting (`0067`, "The semester as a unit" below) that a
+windowed view can read. No automatic notification when someone is flagged
+as falling behind.
 
 One judgement call worth revisiting: §7 grants deletion to "any Director or PM
 with authority over that task" with no self-exclusion, while §2 bars them from
@@ -1288,6 +1290,39 @@ exactly them, reading `simulation-data/last-run.json`.
 
 **Still open, the directors':** whether hours are asked on submit or logged
 as the work happens, and the five questions at the end of the gap report.
+
+## The semester as a unit (2026-09-24)
+
+The Presidency asked for a full picture without the noise. The plan is an
+exceptions list on the dashboard (teams and projects off track, worst first,
+with the accountable Director or PM), a decision queue, and a weekly push
+digest, all scoped by permissions so a Director gets the same page for their
+team. Every number on it is a semester number, so the semester came first.
+
+- **`semester_settings` (`0067`).** One row: `name_en`, `name_ar`,
+  `starts_on`, `ends_on`. Seeded with the first-semester timeline the
+  calendar already carries (2026-08-08 to 2026-11-21). Anyone signed in
+  reads it; the update policy asks `app.can('calendar.manage')` with no
+  team in hand, which only club scope satisfies — the Presidency and the
+  Super Admin, not a Director. Edited at `/admin/semester`; the card on
+  `/admin` shows for `calendar.manage = all`.
+- **`club_semester_kpi`.** One row: the semester and its tasks by state
+  (planned, completed, not done, pending confirmation, overdue). A task is
+  in the semester by its due date, or by its creation day when it has none.
+  It reads `tasks` directly with the same state rules as `task_kpi`, not
+  `task_kpi` itself: this runs on every dashboard load for every member,
+  and going through the per-row view would add §2's cost to the front page.
+  `security_invoker`, so each person counts the tasks `tasks_select` shows
+  them.
+- **The semester line** (`src/components/SemesterLine.tsx`) sits above the
+  dashboard grid: name, "week 7 of 15" (`src/lib/semester.ts`, day
+  arithmetic at UTC noon like `time.ts`), a progress bar, the task counts,
+  and the next `kind = 'club'` calendar entry. When the view is missing the
+  component returns nothing, so the page is safe to deploy before the
+  migration is applied.
+- **Still all-time:** `member_kpi`, `project_kpi` and `/kpi`. Bounding them
+  to the semester is the next step, together with the per-team view the
+  exceptions list needs (there is no `team_kpi` today).
 
 ## Conventions to keep
 
