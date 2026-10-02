@@ -16,6 +16,8 @@ export type EditionSettings = {
   rating_labels: RatingLabel[];
   /** Which questions the application form asks; read through resolveApplyFields (applyFields.ts). */
   apply_fields?: Partial<Record<string, string>>;
+  /** Company ids marked full; read through fullCompanyIds (fullCompanies.ts). */
+  full_companies?: string[];
 };
 
 export type Edition = {
@@ -59,7 +61,7 @@ export type Company = {
   desc_en: string | null;
   desc_ar: string | null;
   is_hidden: boolean;
-  /** 0010: still listed, but no longer choosable. Absent until that migration is applied. */
+  /** 0010's flag, unused: "full" lives in the edition's settings (fullCompanies.ts). */
   is_full?: boolean;
   sort_order: number;
   access_token: string;

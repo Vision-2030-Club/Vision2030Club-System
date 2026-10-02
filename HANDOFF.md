@@ -1184,13 +1184,18 @@ extended; the room flow is untested by script.
 - **Company cards** (`src/components/CompanyPicker.tsx`) replace the numbered
   selects on the public apply form too. The order companies are tapped in is
   their rank.
-- **Full companies.** `companies.is_full`, set by `set_company_full` (Mark as
-  full / Mark as open on the Applicants tab, managers only). A full company is
-  NOT hidden: it stays on both forms, blurred and unclickable, and
-  `submit_application` refuses it (`company_full`) unless that application
-  already held it, so fixing a typo never costs a student a company they had.
-  Remove on the Applicants tab is the old soft-delete (`is_hidden`, plus the
-  room if it has one, the same action as the Rooms tab), restorable.
+- **Full companies.** Mark as full / Mark as open on the Applicants tab
+  (managers only) keeps a list of company ids in the edition's settings,
+  `full_companies` (`src/lib/interviews/fullCompanies.ts`), so it works
+  without 0010. A full company is NOT hidden: it stays on both forms, blurred
+  and unclickable, and both submit actions refuse it (`company_full`) before
+  anything is uploaded, unless that student's application (same email)
+  already held it, so fixing a typo never costs them a company they had. The
+  refusal is in TypeScript, not SQL; a company marked full in the same second
+  a student submits can slip through, which is harmless. 0010's
+  `companies.is_full` and `set_company_full` are unused. Remove on the
+  Applicants tab is the old soft-delete (`is_hidden`, plus the room if it has
+  one, the same action as the Rooms tab), restorable.
 - **Logos** need no file storage. Choosing one on the Applicants tab shrinks
   it in the browser to at most 160 px (`src/components/LogoInput.tsx`) and
   stores the result in `companies.logo_url` as a `data:image/webp` address, a
@@ -1215,10 +1220,13 @@ extended; the room flow is untested by script.
   its zero.
 
 **Not applied yet.** `0010_register_full_companies.sql` must be applied to
-the interviews project after 0005–0009 (0009 is fixed now, see below). Until then nothing crashes: the full
-toggle answers with a database error, staff registration follows the public
-window, and Rebuild refuses rather than creating a sheet it cannot remember.
-The `logos` bucket 0010 creates is unused; if the SQL cannot create it, ignore the warning.
+the interviews project after 0005–0009 (0009 is fixed now, see below). Until
+then nothing crashes, and the question settings, Mark as full and logos all
+work without it; what waits on 0010 is staff registration outside the public
+window (until then it follows the window) and the registrations sheet, whose
+Rebuild refuses rather than creating a sheet it cannot remember. The `logos`
+bucket 0010 creates is unused; if the SQL cannot create it, ignore the
+warning.
 
 **0009 was corrected in place (2026-10-02).** `app.application_by_phone`
 ordered by `a.created_at`, a column `applications` never had, so 0009 failed

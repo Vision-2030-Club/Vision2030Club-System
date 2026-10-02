@@ -20,7 +20,8 @@ import { removeCv, uploadCv } from '@/lib/interviews/cv';
 import { kickRegistrationAppend, syncRegistrationSheet } from '@/lib/interviews/registrationSheet';
 import { APPLY_FIELDS, FIELD_LABELS, FIELD_MODES, resolveApplyFields, type FieldMode } from '@/lib/interviews/applyFields';
 import { applicationPayload } from '@/lib/interviews/applyPayload';
-import type { Stage } from '@/lib/interviews/types';
+import { choosesFullCompany, fullCompanyIds } from '@/lib/interviews/fullCompanies';
+import type { EditionSettings, Stage } from '@/lib/interviews/types';
 import { fromClubWallClock } from '@/lib/time';
 
 /**
@@ -433,8 +434,11 @@ export async function upsertCompanyAction(
 }
 
 /**
- * Full (0010): the company stays on every list, but the form greys it out and
- * submit_application refuses it for anyone who had not already chosen it.
+ * Full: the company stays on every list, but the forms grey it out and both
+ * submit actions refuse it for anyone who had not already chosen it. Kept in
+ * the edition's settings as `full_companies` (fullCompanies.ts), so it works
+ * without migration 0010. The list is read fresh here, not from the request
+ * cache, so two quick toggles do not undo each other.
  */
 export async function setCompanyFullAction(
   _previous: ActionResult,
@@ -442,12 +446,30 @@ export async function setCompanyFullAction(
 ): Promise<ActionResult> {
   const g = await guard(formData, can.manage);
   if ('error' in g) return fail(g.error);
+  const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
+  if (g.access.edition.status === 'archived') return fail(t('errors.archived'), 'archived');
 
+  const companyId = requiredText(formData, 'company_id');
+  const full = text(formData, 'full') === 'true';
+  const editionId = g.access.edition.id;
   const db = createInterviewsClient();
-  const { error } = await db.rpc('set_company_full', {
-    p_edition: g.access.edition.id,
-    p_company: requiredText(formData, 'company_id'),
-    p_full: text(formData, 'full') === 'true',
+
+  const { data: company } = await db
+    .from('companies')
+    .select('id')
+    .eq('id', companyId)
+    .eq('edition_id', editionId)
+    .maybeSingle();
+  if (!company) return fail(t('errors.not_found'), 'not_found');
+
+  const { data: settings } = await db.rpc('edition_settings', { p_edition: editionId });
+  const ids = fullCompanyIds(settings as EditionSettings | null);
+  if (full) ids.add(companyId);
+  else ids.delete(companyId);
+
+  const { error } = await db.rpc('update_edition', {
+    p_edition: editionId,
+    p_patch: { settings: { full_companies: [...ids] } },
     p_actor: g.access.actor,
   });
   if (error) return fromPostgrest(error);
@@ -521,6 +543,17 @@ export async function registerAction(
   );
   if (answers.missing) {
     return fail(t('errors.missing_answer', { question: t(FIELD_LABELS[answers.missing]) }));
+  }
+  if (
+    await choosesFullCompany(
+      db,
+      editionId,
+      answers.payload.email as string | null,
+      answers.payload.preferences as string[],
+      fullCompanyIds(g.access.settings),
+    )
+  ) {
+    return refuse('company_full', 'One of the chosen companies is full.');
   }
 
   let cvPath: string | null = null;

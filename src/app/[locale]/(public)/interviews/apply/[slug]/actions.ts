@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { fail, fromPostgrest, ok, requiredText, text, type ActionResult } from '@/lib/actions';
 import { FIELD_LABELS, resolveApplyFields } from '@/lib/interviews/applyFields';
 import { applicationPayload } from '@/lib/interviews/applyPayload';
+import { choosesFullCompany, fullCompanyIds } from '@/lib/interviews/fullCompanies';
 import { removeCv, uploadCv } from '@/lib/interviews/cv';
 import { kickRegistrationAppend } from '@/lib/interviews/registrationSheet';
 import { newToken } from '@/lib/interviews/tokens';
@@ -40,6 +41,17 @@ export async function applyAction(
   if (answers.missing) {
     const t = await getTranslations({ locale, namespace: 'interviews' });
     return fail(t('errors.missing_answer', { question: t(FIELD_LABELS[answers.missing]) }));
+  }
+  if (
+    await choosesFullCompany(
+      db,
+      editionId,
+      answers.payload.email as string | null,
+      answers.payload.preferences as string[],
+      fullCompanyIds(settings as EditionSettings | null),
+    )
+  ) {
+    return fail('One of the chosen companies is full.', 'company_full');
   }
 
   let cvPath: string | null = null;

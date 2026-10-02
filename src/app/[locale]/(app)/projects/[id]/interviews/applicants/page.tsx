@@ -5,6 +5,7 @@ import { Badge, Button, Card, EmptyState, Input, Label, Select } from '@/compone
 import { formatDateTime, localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { resolveApplyFields } from '@/lib/interviews/applyFields';
+import { fullCompanyIds } from '@/lib/interviews/fullCompanies';
 import { loadApplicants, loadCompanies } from '@/lib/interviews/queries';
 import { DECISION_TONES } from '@/lib/interviews/ui';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
@@ -70,7 +71,9 @@ export default async function InterviewsApplicantsPage({
           t={t}
           tCommon={tCommon}
         />
-        {manage ? <CompanyManager locale={locale} projectId={id} companies={companies} /> : null}
+        {manage ? (
+          <CompanyManager locale={locale} projectId={id} companies={companies} fullIds={fullCompanyIds(settings)} />
+        ) : null}
       </div>
 
       <Card>

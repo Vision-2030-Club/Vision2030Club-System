@@ -11,18 +11,21 @@ import { setCompanyFullAction, setRoomDeletedAction, upsertCompanyAction } from 
 
 /**
  * The companies students choose from (their رغبات), for managers: add one
- * with its logo, edit it, mark it full (0010: it stays on the form, blurred
- * and unclickable, and the database refuses it), or remove it (a soft hide,
+ * with its logo, edit it, mark it full (it stays on the form, blurred and
+ * unclickable, and the submit actions refuse it; fullCompanies.ts), or remove it (a soft hide,
  * restorable, the Rooms tab's own delete). Shown on the Applicants tab.
  */
 export async function CompanyManager({
   locale,
   projectId,
   companies,
+  fullIds,
 }: {
   locale: string;
   projectId: string;
   companies: Company[];
+  /** fullCompanyIds(settings): which of them are full. */
+  fullIds: Set<string>;
 }) {
   const t = await getTranslations('interviews');
   const tCommon = await getTranslations('common');
@@ -45,7 +48,7 @@ export async function CompanyManager({
         <ul className="mt-3 space-y-2">
           {visible.map((company) => {
             const name = localized(company, 'name', locale);
-            const full = Boolean(company.is_full);
+            const full = fullIds.has(company.id);
             return (
               <li key={company.id} className="rounded-lg border border-line p-3">
                 <div className="flex items-center gap-3">
