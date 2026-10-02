@@ -47,6 +47,12 @@ export default async function AdminPage({
       show: (await scopeFor('calendar.manage')) === 'all',
     },
     {
+      href: '/admin/links',
+      title: t('links'),
+      hint: t('linksHint'),
+      show: await hasPermission('links.manage'),
+    },
+    {
       href: '/admin/google',
       title: t('google'),
       hint: t('googleHint'),

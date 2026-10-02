@@ -2,6 +2,7 @@ import 'server-only';
 import { after } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
+import { siteUrl } from '@/lib/site';
 import type { EditionSettings, Feedback, OutboxRow } from '@/lib/interviews/types';
 
 /**
@@ -39,11 +40,7 @@ export function isEmailConfigured(): boolean {
  * hyphen that does not exist, and as SITE_URL was never set every one of these
  * links led nowhere.
  */
-export function siteUrl(): string {
-  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
-  const url = process.env.SITE_URL || (vercel ? `https://${vercel}` : 'https://vision2030club-system.vercel.app');
-  return url.replace(/\/$/, '');
-}
+export { siteUrl };
 
 export type EmailReport = {
   claimed: number;

@@ -91,6 +91,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Skip Next internals, the API routes, and static files.
-  matcher: ['/((?!api|_next|_vercel|favicon.ico|brand|.*\\..*).*)'],
+  // Skip Next internals, the API routes, the short links behind QR codes
+  // (`/go/<slug>`: public, locale-free, resolved by their own route), and
+  // static files.
+  matcher: ['/((?!api|go/|_next|_vercel|favicon.ico|brand|.*\\..*).*)'],
 };

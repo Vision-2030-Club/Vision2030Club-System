@@ -1464,6 +1464,40 @@ team. Every number on it is a semester number, so the semester came first.
   to the semester is the next step, together with the per-team view the
   exceptions list needs (there is no `team_kpi` today).
 
+## Short links and QR codes (2026-10-02)
+
+A QR code is nothing but the address printed inside it, so a code that must
+keep working after its destination moves has to point at an address the club
+owns. That address is `/go/<slug>` on this site; where it leads is a row the
+Presidency edits at `/admin/links`.
+
+- **`short_links` (`0068`, not yet applied — the project lead pastes it into
+  the SQL editor).** `slug` (the printed part, `^[a-z0-9][a-z0-9-]{0,39}$`,
+  fixed for life), `label`, `target_url` (must start with `http(s)://`),
+  `visits`. One permission, `links.manage`, granted at club scope to the
+  Super Admin, the President and the Vice President; every policy on the
+  table asks for it, and the permissions page can hand it to another role
+  without a code change.
+- **`/go/<slug>`** (`src/app/go/[slug]/route.ts`) is public and locale-free:
+  the proxy matcher skips `go/`, and the route uses a cookie-less anon client
+  to call `resolve_short_link`, a definer function that returns the one
+  destination and adds a visit. The redirect is a **307 with `no-store`**,
+  never a 301: a permanent redirect would be remembered by the phone that
+  scanned the code, and changing the row would then change nothing for it.
+  An unknown slug gets a small bilingual "this link no longer works" page.
+- **`/admin/links`** creates a link, shows its QR (an SVG `<img>` from a
+  data URL, made on the server by the `qrcode` package in `src/lib/links.ts`),
+  offers the PNG (1024 px) and SVG for download, and edits the label and
+  destination. Deleting is behind a confirmation: every printed copy dies
+  with the row.
+- **The printed address is `siteUrl()` + `/go/<slug>`**, and `siteUrl()` now
+  lives in `src/lib/site.ts` (the interviews' `email.ts` re-exports it). It
+  reads `SITE_URL`, then Vercel's production address, then the project's
+  `vision2030club-system.vercel.app`. Decide the domain *before* the first
+  poster is printed: a code printed with the Vercel address keeps that
+  address even if `SITE_URL` later changes, so the old host must keep
+  answering `/go/…` for as long as those posters are up.
+
 ## Conventions to keep
 
 - Phone numbers are stored as `+9665XXXXXXXX` and nothing else. Use
