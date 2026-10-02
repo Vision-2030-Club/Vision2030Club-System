@@ -1239,6 +1239,13 @@ connections firing at once; `scripts/component-tests.mjs` covers 0062.
 
 ### Things easy to break
 
+- **Every shareable link starts with `siteUrl()`** (`src/lib/interviews/email.ts`):
+  `SITE_URL` if set, else Vercel's own `VERCEL_PROJECT_PRODUCTION_URL`, else
+  `https://vision2030club-system.vercel.app`. Until 2026-10-02 the fallback
+  read `vision2030-club-system` (a hyphen too many) and `SITE_URL` was never
+  set, so the apply, interviewer, room and TV links and the links in emails
+  all pointed at an address that does not exist. If the club moves to its own
+  domain, set `SITE_URL` in Vercel.
 - **A function that raises must raise with a hint.** The public pages map
   `error.hint` to a translated sentence and fall back to the message. Use
   `app.refuse('some_key', 'A sentence.')` and add `errors.some_key` to both
