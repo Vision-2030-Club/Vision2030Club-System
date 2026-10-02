@@ -33,6 +33,11 @@ export function RoomLoginForm({ locale, token }: { locale: string; token: string
         <Input id="name" name="name" required autoComplete="name" />
       </div>
       <div>
+        <Label htmlFor="email">{t('room.email')}</Label>
+        <Input id="email" name="email" type="email" dir="ltr" required autoComplete="email" />
+        <p className="mt-1 text-xs text-ink-muted">{t('room.emailHint')}</p>
+      </div>
+      <div>
         <Label htmlFor="phone">{t('room.phone')}</Label>
         <Input id="phone" name="phone" type="tel" dir="ltr" required autoComplete="tel" placeholder="05xxxxxxxx" />
       </div>

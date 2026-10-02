@@ -3,10 +3,11 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { ActionForm } from '@/components/ActionForm';
 import { ConfirmForm } from '@/components/ConfirmForm';
 import { Disclosure } from '@/components/Disclosure';
-import { Card, EmptyState, Input, Label, Textarea } from '@/components/ui';
+import { Card, EmptyState, Input, Label, Select, Textarea } from '@/components/ui';
 import { localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { siteUrl } from '@/lib/interviews/email';
+import { roomLinks } from '@/lib/interviews/roomLinks';
 import {
   loadAcceptedPhones,
   loadCompanies,
@@ -22,6 +23,7 @@ import { CopyField } from '../CopyField';
 import {
   acceptPhonesAction,
   createRoomAction,
+  createRoomLinkAction,
   renameRoomAction,
   rotateCompanyTokenAction,
   setRoomDeletedAction,
@@ -51,7 +53,7 @@ export default async function InterviewsCompaniesPage({
 
   const access = await getInterviewAccess(id);
   if (!access?.edition) notFound();
-  const { edition, role } = access;
+  const { edition, settings, role } = access;
 
   const t = await getTranslations('interviews');
   const tCommon = await getTranslations('common');
@@ -86,8 +88,13 @@ export default async function InterviewsCompaniesPage({
 
   const manage = can.manage(role);
   const decide = can.decide(role);
-  const candidateLinkFor = (company: Company) =>
-    company.candidate_token ? `${siteUrl()}/${locale}/interviews/room/${company.candidate_token}` : null;
+  // Each room's public link (roomLinks.ts, kept in the edition's settings);
+  // a candidate_token from 0005, where that migration ran, as a fallback.
+  const links = roomLinks(settings);
+  const candidateLinkFor = (company: Company) => {
+    const token = links[company.id] ?? company.candidate_token;
+    return token ? `${siteUrl()}/${locale}/interviews/room/${token}` : null;
+  };
   const interviewerLinkFor = (company: Company) => `${siteUrl()}/${locale}/interviews/c/${company.access_token}`;
 
   return (
@@ -101,6 +108,17 @@ export default async function InterviewsCompaniesPage({
               <div>
                 <Label htmlFor="new-room-name">{t('companies.roomName')}</Label>
                 <Input id="new-room-name" name="name" required />
+              </div>
+              <div>
+                <Label htmlFor="new-room-company-id">{t('companies.roomCompany')}</Label>
+                <Select id="new-room-company-id" name="company_id" defaultValue="">
+                  <option value="">{t('companies.roomCompanyNew')}</option>
+                  {activeCompanies.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {localized(c, 'name', locale)}
+                    </option>
+                  ))}
+                </Select>
               </div>
               <div>
                 <Label htmlFor="new-room-company">{t('companies.companyName')}</Label>
@@ -173,6 +191,17 @@ export default async function InterviewsCompaniesPage({
                   <div className="mt-4 space-y-3 border-t border-line pt-3">
                     {candidateLinkFor(company) ? (
                       <CopyField label={t('companies.candidateLink')} value={candidateLinkFor(company)!} />
+                    ) : manage ? (
+                      <ActionForm
+                        action={createRoomLinkAction}
+                        submitLabel={t('companies.createLink')}
+                        variant="secondary"
+                        className="space-y-2"
+                      >
+                        <input type="hidden" name="locale" value={locale} />
+                        <input type="hidden" name="project_id" value={id} />
+                        <input type="hidden" name="company_id" value={company.id} />
+                      </ActionForm>
                     ) : null}
 
                     {manage ? (

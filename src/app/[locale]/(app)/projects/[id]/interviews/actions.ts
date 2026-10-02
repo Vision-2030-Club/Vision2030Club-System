@@ -22,6 +22,7 @@ import { APPLY_FIELDS, FIELD_LABELS, FIELD_MODES, resolveApplyFields, type Field
 import { applicationPayload } from '@/lib/interviews/applyPayload';
 import { choosesFullCompany, fullCompanyIds } from '@/lib/interviews/fullCompanies';
 import { normalisePhone } from '@/lib/interviews/phone';
+import { roomLinks, saveRoomLink } from '@/lib/interviews/roomLinks';
 import type { EditionSettings, Stage } from '@/lib/interviews/types';
 import { fromClubWallClock } from '@/lib/time';
 
@@ -607,40 +608,60 @@ export async function createRoomAction(
   if ('error' in g) return fail(g.error);
 
   const name = requiredText(formData, 'name');
+  const existingId = text(formData, 'company_id');
   const companyName = text(formData, 'company_name') || name;
   const companyNameAr = text(formData, 'company_name_ar') || companyName;
   const logoUrl = text(formData, 'logo_url') ?? '';
   const day = requiredText(formData, 'day');
   const startTime = requiredText(formData, 'start_time');
   const endTime = requiredText(formData, 'end_time');
+  const editionId = g.access.edition.id;
   const db = createInterviewsClient();
 
+  // A room for a company students already choose on the form, so the room,
+  // their choices and the accepted list are the same company. Checked first,
+  // before anything is created.
+  if (existingId) {
+    const { data: existing } = await db
+      .from('companies')
+      .select('id')
+      .eq('id', existingId)
+      .eq('edition_id', editionId)
+      .eq('is_hidden', false)
+      .maybeSingle();
+    if (!existing) return fail('No such company.', 'not_found');
+  }
+
   const { data: room, error: roomError } = await db.rpc('upsert_room', {
-    p_edition: g.access.edition.id,
+    p_edition: editionId,
     p_room: null,
     p_payload: { name },
     p_actor: g.access.actor,
   });
   if (roomError) return fromPostgrest(roomError);
 
-  const { data: company, error: companyError } = await db.rpc('upsert_company', {
-    p_edition: g.access.edition.id,
-    p_company: null,
-    p_payload: {
-      name_en: companyName,
-      name_ar: companyNameAr,
-      logo_url: logoUrl,
-      access_token: newToken(),
-      candidate_token: newToken(),
-    },
-    p_actor: g.access.actor,
-  });
-  if (companyError) return fromPostgrest(companyError);
+  let companyId = existingId;
+  if (!companyId) {
+    const { data: company, error: companyError } = await db.rpc('upsert_company', {
+      p_edition: editionId,
+      p_company: null,
+      p_payload: {
+        name_en: companyName,
+        name_ar: companyNameAr,
+        logo_url: logoUrl,
+        access_token: newToken(),
+        candidate_token: newToken(),
+      },
+      p_actor: g.access.actor,
+    });
+    if (companyError) return fromPostgrest(companyError);
+    companyId = company.id as string;
+  }
 
   const { error: sessionError } = await db.rpc('create_session', {
-    p_edition: g.access.edition.id,
+    p_edition: editionId,
     p_payload: {
-      company_id: company.id,
+      company_id: companyId,
       room_id: room.id,
       day,
       start_time: startTime,
@@ -651,8 +672,43 @@ export async function createRoomAction(
   });
   if (sessionError) return fromPostgrest(sessionError);
 
+  // The room's public link (roomLinks.ts), unless the company already has one.
+  if (!roomLinks(g.access.settings)[companyId]) {
+    const { error: linkError } = await saveRoomLink(db, editionId, companyId, newToken(), g.access.actor);
+    if (linkError) return fail(linkError);
+  }
+
   revalidate(g.locale, g.projectId);
   return ok('created');
+}
+
+/**
+ * A room's public link (roomLinks.ts), for a room made before links existed,
+ * or a new one to replace a link that was passed around: the old one stops
+ * working at once.
+ */
+export async function createRoomLinkAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const companyId = requiredText(formData, 'company_id');
+  const db = createInterviewsClient();
+  const { data: company } = await db
+    .from('companies')
+    .select('id')
+    .eq('id', companyId)
+    .eq('edition_id', g.access.edition.id)
+    .maybeSingle();
+  if (!company) return fail('No such company.', 'not_found');
+
+  const { error } = await saveRoomLink(db, g.access.edition.id, companyId, newToken(), g.access.actor);
+  if (error) return fail(error);
+
+  revalidate(g.locale, g.projectId);
+  return ok();
 }
 
 /**

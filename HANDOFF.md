@@ -1152,6 +1152,24 @@ straight from `application_preferences`, so a student accepted from their
 applicant page shows there too. Accepting queues the acceptance email with the
 personal booking link, which goes out once Resend is configured.
 
+**Room links without 0005 (2026-10-02).** Each room's public link is kept in
+the edition's settings, `room_links` ({ company id: token },
+`src/lib/interviews/roomLinks.ts`); **Add room** creates it, and older rooms
+get a **Create room link** button. The link (`/interviews/room/<token>`) asks
+for name, phone, the email the student applied with, and a CV. Email and
+phone must belong to one application in the edition (phone alone is not
+enough: the rule above), and that application must be accepted for the
+room's company; then the student goes to their personal booking page (0002).
+A new CV replaces the one on file, written straight to the row (audited as
+`system`); none is needed if one is there. **Add room** can now attach the room
+to an existing company (the one students chose on the form) instead of
+always creating a new company, which used to leave two companies of the same
+name, one chosen by students and one holding the room. Each room's times are
+its own slots: a 2pm booked in one room leaves every other room's 2pm free,
+while one student still cannot hold two overlapping times
+(`bookings_no_overlap`). A 0005 `candidate_token`, where that migration ran,
+still works as a fallback link.
+
 **Open decision for the club (not taken in code):** run the event on the
 room flow (phone list at the door), on the apply-form flow (HR selects
 applicants, students get a personal link by email), or both. Until it is

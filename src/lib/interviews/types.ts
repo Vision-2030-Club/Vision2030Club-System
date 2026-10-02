@@ -21,6 +21,8 @@ export type EditionSettings = {
   /** The registrations Google Sheet (registrationSheet.ts), set when it is first created. */
   registrations_sheet_id?: string;
   registrations_sheet_url?: string;
+  /** Each room's public link token, by company id; read through roomLinks (roomLinks.ts). */
+  room_links?: Record<string, string>;
 };
 
 export type Edition = {
