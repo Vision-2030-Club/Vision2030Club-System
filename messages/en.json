@@ -80,7 +80,14 @@
     "clubEntry": "Club",
     "meeting": "Meeting",
     "myProjects": "My projects",
-    "noProjects": "You are not managing a project yet."
+    "noProjects": "You are not managing a project yet.",
+    "semesterWeek": "Week {week} of {weeks}",
+    "semesterBefore": "Starts {date}",
+    "semesterAfter": "Ended {date}",
+    "semesterTasks": "{completed} of {planned} tasks completed",
+    "semesterOverdue": "{count, plural, =0 {nothing overdue} one {# overdue} other {# overdue}}",
+    "semesterNext": "Next: {title}, {date}",
+    "semesterNoNext": "No club dates left this semester"
   },
   "members": {
     "title": "Members",
@@ -445,7 +452,12 @@
     "rooms": "Rooms",
     "roomsHint": "Add rooms, set the booking window, and block time off.",
     "google": "Google",
-    "googleHint": "Connect the club's Google account for Meet links and invitations."
+    "googleHint": "Connect the club's Google account for Meet links and invitations.",
+    "semester": "Semester",
+    "semesterHint": "Name the semester and set its dates. The dashboard's semester line follows it.",
+    "semesterName": "Semester name",
+    "semesterStarts": "Starts on",
+    "semesterEnds": "Ends on"
   },
   "kpi": {
     "title": "KPI",
