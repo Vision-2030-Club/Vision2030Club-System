@@ -21,6 +21,10 @@
 --   4. One registrations spreadsheet per edition, next to the floor sheet:
 --      every submission is appended as a row. Its id is remembered here.
 --
+--   5. app.application_by_phone again, as 0009 now defines it (0009 read a
+--      column that does not exist and was corrected in place). Repeated here
+--      so a database where 0009's broken version somehow landed is fixed too.
+--
 -- Safe to re-run: every statement is `if not exists` / `create or replace`.
 -- =============================================================================
 
@@ -297,6 +301,26 @@ begin
   end if;
   return v;
 end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 5. The phone lookup, as corrected in 0009.
+-- ---------------------------------------------------------------------------
+
+create or replace function app.application_by_phone(p_edition uuid, p_phone text)
+returns applications
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select a.*
+    from applications a
+   where a.edition_id = p_edition
+     and a.phone is not null
+     and app.normalise_phone(a.phone) = app.normalise_phone(p_phone)
+   order by (a.email is not null) desc, a.submitted_at desc
+   limit 1
 $$;
 
 -- 0004 revoked PUBLIC's default execute grant for future functions and gave

@@ -1192,18 +1192,20 @@ extended; the room flow is untested by script.
   its zero.
 
 **Not applied yet.** `0010_register_full_companies.sql` must be applied to
-the interviews project after 0005–0009. Until then nothing crashes: the full
+the interviews project after 0005–0009 (0009 is fixed now, see below). Until then nothing crashes: the full
 toggle answers with a database error, staff registration follows the public
 window, and Rebuild refuses rather than creating a sheet it cannot remember.
 Create the `logos` bucket by hand if the SQL cannot (the migration warns).
 
-**Known problem in 0009 (found 2026-10-02, not fixed here):**
-`app.application_by_phone` orders by `a.created_at`, but `applications` has
-no such column (`submitted_at` / `updated_at`). On a fresh database 0009
-stops at that statement, so whoever applies 0005–0009 to the real project
-will hit it. It needs a new migration (or a decision to correct 0009 before it
-is ever applied, since it is recorded as not applied); 0010 does not depend
-on it.
+**0009 was corrected in place (2026-10-02).** `app.application_by_phone`
+ordered by `a.created_at`, a column `applications` never had, so 0009 failed
+and rolled back on every database (db-push and the SQL editor both run a file
+as one transaction). It now orders by `submitted_at`. Editing a merged
+migration is normally forbidden because a recorded one would never re-run;
+0009 could not have been recorded anywhere, so the edit is what lets it apply
+at all. 0010 redefines the same function as a backstop. All ten interviews
+migrations now apply in order to an empty Postgres 16, each in one
+transaction.
 
 ### Verified
 
