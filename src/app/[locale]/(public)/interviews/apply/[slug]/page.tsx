@@ -74,6 +74,7 @@ export default async function ApplyPage({
               name: localized(c, 'name', locale),
               description: localized(c, 'desc', locale),
               logo_url: c.logo_url,
+              is_full: Boolean(c.is_full),
             }))}
         />
       </Card>

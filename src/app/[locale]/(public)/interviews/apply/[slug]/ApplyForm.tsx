@@ -2,22 +2,16 @@
 
 import { useActionState, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { CompanyPicker, type PickerCompany } from '@/components/CompanyPicker';
 import { Alert, Button, Input, Label, Select, Textarea } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
 import { ENGLISH_LEVELS, LEVELS, UNIVERSITIES } from '@/lib/interviews/types';
 import { applyAction } from './actions';
 
-export type ApplyCompany = {
-  id: string;
-  name: string;
-  description: string;
-  logo_url: string | null;
-};
-
 /**
- * The same questions as last year's form. Company preferences are ordered
- * choices — first, second, third… — each a select that hides what the others
- * already took, which is the simplest thing that survives a phone screen.
+ * The same questions as last year's form. Company preferences are chosen on
+ * cards (CompanyPicker), in the order they are tapped; a full company stays
+ * on the grid, blurred, and cannot be chosen.
  */
 export function ApplyForm({
   locale,
@@ -28,14 +22,13 @@ export function ApplyForm({
   locale: string;
   editionId: string;
   maxPreferences: number;
-  companies: ApplyCompany[];
+  companies: PickerCompany[];
 }) {
   const t = useTranslations('interviews');
   const tCommon = useTranslations('common');
   const [state, formAction, pending] = useActionState<ActionResult, FormData>(applyAction, {
     ok: false,
   });
-  const [choices, setChoices] = useState<string[]>(Array(maxPreferences).fill(''));
   const [university, setUniversity] = useState<string>('');
 
   if (state.ok) {
@@ -52,9 +45,6 @@ export function ApplyForm({
       ? t(`errors.${state.hint}`)
       : state.error
     : null;
-
-  const setChoice = (index: number, value: string) =>
-    setChoices((prev) => prev.map((v, i) => (i === index ? value : v)));
 
   return (
     <form action={formAction} className="space-y-5">
@@ -168,43 +158,7 @@ export function ApplyForm({
       <fieldset className="space-y-3">
         <legend className="mb-1 text-base font-semibold">{t('apply.companies')}</legend>
         <p className="text-xs text-ink-muted">{t('apply.companiesHint', { max: maxPreferences })}</p>
-        {choices.map((choice, index) => (
-          <div key={index}>
-            <Label htmlFor={`preference-${index}`}>{t('apply.choiceN', { n: index + 1 })}</Label>
-            <Select
-              id={`preference-${index}`}
-              name="preference"
-              value={choice}
-              onChange={(e) => setChoice(index, e.target.value)}
-              required={index === 0}
-            >
-              <option value="">{index === 0 ? t('apply.choose') : t('apply.none')}</option>
-              {companies.map((company) => (
-                <option
-                  key={company.id}
-                  value={company.id}
-                  disabled={choices.includes(company.id) && choice !== company.id}
-                >
-                  {company.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-        ))}
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {companies.map((company) => (
-            <li key={company.id} className="flex gap-3 rounded-lg border border-line p-3 text-xs">
-              {company.logo_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={company.logo_url} alt="" width={40} height={40} className="size-10 shrink-0 rounded bg-white object-contain" />
-              ) : null}
-              <div className="min-w-0">
-                <div className="font-semibold text-ink">{company.name}</div>
-                {company.description ? <p className="mt-0.5 text-ink-muted">{company.description}</p> : null}
-              </div>
-            </li>
-          ))}
-        </ul>
+        <CompanyPicker companies={companies} max={maxPreferences} />
         <div>
           <Label htmlFor="why_first">{t('apply.whyFirst')}</Label>
           <Textarea id="why_first" name="why_first" rows={4} required maxLength={2000} />

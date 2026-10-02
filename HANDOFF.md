@@ -1005,7 +1005,7 @@ short version:
   signs a ten-minute URL for HR, managers, or the company that holds the
   booking (past its PIN if one is set).
 
-Pages: signed-in under `/projects/[id]/interviews/…` (overview, applicants,
+Pages: signed-in under `/projects/[id]/interviews/…` (overview, applicants, register,
 companies, schedule with the session generator, floor board, bookings, people,
 settings, log, messages — tabs filtered by role); public under `/interviews/…`
 (`apply/<slug>`, `s/<token>` the student, `c/<token>` the interviewer,
@@ -1152,6 +1152,58 @@ from a network where 5432 works, or paste each file into the dashboard's
 SQL editor and insert its name into `schema_migrations` as was done for
 0001–0004. The teammate's `scripts/interviews-tests.mjs` coverage was not
 extended; the room flow is untested by script.
+
+### Registering, full companies, and the registrations sheet (0010)
+
+- **Register tab** (`/projects/<id>/interviews/register`, HR and managers).
+  A short form (name, email, phone, up to `max_preferences` companies as
+  cards, CV) for a student registering at the stand. It goes through the same
+  `submit_application` as the public form, with the staff member as
+  `p_actor`. 0010 lets a **member** actor register outside the public window
+  (draft or closed editions; archived still refuses) and records them as the
+  author; the public form passes no actor and keeps the window. Every other
+  rule holds for both: the company limit, one application per email, the CV.
+- **Company cards** (`src/components/CompanyPicker.tsx`) replace the numbered
+  selects on the public apply form too. The order companies are tapped in is
+  their rank.
+- **Full companies.** `companies.is_full`, set by `set_company_full` (Mark as
+  full / Mark as open on the Register tab, managers only). A full company is
+  NOT hidden: it stays on both forms, blurred and unclickable, and
+  `submit_application` refuses it (`company_full`) unless that application
+  already held it, so fixing a typo never costs a student a company they had.
+  Remove on the Register tab is the old soft-delete (`is_hidden`, plus the
+  room if it has one, the same action as the Rooms tab), restorable.
+- **Logos** can be uploaded (PNG/JPG/WebP/GIF, 1 MB) into the private `logos`
+  bucket. `logo_url` stores the RELATIVE `/api/interviews/logo?path=…`, which
+  streams the file (public, cached forever: every upload gets a new name), so
+  a logo uploaded on a preview works on production. Pasted external URLs still
+  work; the Rooms tab's logo field is plain text now so it accepts both.
+- **Registrations sheet.** `src/lib/interviews/registrationSheet.ts`. Every
+  accepted submission (public form and Register tab) appends one row through
+  `after()`: submitted, name, email, phone, companies in rank order, CV,
+  note ("Updated" for a re-submission), application id. The first submission
+  creates the sheet; Settings → *Rebuild* rewrites it from the database (one
+  row per application), which repairs any row Google missed. Same rules as the
+  floor sheet: owned by the club's Google account, shared by name only, link
+  sharing revoked on every rebuild. The CV column links to `/api/interviews/cv`,
+  which needs a signed-in HR person or manager, so the link never expires and
+  is useless to someone the sheet was forwarded to. User text is written with
+  a leading apostrophe so a name starting with `=` stays text and `05…` keeps
+  its zero.
+
+**Not applied yet.** `0010_register_full_companies.sql` must be applied to
+the interviews project after 0005–0009. Until then nothing crashes: the full
+toggle answers with a database error, staff registration follows the public
+window, and Rebuild refuses rather than creating a sheet it cannot remember.
+Create the `logos` bucket by hand if the SQL cannot (the migration warns).
+
+**Known problem in 0009 (found 2026-10-02, not fixed here):**
+`app.application_by_phone` orders by `a.created_at`, but `applications` has
+no such column (`submitted_at` / `updated_at`). On a fresh database 0009
+stops at that statement, so whoever applies 0005–0009 to the real project
+will hit it. It needs a new migration (or a decision to correct 0009 before it
+is ever applied, since it is recorded as not applied); 0010 does not depend
+on it.
 
 ### Verified
 

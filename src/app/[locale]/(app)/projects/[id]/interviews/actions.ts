@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { getTranslations } from 'next-intl/server';
 import { createClient } from '@/lib/supabase/server';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { getMyMember } from '@/lib/auth/session';
@@ -15,6 +16,9 @@ import { newPin, newToken } from '@/lib/interviews/tokens';
 import { deliverPendingEmails, kickEmailDelivery } from '@/lib/interviews/email';
 import { kickFloorSheetSync, pullFloorSheetStages, syncFloorSheet } from '@/lib/interviews/floorSheet';
 import { takeExport } from '@/lib/interviews/export';
+import { removeCv, uploadCv } from '@/lib/interviews/cv';
+import { removeLogo, uploadLogo } from '@/lib/interviews/logo';
+import { kickRegistrationAppend, syncRegistrationSheet } from '@/lib/interviews/registrationSheet';
 import type { Stage } from '@/lib/interviews/types';
 import { fromClubWallClock } from '@/lib/time';
 
@@ -146,6 +150,24 @@ export async function syncFloorSheetAction(
 
   try {
     await syncFloorSheet(g.access.edition.id);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Sync failed.');
+  }
+
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
+/** Settings → Rebuild: the registrations sheet rewritten from the database (registrationSheet.ts). */
+export async function syncRegistrationSheetAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  try {
+    await syncRegistrationSheet(g.access.edition.id);
   } catch (error) {
     return fail(error instanceof Error ? error.message : 'Sync failed.');
   }
@@ -344,40 +366,160 @@ export async function upsertRoomAction(
   return ok();
 }
 
+/**
+ * Adds or edits a company from the Register tab (a plain company, no room or
+ * session: the apply-form flow). Only the fields the form sends are changed,
+ * so an edit never un-hides or re-orders a company by omission. A logo file
+ * replaces the old logo, which is deleted from the bucket once the row is
+ * saved; a refused save deletes the file just uploaded instead.
+ */
 export async function upsertCompanyAction(
   _previous: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
   const g = await guard(formData, can.manage);
   if ('error' in g) return fail(g.error);
+  const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
 
   const companyId = text(formData, 'company_id');
+  const nameEn = text(formData, 'name_en');
+  if (!companyId && !nameEn) return fail(t('errors.missing_company_name'), 'missing_company_name');
+
   const pinChoice = text(formData, 'pin_choice'); // keep | none | new | typed
   const payload: Record<string, unknown> = {
-    name_en: text(formData, 'name_en'),
-    name_ar: text(formData, 'name_ar'),
-    logo_url: text(formData, 'logo_url') ?? '',
-    desc_en: text(formData, 'desc_en') ?? '',
-    desc_ar: text(formData, 'desc_ar') ?? '',
-    is_hidden: formData.get('is_hidden') === 'on',
-    sort_order: text(formData, 'sort_order'),
+    name_en: nameEn,
+    name_ar: text(formData, 'name_ar') ?? nameEn,
   };
+  if (formData.has('desc_en')) payload.desc_en = text(formData, 'desc_en') ?? '';
+  if (formData.has('desc_ar')) payload.desc_ar = text(formData, 'desc_ar') ?? '';
+  if (formData.has('sort_order')) payload.sort_order = text(formData, 'sort_order');
+  if (formData.has('is_hidden')) payload.is_hidden = formData.get('is_hidden') === 'on';
+  if (formData.has('logo_url')) payload.logo_url = text(formData, 'logo_url') ?? '';
   if (!companyId) payload.access_token = newToken();
   if (pinChoice === 'none') payload.access_pin = '';
   else if (pinChoice === 'new') payload.access_pin = newPin();
   else if (pinChoice === 'typed') payload.access_pin = text(formData, 'access_pin') ?? '';
 
   const db = createInterviewsClient();
+
+  let previousLogo: string | null = null;
+  if (companyId) {
+    const { data } = await db.from('companies').select('logo_url').eq('id', companyId).maybeSingle();
+    previousLogo = (data?.logo_url as string | null) ?? null;
+  }
+
+  let uploadedLogo: string | null = null;
+  const file = formData.get('logo');
+  if (file instanceof File && file.size > 0) {
+    const uploaded = await uploadLogo(db, g.access.edition.id, file);
+    if ('error' in uploaded) {
+      const hint = uploaded.error;
+      return fail(t.has(`errors.${hint}`) ? t(`errors.${hint}`) : hint, hint);
+    }
+    uploadedLogo = uploaded.url;
+    payload.logo_url = uploaded.url;
+  } else if (formData.get('remove_logo') === 'on') {
+    payload.logo_url = '';
+  }
+
   const { error } = await db.rpc('upsert_company', {
     p_edition: g.access.edition.id,
     p_company: companyId,
     p_payload: payload,
     p_actor: g.access.actor,
   });
+  if (error) {
+    await removeLogo(db, uploadedLogo);
+    return fromPostgrest(error);
+  }
+  if ('logo_url' in payload && payload.logo_url !== previousLogo) await removeLogo(db, previousLogo);
+
+  revalidate(g.locale, g.projectId);
+  return ok(companyId ? 'saved' : 'created');
+}
+
+/**
+ * Full (0010): the company stays on every list, but the form greys it out and
+ * submit_application refuses it for anyone who had not already chosen it.
+ */
+export async function setCompanyFullAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const db = createInterviewsClient();
+  const { error } = await db.rpc('set_company_full', {
+    p_edition: g.access.edition.id,
+    p_company: requiredText(formData, 'company_id'),
+    p_full: text(formData, 'full') === 'true',
+    p_actor: g.access.actor,
+  });
   if (error) return fromPostgrest(error);
 
   revalidate(g.locale, g.projectId);
   return ok();
+}
+
+// -----------------------------------------------------------------------------
+// Registering a student (the Register tab)
+// -----------------------------------------------------------------------------
+
+/**
+ * HR or a manager registers a student: the apply form's short version, through
+ * the same submit_application, with the staff member as the actor. The
+ * database lets staff in outside the public window (0010) and applies every
+ * other rule the public form meets: the company limit, full companies, one
+ * application per email, the CV. Same CV handling as applyAction.
+ */
+export async function registerAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.decide);
+  if ('error' in g) return fail(g.error);
+  const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
+  const refuse = (hint: string, fallback: string) =>
+    fail(t.has(`errors.${hint}`) ? t(`errors.${hint}`) : fallback, hint);
+
+  const editionId = g.access.edition.id;
+  const db = createInterviewsClient();
+
+  let cvPath: string | null = null;
+  const file = formData.get('cv');
+  if (file instanceof File && file.size > 0) {
+    const uploaded = await uploadCv(db, editionId, file);
+    if ('error' in uploaded) return refuse(uploaded.error, uploaded.error);
+    cvPath = uploaded.path;
+  }
+
+  const { data, error } = await db.rpc('submit_application', {
+    p_edition: editionId,
+    p_payload: {
+      name: text(formData, 'name'),
+      email: text(formData, 'email'),
+      phone: text(formData, 'phone'),
+      locale: g.locale === 'en' ? 'en' : 'ar',
+      preferences: all(formData, 'preference'),
+      cv_path: cvPath,
+    },
+    p_token: newToken(),
+    p_actor: g.access.actor,
+  });
+
+  if (error) {
+    await removeCv(db, cvPath);
+    const refused = fromPostgrest(error);
+    return refused.hint ? refuse(refused.hint, refused.error ?? '') : refused;
+  }
+
+  const result = data as { id: string; replaced: boolean; previous_cv_path: string | null };
+  await removeCv(db, result.previous_cv_path);
+  kickRegistrationAppend(editionId, result.id, result.replaced);
+
+  revalidate(g.locale, g.projectId);
+  return ok('applied', { replaced: String(result.replaced) });
 }
 
 /**

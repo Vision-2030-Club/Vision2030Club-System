@@ -2,6 +2,7 @@
 
 import { all, fail, fromPostgrest, ok, requiredText, text, type ActionResult } from '@/lib/actions';
 import { removeCv, uploadCv } from '@/lib/interviews/cv';
+import { kickRegistrationAppend } from '@/lib/interviews/registrationSheet';
 import { newToken } from '@/lib/interviews/tokens';
 import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/interviews';
 
@@ -11,6 +12,8 @@ import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/i
  * If the database refuses — window closed, already reviewed, a bad choice —
  * the file just uploaded is deleted again, so a refused form leaves nothing
  * behind; if it accepts a re-submission, the previous CV is deleted instead.
+ * An accepted submission is then appended to the registrations sheet, after
+ * the response (registrationSheet.ts).
  */
 export async function applyAction(
   _previous: ActionResult,
@@ -63,8 +66,9 @@ export async function applyAction(
     return fromPostgrest(error);
   }
 
-  const result = data as { replaced: boolean; previous_cv_path: string | null };
+  const result = data as { id: string; replaced: boolean; previous_cv_path: string | null };
   await removeCv(db, result.previous_cv_path);
+  kickRegistrationAppend(editionId, result.id, result.replaced);
 
   return ok('applied', { replaced: String(result.replaced) });
 }
