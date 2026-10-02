@@ -3,7 +3,7 @@ import { after } from 'next/server';
 import { GoogleNotConnectedError, isGoogleConfigured } from '@/lib/google/auth';
 import { appendRows, createSpreadsheet, listTabs, revokeLinkSharing, writeTab } from '@/lib/google/sheets';
 import { siteUrl } from '@/lib/interviews/email';
-import type { Edition } from '@/lib/interviews/types';
+import type { Edition, EditionSettings } from '@/lib/interviews/types';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import en from '../../../messages/en.json';
 
@@ -123,19 +123,26 @@ async function loadEdition(db: Db, editionId: string): Promise<Edition | null> {
   return data as Edition | null;
 }
 
-/** The edition's sheet, created (and remembered through 0010) the first time it is needed. */
+/**
+ * The edition's sheet, remembered in its settings (`registrations_sheet_id`
+ * and `_url`, merged in by update_edition like every other setting) rather
+ * than in 0010's columns, so it works on a database that never got 0010.
+ */
+async function savedSheet(db: Db, editionId: string): Promise<string | null> {
+  const { data } = await db.rpc('edition_settings', { p_edition: editionId });
+  const id = (data as EditionSettings | null)?.registrations_sheet_id;
+  return typeof id === 'string' && id ? id : null;
+}
+
+/** The edition's sheet, created and remembered the first time it is needed. */
 async function ensureSheet(db: Db, edition: Edition): Promise<string> {
-  if (edition.registrations_sheet_id) return edition.registrations_sheet_id;
-  // Before 0010 there is nowhere to remember the sheet, and every press would
-  // leave another orphan spreadsheet in the club's Drive.
-  if (!('registrations_sheet_id' in edition)) {
-    throw new Error('The registrations sheet needs interviews migration 0010 applied first.');
-  }
+  const saved = await savedSheet(db, edition.id);
+  if (saved) return saved;
   const { id, url } = await createSpreadsheet(`${edition.name_en} — Registrations`, TAB);
-  const { error } = await db.rpc('set_registrations_sheet', {
+  const { error } = await db.rpc('update_edition', {
     p_edition: edition.id,
-    p_sheet_id: id,
-    p_sheet_url: url,
+    p_patch: { settings: { registrations_sheet_id: id, registrations_sheet_url: url } },
+    p_actor: { kind: 'system', name: 'Registrations sheet' },
   });
   if (error) throw new Error(error.message);
   return id;
@@ -220,7 +227,8 @@ async function appendRegistration(editionId: string, applicationId: string, repl
   const db = createInterviewsClient();
   const edition = await loadEdition(db, editionId);
   if (!edition) return;
-  if (!edition.registrations_sheet_id) {
+  const sheetId = await savedSheet(db, editionId);
+  if (!sheetId) {
     await syncRegistrationSheet(editionId);
     return;
   }
@@ -237,8 +245,8 @@ async function appendRegistration(editionId: string, applicationId: string, repl
   if (!application) return;
 
   const companies = ((preferences ?? []) as { company_id: string }[]).map((p) => names.get(p.company_id) ?? '');
-  const tab = await tabOf(edition.registrations_sheet_id);
-  await appendRows(edition.registrations_sheet_id, tab.title, [
+  const tab = await tabOf(sheetId);
+  await appendRows(sheetId, tab.title, [
     toRow(edition, application as Row, companies, replaced ? 'Updated' : ''),
   ]);
 }

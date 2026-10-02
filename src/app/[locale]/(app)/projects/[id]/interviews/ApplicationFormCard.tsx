@@ -28,6 +28,7 @@ export function ApplicationFormCard({
   projectId,
   edition,
   fields,
+  sheetUrl,
   manage,
   now,
   t,
@@ -37,6 +38,8 @@ export function ApplicationFormCard({
   projectId: string;
   edition: Edition;
   fields: ApplyFields;
+  /** The registrations sheet, once created (kept in the edition's settings). */
+  sheetUrl: string | null;
   manage: boolean;
   /** Read once by the page; a component that reads the clock is not pure. */
   now: number;
@@ -74,9 +77,9 @@ export function ApplicationFormCard({
       <div className="mt-4 border-t border-line pt-3">
         <h3 className="mb-1 text-sm font-semibold">{t('settings.registrationsSheet')}</h3>
         <p className="mb-2 text-xs text-ink-muted">{t('applyForm.sheetHint')}</p>
-        {edition.registrations_sheet_url ? (
+        {sheetUrl ? (
           <a
-            href={edition.registrations_sheet_url}
+            href={sheetUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="mb-2 inline-block text-sm font-medium text-brand-700 hover:underline"

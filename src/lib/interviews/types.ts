@@ -18,6 +18,9 @@ export type EditionSettings = {
   apply_fields?: Partial<Record<string, string>>;
   /** Company ids marked full; read through fullCompanyIds (fullCompanies.ts). */
   full_companies?: string[];
+  /** The registrations Google Sheet (registrationSheet.ts), set when it is first created. */
+  registrations_sheet_id?: string;
+  registrations_sheet_url?: string;
 };
 
 export type Edition = {
@@ -35,9 +38,6 @@ export type Edition = {
   tv_token: string | null;
   floor_sheet_id: string | null;
   floor_sheet_url: string | null;
-  /** 0010; absent until that migration is applied. */
-  registrations_sheet_id?: string | null;
-  registrations_sheet_url?: string | null;
   settings: Partial<EditionSettings>;
   created_at: string;
   updated_at: string;

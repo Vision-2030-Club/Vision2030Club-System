@@ -1208,7 +1208,9 @@ extended; the room flow is untested by script.
   accepted submission (public form and Register tab) appends one row through
   `after()`: submitted, name, email, phone, university, year, major,
   companies in rank order, CV, note ("Updated" for a re-submission),
-  application id. University and year are written as the English labels. The first submission
+  application id. University and year are written as the English labels.
+  The sheet's id and link are kept in the edition's settings, so it needs
+  only the Google account, no migration. The first submission
   creates the sheet; its link is on the Applicants tab (and in Settings), and
   *Rebuild* in either place rewrites it from the database (one
   row per application), which repairs any row Google missed. Same rules as the
@@ -1221,12 +1223,14 @@ extended; the room flow is untested by script.
 
 **Not applied yet.** `0010_register_full_companies.sql` must be applied to
 the interviews project after 0005–0009 (0009 is fixed now, see below). Until
-then nothing crashes, and the question settings, Mark as full and logos all
-work without it; what waits on 0010 is staff registration outside the public
-window (until then it follows the window) and the registrations sheet, whose
-Rebuild refuses rather than creating a sheet it cannot remember. The `logos`
-bucket 0010 creates is unused; if the SQL cannot create it, ignore the
-warning.
+then nothing crashes, and the question settings, Mark as full, logos and the
+registrations sheet all work without it; the one thing that waits on 0010 is
+staff registration outside the public window (until then it follows the
+window). The registrations sheet's id and link are kept in the edition's
+settings (`registrations_sheet_id`, `registrations_sheet_url`), so 0010's
+columns of that name and `set_registrations_sheet` are unused, as are its
+`logos` bucket and `is_full` column; if the SQL cannot create the bucket,
+ignore the warning.
 
 **0009 was corrected in place (2026-10-02).** `app.application_by_phone`
 ordered by `a.created_at`, a column `applications` never had, so 0009 failed

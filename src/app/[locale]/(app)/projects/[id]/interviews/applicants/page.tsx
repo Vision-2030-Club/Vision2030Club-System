@@ -66,6 +66,7 @@ export default async function InterviewsApplicantsPage({
           projectId={id}
           edition={edition}
           fields={fields}
+          sheetUrl={settings?.registrations_sheet_url ?? null}
           manage={manage}
           now={now}
           t={t}

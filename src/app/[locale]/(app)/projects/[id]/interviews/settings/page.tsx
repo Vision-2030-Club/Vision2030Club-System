@@ -219,15 +219,15 @@ export default async function InterviewsSettingsPage({
         <Card>
           <h2 className="mb-1 font-semibold">{t('settings.registrationsSheet')}</h2>
           <p className="mb-3 text-xs text-ink-muted">{t('settings.registrationsSheetHint')}</p>
-          {edition.registrations_sheet_url ? (
+          {settings.registrations_sheet_url ? (
             <a
-              href={edition.registrations_sheet_url}
+              href={settings.registrations_sheet_url}
               target="_blank"
               rel="noopener noreferrer"
               className="mb-3 block break-all text-sm font-medium text-brand-600 hover:underline"
               dir="ltr"
             >
-              {edition.registrations_sheet_url}
+              {settings.registrations_sheet_url}
             </a>
           ) : (
             <p className="mb-3 text-sm text-ink-muted">{t('settings.registrationsSheetNone')}</p>
