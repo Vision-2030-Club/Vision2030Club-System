@@ -112,7 +112,7 @@ export default async function InterviewsCompaniesPage({
               </div>
               <div>
                 <Label htmlFor="new-room-logo">{t('companies.logoUrl')}</Label>
-                <Input id="new-room-logo" name="logo_url" inputMode="url" dir="ltr" />
+                <Input id="new-room-logo" name="logo_url" type="url" dir="ltr" />
               </div>
               <div>
                 <Label htmlFor="new-room-day">{t('companies.roomDay')}</Label>
@@ -299,15 +299,25 @@ function RoomForm({
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor={`${company.id}-logo_url`}>{t('companies.logoUrl')}</Label>
-          <Input
-            id={`${company.id}-logo_url`}
-            name="logo_url"
-            // Text, not type="url": a logo uploaded on the Applicants tab is
-            // stored as a relative /api/interviews/logo address.
-            inputMode="url"
-            dir="ltr"
-            defaultValue={company.logo_url ?? ''}
-          />
+          {company.logo_url?.startsWith('data:') ? (
+            // Uploaded on the Applicants tab and stored as the image itself
+            // (LogoInput): carried through unchanged rather than shown as a
+            // page of base64 in a text box.
+            <>
+              <input type="hidden" name="logo_url" value={company.logo_url} />
+              <p id={`${company.id}-logo_url`} className="text-xs text-ink-muted">
+                {t('companies.logoUploaded')}
+              </p>
+            </>
+          ) : (
+            <Input
+              id={`${company.id}-logo_url`}
+              name="logo_url"
+              type="url"
+              dir="ltr"
+              defaultValue={company.logo_url ?? ''}
+            />
+          )}
         </div>
       </div>
     </ActionForm>

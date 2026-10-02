@@ -1191,11 +1191,14 @@ extended; the room flow is untested by script.
   already held it, so fixing a typo never costs a student a company they had.
   Remove on the Applicants tab is the old soft-delete (`is_hidden`, plus the
   room if it has one, the same action as the Rooms tab), restorable.
-- **Logos** can be uploaded (PNG/JPG/WebP/GIF, 1 MB) into the private `logos`
-  bucket. `logo_url` stores the RELATIVE `/api/interviews/logo?path=…`, which
-  streams the file (public, cached forever: every upload gets a new name), so
-  a logo uploaded on a preview works on production. Pasted external URLs still
-  work; the Rooms tab's logo field is plain text now so it accepts both.
+- **Logos** need no file storage. Choosing one on the Applicants tab shrinks
+  it in the browser to at most 160 px (`src/components/LogoInput.tsx`) and
+  stores the result in `companies.logo_url` as a `data:image/webp` address, a
+  few kilobytes; the server accepts only a PNG/WebP/JPEG data URL under
+  200 KB. Pasted external URLs still work from the Rooms tab, which carries an
+  uploaded logo through unchanged. (The first version uploaded into a `logos`
+  bucket that 0010 creates; that bucket was never there on the real project,
+  so uploads failed with "Bucket not found". The bucket is now unused.)
 - **Registrations sheet.** `src/lib/interviews/registrationSheet.ts`. Every
   accepted submission (public form and Register tab) appends one row through
   `after()`: submitted, name, email, phone, university, year, major,
@@ -1215,7 +1218,7 @@ extended; the room flow is untested by script.
 the interviews project after 0005–0009 (0009 is fixed now, see below). Until then nothing crashes: the full
 toggle answers with a database error, staff registration follows the public
 window, and Rebuild refuses rather than creating a sheet it cannot remember.
-Create the `logos` bucket by hand if the SQL cannot (the migration warns).
+The `logos` bucket 0010 creates is unused; if the SQL cannot create it, ignore the warning.
 
 **0009 was corrected in place (2026-10-02).** `app.application_by_phone`
 ordered by `a.created_at`, a column `applications` never had, so 0009 failed

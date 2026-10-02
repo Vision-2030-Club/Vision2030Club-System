@@ -17,7 +17,6 @@ import { deliverPendingEmails, kickEmailDelivery } from '@/lib/interviews/email'
 import { kickFloorSheetSync, pullFloorSheetStages, syncFloorSheet } from '@/lib/interviews/floorSheet';
 import { takeExport } from '@/lib/interviews/export';
 import { removeCv, uploadCv } from '@/lib/interviews/cv';
-import { removeLogo, uploadLogo } from '@/lib/interviews/logo';
 import { kickRegistrationAppend, syncRegistrationSheet } from '@/lib/interviews/registrationSheet';
 import { APPLY_FIELDS, FIELD_LABELS, FIELD_MODES, resolveApplyFields, type FieldMode } from '@/lib/interviews/applyFields';
 import { applicationPayload } from '@/lib/interviews/applyPayload';
@@ -371,10 +370,17 @@ export async function upsertRoomAction(
 /**
  * Adds or edits a company from the Applicants tab (a plain company, no room or
  * session: the apply-form flow). Only the fields the form sends are changed,
- * so an edit never un-hides or re-orders a company by omission. A logo file
- * replaces the old logo, which is deleted from the bucket once the row is
- * saved; a refused save deletes the file just uploaded instead.
+ * so an edit never un-hides or re-orders a company by omission. A logo
+ * arrives already shrunk by the browser (LogoInput) as a small `data:` image
+ * and is stored in `logo_url` itself, so no file storage is involved.
  */
+/** A shrunk logo is a few kilobytes; this leaves room and still keeps rows small. */
+const MAX_LOGO_DATA = 200_000;
+
+function isLogoDataUrl(value: string): boolean {
+  return value.length <= MAX_LOGO_DATA && /^data:image\/(png|webp|jpeg);base64,[A-Za-z0-9+/]+=*$/.test(value);
+}
+
 export async function upsertCompanyAction(
   _previous: ActionResult,
   formData: FormData,
@@ -402,39 +408,25 @@ export async function upsertCompanyAction(
   else if (pinChoice === 'new') payload.access_pin = newPin();
   else if (pinChoice === 'typed') payload.access_pin = text(formData, 'access_pin') ?? '';
 
-  const db = createInterviewsClient();
-
-  let previousLogo: string | null = null;
-  if (companyId) {
-    const { data } = await db.from('companies').select('logo_url').eq('id', companyId).maybeSingle();
-    previousLogo = (data?.logo_url as string | null) ?? null;
-  }
-
-  let uploadedLogo: string | null = null;
-  const file = formData.get('logo');
-  if (file instanceof File && file.size > 0) {
-    const uploaded = await uploadLogo(db, g.access.edition.id, file);
-    if ('error' in uploaded) {
-      const hint = uploaded.error;
-      return fail(t.has(`errors.${hint}`) ? t(`errors.${hint}`) : hint, hint);
+  const logoData = text(formData, 'logo_data');
+  if (logoData) {
+    if (!isLogoDataUrl(logoData)) {
+      const hint = logoData.length > MAX_LOGO_DATA ? 'logo_too_large' : 'not_image';
+      return fail(t(`errors.${hint}`), hint);
     }
-    uploadedLogo = uploaded.url;
-    payload.logo_url = uploaded.url;
+    payload.logo_url = logoData;
   } else if (formData.get('remove_logo') === 'on') {
     payload.logo_url = '';
   }
 
+  const db = createInterviewsClient();
   const { error } = await db.rpc('upsert_company', {
     p_edition: g.access.edition.id,
     p_company: companyId,
     p_payload: payload,
     p_actor: g.access.actor,
   });
-  if (error) {
-    await removeLogo(db, uploadedLogo);
-    return fromPostgrest(error);
-  }
-  if ('logo_url' in payload && payload.logo_url !== previousLogo) await removeLogo(db, previousLogo);
+  if (error) return fromPostgrest(error);
 
   revalidate(g.locale, g.projectId);
   return ok(companyId ? 'saved' : 'created');

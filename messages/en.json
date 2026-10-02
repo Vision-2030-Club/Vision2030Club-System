@@ -805,7 +805,8 @@
       "companyName": "Company name",
       "companyNameHint": "Defaults to the room name if left blank",
       "companyNameAr": "Company name (Arabic)",
-      "interviewerSide": "Interviewer link and PIN"
+      "interviewerSide": "Interviewer link and PIN",
+      "logoUploaded": "Logo uploaded on the Applicants tab. Change it there."
     },
     "people": {
       "add": "Add",
@@ -963,7 +964,7 @@
       "manageHint": "Students choose from these. A full company stays visible, blurred, but can no longer be chosen. Removing one hides it from the form and closes its room if it has one; nothing is erased and it can be restored.",
       "addCompany": "Add company",
       "logo": "Logo",
-      "logoHint": "PNG, JPG, WebP or GIF, up to 1 MB.",
+      "logoHint": "Any image. It is shrunk to a small square and saved with the company.",
       "removeLogo": "Remove the logo",
       "markFull": "Mark as full",
       "markOpen": "Mark as open",

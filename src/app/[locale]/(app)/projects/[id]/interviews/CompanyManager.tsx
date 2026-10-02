@@ -3,6 +3,7 @@ import { ActionForm } from '@/components/ActionForm';
 import { Logo } from '@/components/CompanyPicker';
 import { ConfirmForm } from '@/components/ConfirmForm';
 import { Disclosure } from '@/components/Disclosure';
+import { LogoInput } from '@/components/LogoInput';
 import { Badge, Card, Input, Label } from '@/components/ui';
 import { localized } from '@/lib/format';
 import type { Company } from '@/lib/interviews/types';
@@ -155,7 +156,7 @@ function CompanyForm({
       </div>
       <div>
         <Label htmlFor={`${key}-logo`}>{t('register.logo')}</Label>
-        <Input id={`${key}-logo`} name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+        <LogoInput id={`${key}-logo`} />
         <p className="mt-1 text-xs text-ink-muted">{t('register.logoHint')}</p>
       </div>
       {company?.logo_url ? (
