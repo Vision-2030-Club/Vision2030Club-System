@@ -8,15 +8,17 @@ import { APPLY_FIELDS, FIELD_LABELS, FIELD_MODES, type ApplyFields } from '@/lib
 import { siteUrl } from '@/lib/interviews/email';
 import type { Edition } from '@/lib/interviews/types';
 import { CopyField } from './CopyField';
-import { updateApplyFieldsAction } from './actions';
+import { syncRegistrationSheetAction, updateApplyFieldsAction } from './actions';
 
 type T = Awaited<ReturnType<typeof getTranslations<'interviews'>>>;
 type TCommon = Awaited<ReturnType<typeof getTranslations<'common'>>>;
 
 /**
  * The public application link, whether it is taking applications right now,
- * and (for managers) which questions it asks (lib/interviews/applyFields.ts).
- * The Register tab asks the same questions.
+ * the registrations Google Sheet every application lands in (with Rebuild
+ * for managers, the same button as in Settings), and (for managers) which
+ * questions it asks (lib/interviews/applyFields.ts). The Register tab asks
+ * the same questions.
  */
 export function ApplicationFormCard({
   locale,
@@ -62,6 +64,35 @@ export function ApplicationFormCard({
           <Link href={`/projects/${projectId}/interviews/settings`} className="font-medium text-brand-700 hover:underline">
             {t('applyForm.openSettings')}
           </Link>
+        ) : null}
+      </div>
+
+      {/* The registrations sheet (registrationSheet.ts): every application, one row each. */}
+      <div className="mt-4 border-t border-line pt-3">
+        <h3 className="mb-1 text-sm font-semibold">{t('settings.registrationsSheet')}</h3>
+        <p className="mb-2 text-xs text-ink-muted">{t('applyForm.sheetHint')}</p>
+        {edition.registrations_sheet_url ? (
+          <a
+            href={edition.registrations_sheet_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mb-2 inline-block text-sm font-medium text-brand-700 hover:underline"
+          >
+            {t('applyForm.openSheet')}
+          </a>
+        ) : (
+          <p className="mb-2 text-sm text-ink-muted">{t('settings.registrationsSheetNone')}</p>
+        )}
+        {manage ? (
+          <ActionForm
+            action={syncRegistrationSheetAction}
+            submitLabel={t('settings.registrationsSheetSync')}
+            variant="secondary"
+            className="space-y-2"
+          >
+            <input type="hidden" name="locale" value={locale} />
+            <input type="hidden" name="project_id" value={projectId} />
+          </ActionForm>
         ) : null}
       </div>
 

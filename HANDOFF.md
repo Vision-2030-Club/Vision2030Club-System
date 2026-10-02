@@ -1199,7 +1199,8 @@ extended; the room flow is untested by script.
   `after()`: submitted, name, email, phone, university, year, major,
   companies in rank order, CV, note ("Updated" for a re-submission),
   application id. University and year are written as the English labels. The first submission
-  creates the sheet; Settings → *Rebuild* rewrites it from the database (one
+  creates the sheet; its link is on the Applicants tab (and in Settings), and
+  *Rebuild* in either place rewrites it from the database (one
   row per application), which repairs any row Google missed. Same rules as the
   floor sheet: owned by the club's Google account, shared by name only, link
   sharing revoked on every rebuild. The CV column links to `/api/interviews/cv`,

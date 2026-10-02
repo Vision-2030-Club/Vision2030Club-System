@@ -978,7 +978,9 @@
         "off": "Not asked",
         "optional": "Optional",
         "required": "Required"
-      }
+      },
+      "sheetHint": "Every application, from the link above or the Register tab, is added here as a row. Only people the club’s Google account shares it with can open it.",
+      "openSheet": "Open the sheet"
     },
     "errors": {
       "applications_closed": "Applications are closed.",
