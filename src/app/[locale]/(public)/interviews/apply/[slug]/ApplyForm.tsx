@@ -1,35 +1,38 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState } from 'react';
 import { useTranslations } from 'next-intl';
+import { ApplicationQuestions, WhyFirstQuestion } from '@/components/ApplicationQuestions';
 import { CompanyPicker, type PickerCompany } from '@/components/CompanyPicker';
-import { Alert, Button, Input, Label, Select, Textarea } from '@/components/ui';
+import { Alert, Button, Input, Label } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
-import { ENGLISH_LEVELS, LEVELS, UNIVERSITIES } from '@/lib/interviews/types';
+import type { ApplyFields } from '@/lib/interviews/applyFields';
 import { applyAction } from './actions';
 
 /**
- * The same questions as last year's form. Company preferences are chosen on
- * cards (CompanyPicker), in the order they are tapped; a full company stays
- * on the grid, blurred, and cannot be chosen.
+ * Name and email, the questions the edition chose to ask (managers set them
+ * on the Applicants tab), the CV, and the companies. Company preferences are
+ * chosen on cards (CompanyPicker), in the order they are tapped; a full
+ * company stays on the grid, blurred, and cannot be chosen.
  */
 export function ApplyForm({
   locale,
   editionId,
   maxPreferences,
   companies,
+  fields,
 }: {
   locale: string;
   editionId: string;
   maxPreferences: number;
   companies: PickerCompany[];
+  fields: ApplyFields;
 }) {
   const t = useTranslations('interviews');
   const tCommon = useTranslations('common');
   const [state, formAction, pending] = useActionState<ActionResult, FormData>(applyAction, {
     ok: false,
   });
-  const [university, setUniversity] = useState<string>('');
 
   if (state.ok) {
     return (
@@ -60,97 +63,24 @@ export function ApplyForm({
       <fieldset className="space-y-3">
         <legend className="mb-1 text-base font-semibold">{t('apply.aboutYou')}</legend>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <Label htmlFor="name">{t('applicants.name')}</Label>
-            <Input id="name" name="name" required autoComplete="name" />
+          <div>
+            <Label htmlFor="apply-name">{t('applicants.name')}</Label>
+            <Input id="apply-name" name="name" required autoComplete="name" />
           </div>
           <div>
-            <Label htmlFor="email">{t('applicants.email')}</Label>
-            <Input id="email" name="email" type="email" dir="ltr" required autoComplete="email" />
+            <Label htmlFor="apply-email">{t('applicants.email')}</Label>
+            <Input id="apply-email" name="email" type="email" dir="ltr" required autoComplete="email" />
             <p className="mt-1 text-xs text-ink-muted">{t('apply.emailHint')}</p>
           </div>
-          <div>
-            <Label htmlFor="phone">{t('applicants.phone')}</Label>
-            <Input id="phone" name="phone" type="tel" dir="ltr" required autoComplete="tel" placeholder="05xxxxxxxx" />
-          </div>
-          <div className="sm:col-span-2">
-            <span className="mb-1 block text-sm font-medium text-ink">{t('applicants.clubMember')}</span>
-            <div className="flex gap-4 text-sm">
-              <label className="flex items-center gap-2">
-                <input type="radio" name="is_club_member" value="yes" className="accent-brand-600" />
-                {tCommon('yes')}
-              </label>
-              <label className="flex items-center gap-2">
-                <input type="radio" name="is_club_member" value="no" defaultChecked className="accent-brand-600" />
-                {tCommon('no')}
-              </label>
-            </div>
-          </div>
         </div>
-      </fieldset>
-
-      <fieldset className="space-y-3">
-        <legend className="mb-1 text-base font-semibold">{t('apply.studies')}</legend>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="university">{t('applicants.university')}</Label>
-            <Select id="university" name="university" required value={university} onChange={(e) => setUniversity(e.target.value)}>
-              <option value="">{t('apply.choose')}</option>
-              {UNIVERSITIES.map((key) => (
-                <option key={key} value={key}>
-                  {t(`universities.${key}`)}
-                </option>
-              ))}
-            </Select>
-          </div>
-          {university === 'other' ? (
-            <div>
-              <Label htmlFor="university_other">{t('apply.universityOther')}</Label>
-              <Input id="university_other" name="university_other" required />
-            </div>
-          ) : null}
-          <div>
-            <Label htmlFor="level">{t('applicants.level')}</Label>
-            <Select id="level" name="level" required defaultValue="">
-              <option value="">{t('apply.choose')}</option>
-              {LEVELS.map((key) => (
-                <option key={key} value={key}>
-                  {t(`levels.${key}`)}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="college">{t('applicants.college')}</Label>
-            <Input id="college" name="college" required />
-          </div>
-          <div>
-            <Label htmlFor="major">{t('applicants.major')}</Label>
-            <Input id="major" name="major" required />
-          </div>
-          <div>
-            <Label htmlFor="gpa">{t('applicants.gpa')}</Label>
-            <Input id="gpa" name="gpa" dir="ltr" inputMode="decimal" placeholder="4.5" />
-          </div>
-          <div>
-            <Label htmlFor="english_level">{t('applicants.english')}</Label>
-            <Select id="english_level" name="english_level" required defaultValue="">
-              <option value="">{t('apply.choose')}</option>
-              {ENGLISH_LEVELS.map((key) => (
-                <option key={key} value={key}>
-                  {t(`english.${key}`)}
-                </option>
-              ))}
-            </Select>
-          </div>
-        </div>
+        <ApplicationQuestions fields={fields} idPrefix="apply" />
       </fieldset>
 
       <fieldset className="space-y-3">
         <legend className="mb-1 text-base font-semibold">{t('apply.cv')}</legend>
         <div>
-          <Label htmlFor="cv">{t('apply.cvFile')}</Label>
-          <Input id="cv" name="cv" type="file" accept="application/pdf,.pdf" required />
+          <Label htmlFor="apply-cv">{t('apply.cvFile')}</Label>
+          <Input id="apply-cv" name="cv" type="file" accept="application/pdf,.pdf" required />
           <p className="mt-1 text-xs text-ink-muted">{t('apply.cvHint')}</p>
         </div>
       </fieldset>
@@ -159,10 +89,7 @@ export function ApplyForm({
         <legend className="mb-1 text-base font-semibold">{t('apply.companies')}</legend>
         <p className="text-xs text-ink-muted">{t('apply.companiesHint', { max: maxPreferences })}</p>
         <CompanyPicker companies={companies} max={maxPreferences} />
-        <div>
-          <Label htmlFor="why_first">{t('apply.whyFirst')}</Label>
-          <Textarea id="why_first" name="why_first" rows={4} required maxLength={2000} />
-        </div>
+        <WhyFirstQuestion fields={fields} idPrefix="apply" />
       </fieldset>
 
       {errorText ? <Alert tone="danger">{errorText}</Alert> : null}

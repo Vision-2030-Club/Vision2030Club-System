@@ -5,10 +5,15 @@ import { appendRows, createSpreadsheet, listTabs, revokeLinkSharing, writeTab } 
 import { siteUrl } from '@/lib/interviews/email';
 import type { Edition } from '@/lib/interviews/types';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
+import en from '../../../messages/en.json';
 
 /**
  * The registrations sheet: one Google Sheet per edition with a row for every
  * submission, from the public apply form and from staff on the Register tab.
+ *
+ * Columns: submitted, name, email, phone, university, year, major, the
+ * companies in rank order, CV, a note, and the application id. A question the
+ * edition does not ask (applyFields.ts) simply leaves its column blank.
  *
  * Two ways in:
  *   - kickRegistrationAppend, after each submission: appends ONE row. Cheap,
@@ -30,16 +35,30 @@ import { createInterviewsClient } from '@/lib/supabase/interviews';
  */
 
 const TAB = 'Registrations';
-const COLUMNS = ['Submitted', 'Name', 'Email', 'Phone', 'Companies', 'CV', 'Note', 'Application ID'];
+const COLUMNS = ['Submitted', 'Name', 'Email', 'Phone', 'University', 'Year', 'Major', 'Companies', 'CV', 'Note', 'Application ID'];
+const ROW_FIELDS = 'id, name, email, phone, university, university_other, level, major, submitted_at, cv_path';
 
 type Row = {
   id: string;
   name: string;
   email: string | null;
   phone: string | null;
+  university: string | null;
+  university_other: string | null;
+  level: string | null;
+  major: string | null;
   submitted_at: string;
   cv_path: string | null;
 };
+
+/** Answers stored as keys ("ksu", "year3") are written as the English form's own labels. */
+const UNIVERSITY_LABELS: Record<string, string> = en.interviews.universities;
+const LEVEL_LABELS: Record<string, string> = en.interviews.levels;
+
+function university(application: Row): string | null {
+  if (application.university === 'other') return application.university_other;
+  return application.university ? (UNIVERSITY_LABELS[application.university] ?? application.university) : null;
+}
 
 /**
  * A leading apostrophe makes Sheets keep a value as typed: a name starting
@@ -71,6 +90,9 @@ function toRow(edition: Edition, application: Row, companies: string[], note: st
     plain(application.name),
     plain(application.email),
     plain(application.phone),
+    plain(university(application)),
+    application.level ? (LEVEL_LABELS[application.level] ?? application.level) : '',
+    plain(application.major),
     plain(companies.join(' · ')),
     cv,
     note,
@@ -139,7 +161,7 @@ export async function syncRegistrationSheet(editionId: string): Promise<void> {
     pages<Row>((from, to) =>
       db
         .from('applications')
-        .select('id, name, email, phone, submitted_at, cv_path')
+        .select(ROW_FIELDS)
         .eq('edition_id', editionId)
         .order('submitted_at')
         .order('id')
@@ -206,7 +228,7 @@ async function appendRegistration(editionId: string, applicationId: string, repl
   const [{ data: application }, { data: preferences }, names] = await Promise.all([
     db
       .from('applications')
-      .select('id, name, email, phone, submitted_at, cv_path')
+      .select(ROW_FIELDS)
       .eq('id', applicationId)
       .maybeSingle(),
     db.from('application_preferences').select('company_id, rank').eq('application_id', applicationId).order('rank'),

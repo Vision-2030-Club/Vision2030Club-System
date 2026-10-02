@@ -14,6 +14,8 @@ export type EditionSettings = {
   tv_call_minutes: number;
   feedback_email_mode: 'on_release' | 'immediately';
   rating_labels: RatingLabel[];
+  /** Which questions the application form asks; read through resolveApplyFields (applyFields.ts). */
+  apply_fields?: Partial<Record<string, string>>;
 };
 
 export type Edition = {

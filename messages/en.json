@@ -811,7 +811,7 @@
       "empty": "No applicants match.",
       "name": "Name",
       "university": "University",
-      "level": "Level",
+      "level": "Year",
       "gpa": "GPA",
       "choices": "Companies",
       "submitted": "Submitted",
@@ -919,7 +919,6 @@
       "whatNext": "If a company accepts you, you will get an email with a personal link to choose your times.",
       "aboutYou": "About you",
       "emailHint": "Your personal link and every update go here.",
-      "studies": "Your studies",
       "choose": "Choose…",
       "universityOther": "Which university",
       "cv": "CV",
@@ -932,7 +931,7 @@
     },
     "register": {
       "title": "Register a student",
-      "intro": "For a student registering at the stand, or one who could not use the public form. Staff can register at any time until the edition is archived; the public form follows the application window.",
+      "intro": "For a student registering at the stand, or one who could not use the public form. It asks the same questions as the public form. Staff can register at any time until the edition is archived; the public form follows the application window.",
       "fullName": "Full name",
       "companies": "Companies of choice",
       "companiesHint": "Tap up to {max}, in order of preference. Tap a company again to undo it.",
@@ -947,8 +946,6 @@
       "done": "The student is registered.",
       "updated": "The student’s registration was updated.",
       "another": "Register another student",
-      "publicForm": "Public form",
-      "publicFormHint": "Students can also register themselves on this link while applications are open.",
       "publicLink": "Apply link",
       "manage": "Companies on the form",
       "manageHint": "Students choose from these. A full company stays visible, blurred, but can no longer be chosen. Removing one hides it from the form and closes its room if it has one; nothing is erased and it can be restored.",
@@ -962,7 +959,26 @@
       "removeTitle": "Remove this company?",
       "removeBody": "It disappears from the form, and its room closes if it has one, but nothing is erased: the students who chose it, its bookings and its history stay as they are. You can restore it any time.",
       "restore": "Restore",
-      "removedSection": "Removed companies ({count})"
+      "removedSection": "Removed companies ({count})",
+      "manageOnApplicants": "The questions, the companies and the public link are on the Applicants tab."
+    },
+    "applyForm": {
+      "title": "Application form",
+      "hint": "Share this link with students. Every application lands in the list below and in the registrations Google Sheet.",
+      "open": "Taking applications until {when}.",
+      "notYet": "Opens {when}.",
+      "closed": "Not taking applications: set the edition to Active and the application window in Settings.",
+      "openBadge": "Open",
+      "closedBadge": "Closed",
+      "openSettings": "Open Settings",
+      "questions": "Questions on the form",
+      "alwaysAsked": "Always asked: name, email, the companies (up to the limit in Settings) and the CV. Also asked:",
+      "editQuestions": "Edit questions",
+      "mode": {
+        "off": "Not asked",
+        "optional": "Optional",
+        "required": "Required"
+      }
     },
     "errors": {
       "applications_closed": "Applications are closed.",
@@ -999,7 +1015,8 @@
       "company_full": "One of the chosen companies is full. Choose another.",
       "not_image": "The logo must be a PNG, JPG, WebP or GIF image.",
       "logo_too_large": "The logo is larger than 1 MB.",
-      "missing_company_name": "Enter the company’s name."
+      "missing_company_name": "Enter the company’s name.",
+      "missing_answer": "Answer this question: {question}."
     },
     "student": {
       "hello": "Hello, {name}.",

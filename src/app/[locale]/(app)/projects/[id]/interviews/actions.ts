@@ -19,6 +19,8 @@ import { takeExport } from '@/lib/interviews/export';
 import { removeCv, uploadCv } from '@/lib/interviews/cv';
 import { removeLogo, uploadLogo } from '@/lib/interviews/logo';
 import { kickRegistrationAppend, syncRegistrationSheet } from '@/lib/interviews/registrationSheet';
+import { APPLY_FIELDS, FIELD_LABELS, FIELD_MODES, resolveApplyFields, type FieldMode } from '@/lib/interviews/applyFields';
+import { applicationPayload } from '@/lib/interviews/applyPayload';
 import type { Stage } from '@/lib/interviews/types';
 import { fromClubWallClock } from '@/lib/time';
 
@@ -367,7 +369,7 @@ export async function upsertRoomAction(
 }
 
 /**
- * Adds or edits a company from the Register tab (a plain company, no room or
+ * Adds or edits a company from the Applicants tab (a plain company, no room or
  * session: the apply-form flow). Only the fields the form sends are changed,
  * so an edit never un-hides or re-orders a company by omission. A logo file
  * replaces the old logo, which is deleted from the bucket once the row is
@@ -462,13 +464,45 @@ export async function setCompanyFullAction(
   return ok();
 }
 
+/**
+ * Which questions the application form asks (applyFields.ts), from the
+ * Applicants tab. Stored as one `apply_fields` object in the edition's
+ * settings; update_edition merges it over the rest, so nothing else moves.
+ */
+export async function updateApplyFieldsAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const apply_fields = Object.fromEntries(
+    APPLY_FIELDS.map((field) => {
+      const mode = text(formData, `field_${field}`);
+      return [field, (FIELD_MODES as readonly string[]).includes(mode ?? '') ? (mode as FieldMode) : 'off'];
+    }),
+  );
+
+  const db = createInterviewsClient();
+  const { error } = await db.rpc('update_edition', {
+    p_edition: g.access.edition.id,
+    p_patch: { settings: { apply_fields } },
+    p_actor: g.access.actor,
+  });
+  if (error) return fromPostgrest(error);
+
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
 // -----------------------------------------------------------------------------
 // Registering a student (the Register tab)
 // -----------------------------------------------------------------------------
 
 /**
- * HR or a manager registers a student: the apply form's short version, through
- * the same submit_application, with the staff member as the actor. The
+ * HR or a manager registers a student: the same questions as the public form
+ * (applyFields.ts), through the same submit_application, with the staff
+ * member as the actor. The
  * database lets staff in outside the public window (0010) and applies every
  * other rule the public form meets: the company limit, full companies, one
  * application per email, the CV. Same CV handling as applyAction.
@@ -486,6 +520,17 @@ export async function registerAction(
   const editionId = g.access.edition.id;
   const db = createInterviewsClient();
 
+  // The same questions the public form asks (applyFields.ts), checked before
+  // the CV is uploaded.
+  const answers = applicationPayload(
+    formData,
+    resolveApplyFields(g.access.settings?.apply_fields),
+    g.locale === 'en' ? 'en' : 'ar',
+  );
+  if (answers.missing) {
+    return fail(t('errors.missing_answer', { question: t(FIELD_LABELS[answers.missing]) }));
+  }
+
   let cvPath: string | null = null;
   const file = formData.get('cv');
   if (file instanceof File && file.size > 0) {
@@ -496,14 +541,7 @@ export async function registerAction(
 
   const { data, error } = await db.rpc('submit_application', {
     p_edition: editionId,
-    p_payload: {
-      name: text(formData, 'name'),
-      email: text(formData, 'email'),
-      phone: text(formData, 'phone'),
-      locale: g.locale === 'en' ? 'en' : 'ar',
-      preferences: all(formData, 'preference'),
-      cv_path: cvPath,
-    },
+    p_payload: { ...answers.payload, cv_path: cvPath },
     p_token: newToken(),
     p_actor: g.access.actor,
   });

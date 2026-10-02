@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * Company logos uploaded from the Register tab live in the PRIVATE `logos`
+ * Company logos uploaded from the Applicants tab live in the PRIVATE `logos`
  * bucket (migration 0010), like everything else in this project. They are
  * not secret — they are on the public apply form — but a private bucket
  * needs no storage policy, and the rule here is that nothing opens one.

@@ -2,9 +2,11 @@
 
 import { useActionState, useRef, useState, type DragEvent } from 'react';
 import { useTranslations } from 'next-intl';
+import { ApplicationQuestions, WhyFirstQuestion } from '@/components/ApplicationQuestions';
 import { CompanyPicker, type PickerCompany } from '@/components/CompanyPicker';
 import { Alert, Button, Input, Label, cx } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
+import type { ApplyFields } from '@/lib/interviews/applyFields';
 import { registerAction } from '../actions';
 
 /**
@@ -16,6 +18,7 @@ export function RegisterForm(props: {
   projectId: string;
   maxPreferences: number;
   companies: PickerCompany[];
+  fields: ApplyFields;
 }) {
   const [round, setRound] = useState(0);
   return <Form key={round} {...props} onAnother={() => setRound((n) => n + 1)} />;
@@ -26,12 +29,14 @@ function Form({
   projectId,
   maxPreferences,
   companies,
+  fields,
   onAnother,
 }: {
   locale: string;
   projectId: string;
   maxPreferences: number;
   companies: PickerCompany[];
+  fields: ApplyFields;
   onAnother: () => void;
 }) {
   const t = useTranslations('interviews');
@@ -55,7 +60,7 @@ function Form({
       <input type="hidden" name="locale" value={locale} />
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="sm:col-span-2">
+        <div>
           <Label htmlFor="register-name">{t('register.fullName')}</Label>
           <Input id="register-name" name="name" required autoComplete="off" />
         </div>
@@ -63,19 +68,8 @@ function Form({
           <Label htmlFor="register-email">{t('applicants.email')}</Label>
           <Input id="register-email" name="email" type="email" dir="ltr" required autoComplete="off" />
         </div>
-        <div>
-          <Label htmlFor="register-phone">{t('applicants.phone')}</Label>
-          <Input
-            id="register-phone"
-            name="phone"
-            type="tel"
-            dir="ltr"
-            required
-            autoComplete="off"
-            placeholder="05xxxxxxxx"
-          />
-        </div>
       </div>
+      <ApplicationQuestions fields={fields} idPrefix="register" />
 
       <fieldset className="space-y-2">
         <legend className="mb-1 text-sm font-medium text-ink">{t('register.companies')}</legend>
@@ -85,6 +79,7 @@ function Form({
         ) : (
           <p className="text-sm text-ink-muted">{t('register.noCompanies')}</p>
         )}
+        <WhyFirstQuestion fields={fields} idPrefix="register" />
       </fieldset>
 
       <CvDropzone />

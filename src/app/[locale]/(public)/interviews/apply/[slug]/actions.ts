@@ -1,9 +1,13 @@
 'use server';
 
-import { all, fail, fromPostgrest, ok, requiredText, text, type ActionResult } from '@/lib/actions';
+import { getTranslations } from 'next-intl/server';
+import { fail, fromPostgrest, ok, requiredText, text, type ActionResult } from '@/lib/actions';
+import { FIELD_LABELS, resolveApplyFields } from '@/lib/interviews/applyFields';
+import { applicationPayload } from '@/lib/interviews/applyPayload';
 import { removeCv, uploadCv } from '@/lib/interviews/cv';
 import { kickRegistrationAppend } from '@/lib/interviews/registrationSheet';
 import { newToken } from '@/lib/interviews/tokens';
+import type { EditionSettings } from '@/lib/interviews/types';
 import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/interviews';
 
 /**
@@ -28,6 +32,16 @@ export async function applyAction(
   if (!isInterviewsConfigured()) return fail('Applications are not available right now.', 'not_configured');
   const db = createInterviewsClient();
 
+  // The questions this edition asks (lib/interviews/applyFields.ts). A
+  // required one left blank is refused here, before the CV is uploaded.
+  const { data: settings } = await db.rpc('edition_settings', { p_edition: editionId });
+  const fields = resolveApplyFields((settings as EditionSettings | null)?.apply_fields);
+  const answers = applicationPayload(formData, fields, locale);
+  if (answers.missing) {
+    const t = await getTranslations({ locale, namespace: 'interviews' });
+    return fail(t('errors.missing_answer', { question: t(FIELD_LABELS[answers.missing]) }));
+  }
+
   let cvPath: string | null = null;
   const file = formData.get('cv');
   if (file instanceof File && file.size > 0) {
@@ -36,24 +50,7 @@ export async function applyAction(
     cvPath = uploaded.path;
   }
 
-  const university = text(formData, 'university');
-  const payload = {
-    email: text(formData, 'email'),
-    name: text(formData, 'name'),
-    phone: text(formData, 'phone'),
-    is_club_member: formData.get('is_club_member') === 'yes',
-    university,
-    university_other: university === 'other' ? text(formData, 'university_other') : null,
-    level: text(formData, 'level'),
-    college: text(formData, 'college'),
-    major: text(formData, 'major'),
-    gpa: text(formData, 'gpa'),
-    english_level: text(formData, 'english_level'),
-    why_first: text(formData, 'why_first'),
-    locale,
-    preferences: all(formData, 'preference'),
-    cv_path: cvPath,
-  };
+  const payload = { ...answers.payload, cv_path: cvPath };
 
   const { data, error } = await db.rpc('submit_application', {
     p_edition: editionId,

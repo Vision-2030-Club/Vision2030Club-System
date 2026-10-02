@@ -1155,9 +1155,25 @@ extended; the room flow is untested by script.
 
 ### Registering, full companies, and the registrations sheet (0010)
 
+- **Applicants tab** now opens with the application form (the public link,
+  whether it is taking applications, and the questions it asks) and, for
+  managers, the companies students choose from (their رغبات): add, edit,
+  logo, Mark as full, Remove/Restore (`CompanyManager.tsx`).
+- **The questions are a setting.** `editions.settings.apply_fields`, edited
+  under *Edit questions* on the Applicants tab, says for phone, university,
+  year (`level`), major, college, GPA, English, club member and "why your
+  first choice" whether each is not asked, optional or required
+  (`src/lib/interviews/applyFields.ts`). Name, email, the companies and the
+  CV are always asked. An edition that never saved a choice gets the club's
+  October 2026 list: phone, university, year, major required, the rest off.
+  Both forms draw the questions from it (`ApplicationQuestions.tsx`), and
+  both actions check required answers and drop unasked ones on the server
+  (`applyPayload.ts`); the database itself still only insists on name,
+  email, companies and CV. No migration: settings is a jsonb that
+  `update_edition` merges.
 - **Register tab** (`/projects/<id>/interviews/register`, HR and managers).
-  A short form (name, email, phone, up to `max_preferences` companies as
-  cards, CV) for a student registering at the stand. It goes through the same
+  The same questions as the public form, the companies as cards, and the CV,
+  for a student registering at the stand. It goes through the same
   `submit_application` as the public form, with the staff member as
   `p_actor`. 0010 lets a **member** actor register outside the public window
   (draft or closed editions; archived still refuses) and records them as the
@@ -1167,11 +1183,11 @@ extended; the room flow is untested by script.
   selects on the public apply form too. The order companies are tapped in is
   their rank.
 - **Full companies.** `companies.is_full`, set by `set_company_full` (Mark as
-  full / Mark as open on the Register tab, managers only). A full company is
+  full / Mark as open on the Applicants tab, managers only). A full company is
   NOT hidden: it stays on both forms, blurred and unclickable, and
   `submit_application` refuses it (`company_full`) unless that application
   already held it, so fixing a typo never costs a student a company they had.
-  Remove on the Register tab is the old soft-delete (`is_hidden`, plus the
+  Remove on the Applicants tab is the old soft-delete (`is_hidden`, plus the
   room if it has one, the same action as the Rooms tab), restorable.
 - **Logos** can be uploaded (PNG/JPG/WebP/GIF, 1 MB) into the private `logos`
   bucket. `logo_url` stores the RELATIVE `/api/interviews/logo?path=…`, which
@@ -1180,8 +1196,9 @@ extended; the room flow is untested by script.
   work; the Rooms tab's logo field is plain text now so it accepts both.
 - **Registrations sheet.** `src/lib/interviews/registrationSheet.ts`. Every
   accepted submission (public form and Register tab) appends one row through
-  `after()`: submitted, name, email, phone, companies in rank order, CV,
-  note ("Updated" for a re-submission), application id. The first submission
+  `after()`: submitted, name, email, phone, university, year, major,
+  companies in rank order, CV, note ("Updated" for a re-submission),
+  application id. University and year are written as the English labels. The first submission
   creates the sheet; Settings → *Rebuild* rewrites it from the database (one
   row per application), which repairs any row Google missed. Same rules as the
   floor sheet: owned by the club's Google account, shared by name only, link

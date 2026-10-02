@@ -302,7 +302,7 @@ function RoomForm({
           <Input
             id={`${company.id}-logo_url`}
             name="logo_url"
-            // Text, not type="url": a logo uploaded on the Register tab is
+            // Text, not type="url": a logo uploaded on the Applicants tab is
             // stored as a relative /api/interviews/logo address.
             inputMode="url"
             dir="ltr"
