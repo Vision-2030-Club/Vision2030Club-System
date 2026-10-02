@@ -15,7 +15,7 @@ type TCommon = Awaited<ReturnType<typeof getTranslations<'common'>>>;
 
 /**
  * The public application link, whether it is taking applications right now,
- * the registrations Google Sheet every application lands in (with Rebuild
+ * the registrations Google Sheet every application lands in (with Sync now
  * for managers, the same button as in Settings), and (for managers) which
  * questions it asks (lib/interviews/applyFields.ts). The Register tab asks
  * the same questions.

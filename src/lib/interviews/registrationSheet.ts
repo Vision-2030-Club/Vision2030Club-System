@@ -19,7 +19,7 @@ import en from '../../../messages/en.json';
  *   - kickRegistrationAppend, after each submission: appends ONE row. Cheap,
  *     and what people watching the sheet expect to see. A re-submission with
  *     the same email appends another row marked "Updated"; the later row wins.
- *   - syncRegistrationSheet, from Settings → "Rebuild": rewrites the whole tab
+ *   - syncRegistrationSheet, from Settings → "Sync now": rewrites the whole tab
  *     from the database, one row per application. That is the repair for a
  *     row that never arrived (Google was down, the account not connected yet)
  *     and the way to fold the "Updated" duplicates away.
@@ -219,7 +219,7 @@ export async function syncRegistrationSheet(editionId: string): Promise<void> {
  * Appends one submission. With no sheet yet, the first submission builds it
  * whole instead (which includes this row). Two instances doing that in the
  * same second could each create a sheet; the edition keeps the later one,
- * and Rebuild makes it complete.
+ * and Sync now makes it complete.
  */
 async function appendRegistration(editionId: string, applicationId: string, replaced: boolean): Promise<void> {
   if (!isGoogleConfigured()) return;

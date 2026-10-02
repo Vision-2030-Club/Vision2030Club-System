@@ -1246,7 +1246,7 @@ extended; the room flow is untested by script.
   The sheet's id and link are kept in the edition's settings, so it needs
   only the Google account, no migration. The first submission
   creates the sheet; its link is on the Applicants tab (and in Settings), and
-  *Rebuild* in either place rewrites it from the database (one
+  *Sync now* in either place rewrites it from the database (one
   row per application), which repairs any row Google missed. Same rules as the
   floor sheet: owned by the club's Google account, shared by name only, link
   sharing revoked on every rebuild. The CV column links to `/api/interviews/cv`,
@@ -1285,6 +1285,18 @@ rules, dedupe of every email, the archived edition refusing writes.
 `scripts/interviews-tests.mjs` repeats them against the real project with two
 connections firing at once; `scripts/component-tests.mjs` covers 0062.
 `npm run build`, `npm run typecheck` and `npx eslint` are clean.
+
+**Both Google Sheets remember themselves in the edition's settings
+(2026-10-02).** The floor sheet saved its id with 0006's `set_floor_sheet`,
+ignored the error when 0006 was missing (as on the real project), and so made
+a new spreadsheet on every sync without ever showing a link. It now keeps
+`floor_sheet_id` / `floor_sheet_url` in the settings, the same way the
+registrations sheet keeps `registrations_sheet_id` / `_url`; 0006's column
+still counts where it exists. Both sheets use the Google account connected
+under Admin → Google (any account; the sheets belong to it) and need the
+Google Sheets API and Google Drive API enabled in that Google Cloud project
+as well as the Calendar API. Both have a **Sync now** button, which shows
+Google's error if one comes back; the automatic syncs only log it.
 
 ### Things easy to break
 

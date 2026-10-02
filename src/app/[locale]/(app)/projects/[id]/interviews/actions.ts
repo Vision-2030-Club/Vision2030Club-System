@@ -162,7 +162,7 @@ export async function syncFloorSheetAction(
   return ok();
 }
 
-/** Settings → Rebuild: the registrations sheet rewritten from the database (registrationSheet.ts). */
+/** Settings → Sync now: the registrations sheet rewritten from the database (registrationSheet.ts). */
 export async function syncRegistrationSheetAction(
   _previous: ActionResult,
   formData: FormData,

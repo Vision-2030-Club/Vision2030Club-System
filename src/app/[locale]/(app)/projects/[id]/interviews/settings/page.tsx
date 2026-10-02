@@ -53,6 +53,8 @@ export default async function InterviewsSettingsPage({
       .maybeSingle(),
   ]);
 
+  // The floor sheet's link: 0006's column where it exists, else the settings (floorSheet.ts).
+  const floorSheetUrl = edition.floor_sheet_url ?? settings.floor_sheet_url ?? null;
   const whenInput = (iso: string | null) => (iso ? toDateTimeInput(new Date(iso)) : '');
   const tvUrl = edition.tv_token ? `${siteUrl()}/${locale}/interviews/tv/${edition.tv_token}` : null;
   const labelRows = [...settings.rating_labels, ...Array(6).fill(null)].slice(0, 6);
@@ -184,15 +186,15 @@ export default async function InterviewsSettingsPage({
         <Card>
           <h2 className="mb-1 font-semibold">{t('settings.floorSheet')}</h2>
           <p className="mb-3 text-xs text-ink-muted">{t('settings.floorSheetHint')}</p>
-          {edition.floor_sheet_url ? (
+          {floorSheetUrl ? (
             <a
-              href={edition.floor_sheet_url}
+              href={floorSheetUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="mb-3 block break-all text-sm font-medium text-brand-600 hover:underline"
               dir="ltr"
             >
-              {edition.floor_sheet_url}
+              {floorSheetUrl}
             </a>
           ) : (
             <p className="mb-3 text-sm text-ink-muted">{t('settings.floorSheetNone')}</p>

@@ -759,9 +759,9 @@
       "floorSheetPulled": "Stage changes from the Sheet were applied, and the Sheet was refreshed to match.",
       "floorSheetPullHint": "Reads the Stage column of every day tab and applies any changes (Not Arrived / Arrived / In Interview / Finished / No Show) to the matching booking. Nothing happens automatically — only when this is pressed.",
       "registrationsSheet": "Registrations Google Sheet",
-      "registrationsSheetHint": "Every registration, from the public form and the Register tab, is added as a row: submitted, name, email, phone, companies, CV. A student who registers again with the same email gets a second row marked “Updated”. Rebuild rewrites the sheet from the database, one row per student, which also fills in any row Google missed. Requires the club’s Google account under Admin → Google. The sheet holds personal data: it is shared with nobody by default, so share it with named people only. The CV links open only for signed-in HR and managers.",
-      "registrationsSheetNone": "Not created yet — it appears with the first registration, or press Rebuild.",
-      "registrationsSheetSync": "Rebuild"
+      "registrationsSheetHint": "Every application, from the public form and the Register tab, is added as a row: submitted, name, email, phone, university, year, major, companies, CV. A student who applies again with the same email gets a second row marked “Updated”. Sync now rewrites the sheet from the system, one row per student, which also fills in any row Google missed. Uses the Google account connected under Admin → Google, like the Live Google Sheet. The sheet holds personal data: it is shared with nobody by default, so share it with named people only. The CV links open only for signed-in HR and managers.",
+      "registrationsSheetNone": "Not created yet — it appears with the first application, or press Sync now.",
+      "registrationsSheetSync": "Sync now"
     },
     "companies": {
       "new": "New company",
