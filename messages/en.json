@@ -759,9 +759,9 @@
       "floorSheetPulled": "Stage changes from the Sheet were applied, and the Sheet was refreshed to match.",
       "floorSheetPullHint": "Reads the Stage column of every day tab and applies any changes (Not Arrived / Arrived / In Interview / Finished / No Show) to the matching booking. Nothing happens automatically — only when this is pressed.",
       "registrationsSheet": "Registrations Google Sheet",
-      "registrationsSheetHint": "Every registration, from the public form and the Register tab, is added as a row: submitted, name, email, phone, companies, CV. A student who registers again with the same email gets a second row marked “Updated”. Rebuild rewrites the sheet from the database, one row per student, which also fills in any row Google missed. Requires the club’s Google account under Admin → Google. The sheet holds personal data: it is shared with nobody by default, so share it with named people only. The CV links open only for signed-in HR and managers.",
-      "registrationsSheetNone": "Not created yet — it appears with the first registration, or press Rebuild.",
-      "registrationsSheetSync": "Rebuild"
+      "registrationsSheetHint": "Every application, from the public form and the Register tab, is added as a row: submitted, name, email, phone, university, year, major, companies, CV. A student who applies again with the same email gets a second row marked “Updated”. Sync now rewrites the sheet from the system, one row per student, which also fills in any row Google missed. Uses the Google account connected under Admin → Google, like the Live Google Sheet. The sheet holds personal data: it is shared with nobody by default, so share it with named people only. The CV links open only for signed-in HR and managers.",
+      "registrationsSheetNone": "Not created yet — it appears with the first application, or press Sync now.",
+      "registrationsSheetSync": "Sync now"
     },
     "companies": {
       "new": "New company",
@@ -793,7 +793,7 @@
       "acceptedPhones": "Accepted phone numbers",
       "noAcceptedPhones": "No phone numbers accepted yet.",
       "addPhones": "Add phone numbers",
-      "addPhonesHint": "One per line. Anyone who logs in on the room link with one of these numbers sees the available times right away.",
+      "addPhonesHint": "One per line. Each number is matched to the student who applied with it and accepted for this company; they must have chosen this company on the form.",
       "roomDay": "Day",
       "delete": "Delete room",
       "deleteTitle": "Delete this room?",
@@ -805,7 +805,15 @@
       "companyName": "Company name",
       "companyNameHint": "Defaults to the room name if left blank",
       "companyNameAr": "Company name (Arabic)",
-      "interviewerSide": "Interviewer link and PIN"
+      "interviewerSide": "Interviewer link and PIN",
+      "logoUploaded": "Logo uploaded on the Applicants tab. Change it there.",
+      "phonesEmpty": "Enter at least one phone number.",
+      "phonesAccepted": "Accepted {count}.",
+      "phonesNotFound": "No applicant has these numbers: {phones}.",
+      "phonesNotChosen": "These applicants did not choose this company: {phones}.",
+      "roomCompany": "Company",
+      "roomCompanyNew": "New company (type its name)",
+      "createLink": "Create room link"
     },
     "people": {
       "add": "Add",
@@ -963,7 +971,7 @@
       "manageHint": "Students choose from these. A full company stays visible, blurred, but can no longer be chosen. Removing one hides it from the form and closes its room if it has one; nothing is erased and it can be restored.",
       "addCompany": "Add company",
       "logo": "Logo",
-      "logoHint": "PNG, JPG, WebP or GIF, up to 1 MB.",
+      "logoHint": "Any image. It is shrunk to a small square and saved with the company.",
       "removeLogo": "Remove the logo",
       "markFull": "Mark as full",
       "markOpen": "Mark as open",
@@ -1031,7 +1039,8 @@
       "not_image": "The logo must be a PNG, JPG, WebP or GIF image.",
       "logo_too_large": "The logo is larger than 1 MB.",
       "missing_company_name": "Enter the company’s name.",
-      "missing_answer": "Answer this question: {question}."
+      "missing_answer": "Answer this question: {question}.",
+      "no_match": "No application matches that phone number and email. Use the ones you applied with."
     },
     "student": {
       "hello": "Hello, {name}.",
@@ -1088,13 +1097,15 @@
       "quiet": "Waiting for the next interview"
     },
     "room": {
-      "intro": "Enter your name and phone number, and attach your CV, to see whether you have been accepted here.",
+      "intro": "Enter your name, the phone number and email you applied with, and your CV. If you have been accepted for this room, you will choose your interview time next.",
       "name": "Name",
       "phone": "Phone number",
       "cvFile": "CV (PDF, up to 5 MB)",
-      "cvHint": "Optional if you already sent one. A CV already on file is kept.",
+      "cvHint": "If you already sent your CV when you applied, you can leave this empty, or attach a new one to replace it.",
       "submit": "Continue",
-      "notAccepted": "You have not been accepted for this company yet. Check back later, or contact the club."
+      "notAccepted": "You have not been accepted for this company yet. Check back later, or contact the club.",
+      "email": "Email",
+      "emailHint": "The email you applied with."
     }
   },
   "outreach": {

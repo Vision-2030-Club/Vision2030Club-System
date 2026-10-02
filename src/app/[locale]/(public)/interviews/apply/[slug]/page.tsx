@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Alert, Card } from '@/components/ui';
 import { formatDateTime, localized } from '@/lib/format';
 import { resolveApplyFields } from '@/lib/interviews/applyFields';
+import { fullCompanyIds } from '@/lib/interviews/fullCompanies';
 import { loadCompanies } from '@/lib/interviews/queries';
 import type { Edition, EditionSettings } from '@/lib/interviews/types';
 import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/interviews';
@@ -56,6 +57,7 @@ export default async function ApplyPage({
   ]);
   const maxPreferences = (settings as EditionSettings | null)?.max_preferences ?? 4;
   const fields = resolveApplyFields((settings as EditionSettings | null)?.apply_fields);
+  const full = fullCompanyIds(settings as EditionSettings | null);
 
   return (
     <>
@@ -77,7 +79,7 @@ export default async function ApplyPage({
               name: localized(c, 'name', locale),
               description: localized(c, 'desc', locale),
               logo_url: c.logo_url,
-              is_full: Boolean(c.is_full),
+              is_full: full.has(c.id),
             }))}
         />
       </Card>

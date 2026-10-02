@@ -28,9 +28,21 @@ export function isEmailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
 }
 
-/** Where the links in an email point. The deployment, unless told otherwise. */
+/**
+ * The address every shareable link starts with: emails, the apply link, the
+ * interviewer, room and TV links, the sheet's CV links. Always the production
+ * site, even on a preview, because these links are handed to people.
+ *
+ * SITE_URL when someone set it; otherwise the production domain Vercel itself
+ * reports (a system variable, present on every deployment); otherwise the
+ * club's address. The fallback used to read `vision2030-club-system`, with a
+ * hyphen that does not exist, and as SITE_URL was never set every one of these
+ * links led nowhere.
+ */
 export function siteUrl(): string {
-  return (process.env.SITE_URL ?? 'https://vision2030-club-system.vercel.app').replace(/\/$/, '');
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  const url = process.env.SITE_URL || (vercel ? `https://${vercel}` : 'https://vision2030club-system.vercel.app');
+  return url.replace(/\/$/, '');
 }
 
 export type EmailReport = {

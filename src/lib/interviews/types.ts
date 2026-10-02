@@ -16,6 +16,16 @@ export type EditionSettings = {
   rating_labels: RatingLabel[];
   /** Which questions the application form asks; read through resolveApplyFields (applyFields.ts). */
   apply_fields?: Partial<Record<string, string>>;
+  /** Company ids marked full; read through fullCompanyIds (fullCompanies.ts). */
+  full_companies?: string[];
+  /** The registrations Google Sheet (registrationSheet.ts), set when it is first created. */
+  registrations_sheet_id?: string;
+  registrations_sheet_url?: string;
+  /** The floor sheet (floorSheet.ts), where 0006's columns are missing. */
+  floor_sheet_id?: string;
+  floor_sheet_url?: string;
+  /** Each room's public link token, by company id; read through roomLinks (roomLinks.ts). */
+  room_links?: Record<string, string>;
 };
 
 export type Edition = {
@@ -33,9 +43,6 @@ export type Edition = {
   tv_token: string | null;
   floor_sheet_id: string | null;
   floor_sheet_url: string | null;
-  /** 0010; absent until that migration is applied. */
-  registrations_sheet_id?: string | null;
-  registrations_sheet_url?: string | null;
   settings: Partial<EditionSettings>;
   created_at: string;
   updated_at: string;
@@ -59,7 +66,7 @@ export type Company = {
   desc_en: string | null;
   desc_ar: string | null;
   is_hidden: boolean;
-  /** 0010: still listed, but no longer choosable. Absent until that migration is applied. */
+  /** 0010's flag, unused: "full" lives in the edition's settings (fullCompanies.ts). */
   is_full?: boolean;
   sort_order: number;
   access_token: string;

@@ -129,15 +129,38 @@ export async function loadCounters(
   return new Map(((data ?? []) as CompanyCounter[]).map((row) => [row.company_id, row]));
 }
 
-export type AcceptedPhone = { phone: string; name: string; decided_at: string | null };
+export type AcceptedPhone = { application_id: string; phone: string; name: string; decided_at: string | null };
 
-/** HR's pre-approval list (0005) for one company/room's candidate link. */
+/**
+ * Who is accepted for one company: every application whose preference for
+ * it is `accepted`, however it got there (the Rooms tab's phone list or the
+ * Accept button on an applicant's page). Read straight from the tables
+ * 0001 made, so it needs no later migration.
+ */
 export async function loadAcceptedPhones(
   db: SupabaseClient,
   companyId: string,
 ): Promise<AcceptedPhone[]> {
-  const { data } = await db.rpc('accepted_phones', { p_company: companyId });
-  return (data ?? []) as AcceptedPhone[];
+  const { data } = await db
+    .from('application_preferences')
+    .select('application_id, decided_at, applications(name, phone)')
+    .eq('company_id', companyId)
+    .eq('decision', 'accepted')
+    .order('decided_at', { ascending: false });
+  type Row = {
+    application_id: string;
+    decided_at: string | null;
+    applications: { name: string; phone: string | null } | { name: string; phone: string | null }[] | null;
+  };
+  return ((data ?? []) as Row[]).map((row) => {
+    const app = Array.isArray(row.applications) ? row.applications[0] : row.applications;
+    return {
+      application_id: row.application_id,
+      phone: app?.phone ?? '',
+      name: app?.name ?? '',
+      decided_at: row.decided_at,
+    };
+  });
 }
 
 export async function countApplications(db: SupabaseClient, editionId: string): Promise<number> {

@@ -1136,6 +1136,40 @@ apply form → HR selection → personal link flow decided on 2026-09-16:
   link* (behind *Interviewer link and PIN*), and takes an Arabic company
   name, so the apply-form flow stays manageable.
 
+**The Rooms tab without 0005 (2026-10-02).** 0005–0009 were never applied to
+the real project, so rooms had no candidate link, and the tab hid Edit,
+Delete, the accepted-phones list and the interviewer link behind that link.
+Now only the candidate link waits on 0005; everything else shows on every
+room. The accepted-phones list no longer uses 0005's `accept_phone`,
+`unaccept_phone` and `accepted_phones`: HR pastes numbers (nothing is filled
+in automatically), each is matched in the app to the applicant who applied
+with it (`src/lib/interviews/phone.ts`, the same rule as
+`app.normalise_phone`; an application with an email first, then the newest),
+and accepted for the room's company with 0001's `decide_preference`, the
+Accept button's own function. A number that matches nobody, or a student who
+did not choose that company, is listed back instead. The list is read
+straight from `application_preferences`, so a student accepted from their
+applicant page shows there too. Accepting queues the acceptance email with the
+personal booking link, which goes out once Resend is configured.
+
+**Room links without 0005 (2026-10-02).** Each room's public link is kept in
+the edition's settings, `room_links` ({ company id: token },
+`src/lib/interviews/roomLinks.ts`); **Add room** creates it, and older rooms
+get a **Create room link** button. The link (`/interviews/room/<token>`) asks
+for name, phone, the email the student applied with, and a CV. Email and
+phone must belong to one application in the edition (phone alone is not
+enough: the rule above), and that application must be accepted for the
+room's company; then the student goes to their personal booking page (0002).
+A new CV replaces the one on file, written straight to the row (audited as
+`system`); none is needed if one is there. **Add room** can now attach the room
+to an existing company (the one students chose on the form) instead of
+always creating a new company, which used to leave two companies of the same
+name, one chosen by students and one holding the room. Each room's times are
+its own slots: a 2pm booked in one room leaves every other room's 2pm free,
+while one student still cannot hold two overlapping times
+(`bookings_no_overlap`). A 0005 `candidate_token`, where that migration ran,
+still works as a fallback link.
+
 **Open decision for the club (not taken in code):** run the event on the
 room flow (phone list at the door), on the apply-form flow (HR selects
 applicants, students get a personal link by email), or both. Until it is
@@ -1184,25 +1218,35 @@ extended; the room flow is untested by script.
 - **Company cards** (`src/components/CompanyPicker.tsx`) replace the numbered
   selects on the public apply form too. The order companies are tapped in is
   their rank.
-- **Full companies.** `companies.is_full`, set by `set_company_full` (Mark as
-  full / Mark as open on the Applicants tab, managers only). A full company is
-  NOT hidden: it stays on both forms, blurred and unclickable, and
-  `submit_application` refuses it (`company_full`) unless that application
-  already held it, so fixing a typo never costs a student a company they had.
-  Remove on the Applicants tab is the old soft-delete (`is_hidden`, plus the
-  room if it has one, the same action as the Rooms tab), restorable.
-- **Logos** can be uploaded (PNG/JPG/WebP/GIF, 1 MB) into the private `logos`
-  bucket. `logo_url` stores the RELATIVE `/api/interviews/logo?path=…`, which
-  streams the file (public, cached forever: every upload gets a new name), so
-  a logo uploaded on a preview works on production. Pasted external URLs still
-  work; the Rooms tab's logo field is plain text now so it accepts both.
+- **Full companies.** Mark as full / Mark as open on the Applicants tab
+  (managers only) keeps a list of company ids in the edition's settings,
+  `full_companies` (`src/lib/interviews/fullCompanies.ts`), so it works
+  without 0010. A full company is NOT hidden: it stays on both forms, blurred
+  and unclickable, and both submit actions refuse it (`company_full`) before
+  anything is uploaded, unless that student's application (same email)
+  already held it, so fixing a typo never costs them a company they had. The
+  refusal is in TypeScript, not SQL; a company marked full in the same second
+  a student submits can slip through, which is harmless. 0010's
+  `companies.is_full` and `set_company_full` are unused. Remove on the
+  Applicants tab is the old soft-delete (`is_hidden`, plus the room if it has
+  one, the same action as the Rooms tab), restorable.
+- **Logos** need no file storage. Choosing one on the Applicants tab shrinks
+  it in the browser to at most 160 px (`src/components/LogoInput.tsx`) and
+  stores the result in `companies.logo_url` as a `data:image/webp` address, a
+  few kilobytes; the server accepts only a PNG/WebP/JPEG data URL under
+  200 KB. Pasted external URLs still work from the Rooms tab, which carries an
+  uploaded logo through unchanged. (The first version uploaded into a `logos`
+  bucket that 0010 creates; that bucket was never there on the real project,
+  so uploads failed with "Bucket not found". The bucket is now unused.)
 - **Registrations sheet.** `src/lib/interviews/registrationSheet.ts`. Every
   accepted submission (public form and Register tab) appends one row through
   `after()`: submitted, name, email, phone, university, year, major,
   companies in rank order, CV, note ("Updated" for a re-submission),
-  application id. University and year are written as the English labels. The first submission
+  application id. University and year are written as the English labels.
+  The sheet's id and link are kept in the edition's settings, so it needs
+  only the Google account, no migration. The first submission
   creates the sheet; its link is on the Applicants tab (and in Settings), and
-  *Rebuild* in either place rewrites it from the database (one
+  *Sync now* in either place rewrites it from the database (one
   row per application), which repairs any row Google missed. Same rules as the
   floor sheet: owned by the club's Google account, shared by name only, link
   sharing revoked on every rebuild. The CV column links to `/api/interviews/cv`,
@@ -1212,10 +1256,15 @@ extended; the room flow is untested by script.
   its zero.
 
 **Not applied yet.** `0010_register_full_companies.sql` must be applied to
-the interviews project after 0005–0009 (0009 is fixed now, see below). Until then nothing crashes: the full
-toggle answers with a database error, staff registration follows the public
-window, and Rebuild refuses rather than creating a sheet it cannot remember.
-Create the `logos` bucket by hand if the SQL cannot (the migration warns).
+the interviews project after 0005–0009 (0009 is fixed now, see below). Until
+then nothing crashes, and the question settings, Mark as full, logos and the
+registrations sheet all work without it; the one thing that waits on 0010 is
+staff registration outside the public window (until then it follows the
+window). The registrations sheet's id and link are kept in the edition's
+settings (`registrations_sheet_id`, `registrations_sheet_url`), so 0010's
+columns of that name and `set_registrations_sheet` are unused, as are its
+`logos` bucket and `is_full` column; if the SQL cannot create the bucket,
+ignore the warning.
 
 **0009 was corrected in place (2026-10-02).** `app.application_by_phone`
 ordered by `a.created_at`, a column `applications` never had, so 0009 failed
@@ -1237,8 +1286,27 @@ rules, dedupe of every email, the archived edition refusing writes.
 connections firing at once; `scripts/component-tests.mjs` covers 0062.
 `npm run build`, `npm run typecheck` and `npx eslint` are clean.
 
+**Both Google Sheets remember themselves in the edition's settings
+(2026-10-02).** The floor sheet saved its id with 0006's `set_floor_sheet`,
+ignored the error when 0006 was missing (as on the real project), and so made
+a new spreadsheet on every sync without ever showing a link. It now keeps
+`floor_sheet_id` / `floor_sheet_url` in the settings, the same way the
+registrations sheet keeps `registrations_sheet_id` / `_url`; 0006's column
+still counts where it exists. Both sheets use the Google account connected
+under Admin → Google (any account; the sheets belong to it) and need the
+Google Sheets API and Google Drive API enabled in that Google Cloud project
+as well as the Calendar API. Both have a **Sync now** button, which shows
+Google's error if one comes back; the automatic syncs only log it.
+
 ### Things easy to break
 
+- **Every shareable link starts with `siteUrl()`** (`src/lib/interviews/email.ts`):
+  `SITE_URL` if set, else Vercel's own `VERCEL_PROJECT_PRODUCTION_URL`, else
+  `https://vision2030club-system.vercel.app`. Until 2026-10-02 the fallback
+  read `vision2030-club-system` (a hyphen too many) and `SITE_URL` was never
+  set, so the apply, interviewer, room and TV links and the links in emails
+  all pointed at an address that does not exist. If the club moves to its own
+  domain, set `SITE_URL` in Vercel.
 - **A function that raises must raise with a hint.** The public pages map
   `error.hint` to a translated sentence and fall back to the message. Use
   `app.refuse('some_key', 'A sentence.')` and add `errors.some_key` to both

@@ -100,7 +100,7 @@ export function Logo({ company, size = 'md' }: { company: { name: string; logo_u
   const box = size === 'lg' ? 'size-12' : 'size-10';
   if (company.logo_url) {
     return (
-      // Logos are either uploaded (served by /api/interviews/logo) or an
+      // Logos are either uploaded (a small data: image, see LogoInput) or an
       // external URL pasted in; next/image would need every host allow-listed.
       // eslint-disable-next-line @next/next/no-img-element
       <img

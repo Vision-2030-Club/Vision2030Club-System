@@ -5,7 +5,7 @@ import { addTab, createFloorSheet, deleteOtherTabs, listTabs, readTab, renameTab
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { signCvLong } from '@/lib/interviews/cv';
 import type { Actor } from '@/lib/interviews/access';
-import type { Edition, Room, SlotStatus, Stage } from '@/lib/interviews/types';
+import type { Edition, EditionSettings, Room, SlotStatus, Stage } from '@/lib/interviews/types';
 import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/interviews/queries';
 
 /**
@@ -383,18 +383,38 @@ async function syncDayTab(
   await writeTab(spreadsheetId, sheetId, sheetTitle, values, formatRequests);
 }
 
+/**
+ * Where the floor sheet is remembered. 0006 added `floor_sheet_id` for it, but
+ * 0006 never reached the real project, and `set_floor_sheet` failing there
+ * was ignored, so every sync made a new spreadsheet and none was ever
+ * remembered. Now the id and link live in the edition's settings
+ * (`floor_sheet_id`, `floor_sheet_url`), like the registrations sheet; the
+ * column still counts where 0006 did run.
+ */
+async function savedFloorSheet(
+  db: ReturnType<typeof createInterviewsClient>,
+  edition: Edition,
+): Promise<string | null> {
+  if (edition.floor_sheet_id) return edition.floor_sheet_id;
+  const { data } = await db.rpc('edition_settings', { p_edition: edition.id });
+  const id = (data as EditionSettings | null)?.floor_sheet_id;
+  return typeof id === 'string' && id ? id : null;
+}
+
 async function ensureFloorSheet(
   db: ReturnType<typeof createInterviewsClient>,
   edition: Edition,
 ): Promise<string> {
-  if (edition.floor_sheet_id) return edition.floor_sheet_id;
+  const saved = await savedFloorSheet(db, edition);
+  if (saved) return saved;
 
   const created = await createFloorSheet(`${edition.name_en} — Floor`);
-  await db.rpc('set_floor_sheet', {
+  const { error } = await db.rpc('update_edition', {
     p_edition: edition.id,
-    p_sheet_id: created.id,
-    p_sheet_url: created.url,
+    p_patch: { settings: { floor_sheet_id: created.id, floor_sheet_url: created.url } },
+    p_actor: { kind: 'system', name: 'Floor sheet' },
   });
+  if (error) throw new Error(error.message);
   return created.id;
 }
 
@@ -560,14 +580,15 @@ export async function pullFloorSheetStages(
   const db = createInterviewsClient();
   const { data: editionRow } = await db.from('editions').select('*').eq('id', editionId).maybeSingle();
   const edition = editionRow as Edition | null;
-  if (!edition?.floor_sheet_id) return { updated: 0, skipped: 0 };
+  const sheetId = edition ? await savedFloorSheet(db, edition) : null;
+  if (!sheetId) return { updated: 0, skipped: 0 };
 
-  const tabs = await listTabs(edition.floor_sheet_id);
+  const tabs = await listTabs(sheetId);
   let updated = 0;
   let skipped = 0;
 
   for (const tab of tabs) {
-    const rows = await readTab(edition.floor_sheet_id, tab.title);
+    const rows = await readTab(sheetId, tab.title);
     for (const row of rows) {
       for (const startCol of [0, BLOCK_COLS + 1]) {
         const bookingId = row[startCol + ID_COL];

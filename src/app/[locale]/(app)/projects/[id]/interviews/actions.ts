@@ -17,11 +17,13 @@ import { deliverPendingEmails, kickEmailDelivery } from '@/lib/interviews/email'
 import { kickFloorSheetSync, pullFloorSheetStages, syncFloorSheet } from '@/lib/interviews/floorSheet';
 import { takeExport } from '@/lib/interviews/export';
 import { removeCv, uploadCv } from '@/lib/interviews/cv';
-import { removeLogo, uploadLogo } from '@/lib/interviews/logo';
 import { kickRegistrationAppend, syncRegistrationSheet } from '@/lib/interviews/registrationSheet';
 import { APPLY_FIELDS, FIELD_LABELS, FIELD_MODES, resolveApplyFields, type FieldMode } from '@/lib/interviews/applyFields';
 import { applicationPayload } from '@/lib/interviews/applyPayload';
-import type { Stage } from '@/lib/interviews/types';
+import { choosesFullCompany, fullCompanyIds } from '@/lib/interviews/fullCompanies';
+import { normalisePhone } from '@/lib/interviews/phone';
+import { roomLinks, saveRoomLink } from '@/lib/interviews/roomLinks';
+import type { EditionSettings, Stage } from '@/lib/interviews/types';
 import { fromClubWallClock } from '@/lib/time';
 
 /**
@@ -160,7 +162,7 @@ export async function syncFloorSheetAction(
   return ok();
 }
 
-/** Settings → Rebuild: the registrations sheet rewritten from the database (registrationSheet.ts). */
+/** Settings → Sync now: the registrations sheet rewritten from the database (registrationSheet.ts). */
 export async function syncRegistrationSheetAction(
   _previous: ActionResult,
   formData: FormData,
@@ -371,10 +373,17 @@ export async function upsertRoomAction(
 /**
  * Adds or edits a company from the Applicants tab (a plain company, no room or
  * session: the apply-form flow). Only the fields the form sends are changed,
- * so an edit never un-hides or re-orders a company by omission. A logo file
- * replaces the old logo, which is deleted from the bucket once the row is
- * saved; a refused save deletes the file just uploaded instead.
+ * so an edit never un-hides or re-orders a company by omission. A logo
+ * arrives already shrunk by the browser (LogoInput) as a small `data:` image
+ * and is stored in `logo_url` itself, so no file storage is involved.
  */
+/** A shrunk logo is a few kilobytes; this leaves room and still keeps rows small. */
+const MAX_LOGO_DATA = 200_000;
+
+function isLogoDataUrl(value: string): boolean {
+  return value.length <= MAX_LOGO_DATA && /^data:image\/(png|webp|jpeg);base64,[A-Za-z0-9+/]+=*$/.test(value);
+}
+
 export async function upsertCompanyAction(
   _previous: ActionResult,
   formData: FormData,
@@ -402,47 +411,36 @@ export async function upsertCompanyAction(
   else if (pinChoice === 'new') payload.access_pin = newPin();
   else if (pinChoice === 'typed') payload.access_pin = text(formData, 'access_pin') ?? '';
 
-  const db = createInterviewsClient();
-
-  let previousLogo: string | null = null;
-  if (companyId) {
-    const { data } = await db.from('companies').select('logo_url').eq('id', companyId).maybeSingle();
-    previousLogo = (data?.logo_url as string | null) ?? null;
-  }
-
-  let uploadedLogo: string | null = null;
-  const file = formData.get('logo');
-  if (file instanceof File && file.size > 0) {
-    const uploaded = await uploadLogo(db, g.access.edition.id, file);
-    if ('error' in uploaded) {
-      const hint = uploaded.error;
-      return fail(t.has(`errors.${hint}`) ? t(`errors.${hint}`) : hint, hint);
+  const logoData = text(formData, 'logo_data');
+  if (logoData) {
+    if (!isLogoDataUrl(logoData)) {
+      const hint = logoData.length > MAX_LOGO_DATA ? 'logo_too_large' : 'not_image';
+      return fail(t(`errors.${hint}`), hint);
     }
-    uploadedLogo = uploaded.url;
-    payload.logo_url = uploaded.url;
+    payload.logo_url = logoData;
   } else if (formData.get('remove_logo') === 'on') {
     payload.logo_url = '';
   }
 
+  const db = createInterviewsClient();
   const { error } = await db.rpc('upsert_company', {
     p_edition: g.access.edition.id,
     p_company: companyId,
     p_payload: payload,
     p_actor: g.access.actor,
   });
-  if (error) {
-    await removeLogo(db, uploadedLogo);
-    return fromPostgrest(error);
-  }
-  if ('logo_url' in payload && payload.logo_url !== previousLogo) await removeLogo(db, previousLogo);
+  if (error) return fromPostgrest(error);
 
   revalidate(g.locale, g.projectId);
   return ok(companyId ? 'saved' : 'created');
 }
 
 /**
- * Full (0010): the company stays on every list, but the form greys it out and
- * submit_application refuses it for anyone who had not already chosen it.
+ * Full: the company stays on every list, but the forms grey it out and both
+ * submit actions refuse it for anyone who had not already chosen it. Kept in
+ * the edition's settings as `full_companies` (fullCompanies.ts), so it works
+ * without migration 0010. The list is read fresh here, not from the request
+ * cache, so two quick toggles do not undo each other.
  */
 export async function setCompanyFullAction(
   _previous: ActionResult,
@@ -450,12 +448,30 @@ export async function setCompanyFullAction(
 ): Promise<ActionResult> {
   const g = await guard(formData, can.manage);
   if ('error' in g) return fail(g.error);
+  const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
+  if (g.access.edition.status === 'archived') return fail(t('errors.archived'), 'archived');
 
+  const companyId = requiredText(formData, 'company_id');
+  const full = text(formData, 'full') === 'true';
+  const editionId = g.access.edition.id;
   const db = createInterviewsClient();
-  const { error } = await db.rpc('set_company_full', {
-    p_edition: g.access.edition.id,
-    p_company: requiredText(formData, 'company_id'),
-    p_full: text(formData, 'full') === 'true',
+
+  const { data: company } = await db
+    .from('companies')
+    .select('id')
+    .eq('id', companyId)
+    .eq('edition_id', editionId)
+    .maybeSingle();
+  if (!company) return fail(t('errors.not_found'), 'not_found');
+
+  const { data: settings } = await db.rpc('edition_settings', { p_edition: editionId });
+  const ids = fullCompanyIds(settings as EditionSettings | null);
+  if (full) ids.add(companyId);
+  else ids.delete(companyId);
+
+  const { error } = await db.rpc('update_edition', {
+    p_edition: editionId,
+    p_patch: { settings: { full_companies: [...ids] } },
     p_actor: g.access.actor,
   });
   if (error) return fromPostgrest(error);
@@ -530,6 +546,17 @@ export async function registerAction(
   if (answers.missing) {
     return fail(t('errors.missing_answer', { question: t(FIELD_LABELS[answers.missing]) }));
   }
+  if (
+    await choosesFullCompany(
+      db,
+      editionId,
+      answers.payload.email as string | null,
+      answers.payload.preferences as string[],
+      fullCompanyIds(g.access.settings),
+    )
+  ) {
+    return refuse('company_full', 'One of the chosen companies is full.');
+  }
 
   let cvPath: string | null = null;
   const file = formData.get('cv');
@@ -581,40 +608,60 @@ export async function createRoomAction(
   if ('error' in g) return fail(g.error);
 
   const name = requiredText(formData, 'name');
+  const existingId = text(formData, 'company_id');
   const companyName = text(formData, 'company_name') || name;
   const companyNameAr = text(formData, 'company_name_ar') || companyName;
   const logoUrl = text(formData, 'logo_url') ?? '';
   const day = requiredText(formData, 'day');
   const startTime = requiredText(formData, 'start_time');
   const endTime = requiredText(formData, 'end_time');
+  const editionId = g.access.edition.id;
   const db = createInterviewsClient();
 
+  // A room for a company students already choose on the form, so the room,
+  // their choices and the accepted list are the same company. Checked first,
+  // before anything is created.
+  if (existingId) {
+    const { data: existing } = await db
+      .from('companies')
+      .select('id')
+      .eq('id', existingId)
+      .eq('edition_id', editionId)
+      .eq('is_hidden', false)
+      .maybeSingle();
+    if (!existing) return fail('No such company.', 'not_found');
+  }
+
   const { data: room, error: roomError } = await db.rpc('upsert_room', {
-    p_edition: g.access.edition.id,
+    p_edition: editionId,
     p_room: null,
     p_payload: { name },
     p_actor: g.access.actor,
   });
   if (roomError) return fromPostgrest(roomError);
 
-  const { data: company, error: companyError } = await db.rpc('upsert_company', {
-    p_edition: g.access.edition.id,
-    p_company: null,
-    p_payload: {
-      name_en: companyName,
-      name_ar: companyNameAr,
-      logo_url: logoUrl,
-      access_token: newToken(),
-      candidate_token: newToken(),
-    },
-    p_actor: g.access.actor,
-  });
-  if (companyError) return fromPostgrest(companyError);
+  let companyId = existingId;
+  if (!companyId) {
+    const { data: company, error: companyError } = await db.rpc('upsert_company', {
+      p_edition: editionId,
+      p_company: null,
+      p_payload: {
+        name_en: companyName,
+        name_ar: companyNameAr,
+        logo_url: logoUrl,
+        access_token: newToken(),
+        candidate_token: newToken(),
+      },
+      p_actor: g.access.actor,
+    });
+    if (companyError) return fromPostgrest(companyError);
+    companyId = company.id as string;
+  }
 
   const { error: sessionError } = await db.rpc('create_session', {
-    p_edition: g.access.edition.id,
+    p_edition: editionId,
     p_payload: {
-      company_id: company.id,
+      company_id: companyId,
       room_id: room.id,
       day,
       start_time: startTime,
@@ -625,60 +672,150 @@ export async function createRoomAction(
   });
   if (sessionError) return fromPostgrest(sessionError);
 
+  // The room's public link (roomLinks.ts), unless the company already has one.
+  if (!roomLinks(g.access.settings)[companyId]) {
+    const { error: linkError } = await saveRoomLink(db, editionId, companyId, newToken(), g.access.actor);
+    if (linkError) return fail(linkError);
+  }
+
   revalidate(g.locale, g.projectId);
   return ok('created');
 }
 
-/** HR's pre-approval list for one room: phone numbers, one per line. */
+/**
+ * A room's public link (roomLinks.ts), for a room made before links existed,
+ * or a new one to replace a link that was passed around: the old one stops
+ * working at once.
+ */
+export async function createRoomLinkAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const companyId = requiredText(formData, 'company_id');
+  const db = createInterviewsClient();
+  const { data: company } = await db
+    .from('companies')
+    .select('id')
+    .eq('id', companyId)
+    .eq('edition_id', g.access.edition.id)
+    .maybeSingle();
+  if (!company) return fail('No such company.', 'not_found');
+
+  const { error } = await saveRoomLink(db, g.access.edition.id, companyId, newToken(), g.access.actor);
+  if (error) return fail(error);
+
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
+/**
+ * HR's accepted list for one room, pasted as phone numbers (one per line, or
+ * separated by commas). Nothing is added automatically: only the numbers HR
+ * types are used. Each is matched to the applicant who applied with it
+ * (normalised, so +966 5… and 05… are the same number; an application with an
+ * email first, then the newest) and accepted for this room's company with
+ * `decide_preference`, the same function as the Accept button on an
+ * applicant's page, which needs no migration after 0001. That also queues the
+ * student's acceptance email with their personal booking link, delivered once
+ * email is configured.
+ *
+ * A number that matches nobody, or a student who did not choose this
+ * company, is listed back rather than accepted.
+ */
 export async function acceptPhonesAction(
   _previous: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
   const g = await guard(formData, can.decide);
   if ('error' in g) return fail(g.error);
+  const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
 
   const companyId = requiredText(formData, 'company_id');
-  const phones = Array.from(
+  const typed = Array.from(
     new Set(
       (text(formData, 'phones') ?? '')
-        .split(/[\s,]+/)
+        .split(/[\n,;]+/)
         .map((p) => p.trim())
         .filter(Boolean),
     ),
   );
-  if (phones.length === 0) return fail('Enter at least one phone number.');
+  if (typed.length === 0) return fail(t('companies.phonesEmpty'));
 
+  const editionId = g.access.edition.id;
   const db = createInterviewsClient();
-  for (const phone of phones) {
-    const { error } = await db.rpc('accept_phone', {
-      p_edition: g.access.edition.id,
+
+  type Candidate = { id: string; phone: string | null; email: string | null; submitted_at: string };
+  const byPhone = new Map<string, Candidate>();
+  for (let from = 0; ; from += 1000) {
+    const { data } = await db
+      .from('applications')
+      .select('id, phone, email, submitted_at')
+      .eq('edition_id', editionId)
+      .not('phone', 'is', null)
+      .range(from, from + 999);
+    const rows = (data ?? []) as Candidate[];
+    for (const row of rows) {
+      const key = normalisePhone(row.phone);
+      if (!key) continue;
+      const held = byPhone.get(key);
+      const better =
+        !held ||
+        (row.email !== null && held.email === null) ||
+        ((row.email !== null) === (held.email !== null) && row.submitted_at > held.submitted_at);
+      if (better) byPhone.set(key, row);
+    }
+    if (rows.length < 1000) break;
+  }
+
+  const notFound: string[] = [];
+  const notChosen: string[] = [];
+  for (const phone of typed) {
+    const match = byPhone.get(normalisePhone(phone) ?? '');
+    if (!match) {
+      notFound.push(phone);
+      continue;
+    }
+    const { error } = await db.rpc('decide_preference', {
+      p_application: match.id,
       p_company: companyId,
-      p_phone: phone,
-      p_token: newToken(),
+      p_decision: 'accepted',
+      p_note: '',
       p_actor: g.access.actor,
     });
-    if (error) return fromPostgrest(error);
+    if (error?.hint === 'not_found') notChosen.push(phone);
+    else if (error) return fromPostgrest(error);
   }
 
   revalidate(g.locale, g.projectId);
-  return ok('saved', { count: String(phones.length) });
+  if (notFound.length || notChosen.length) {
+    const parts = [t('companies.phonesAccepted', { count: typed.length - notFound.length - notChosen.length })];
+    if (notFound.length) parts.push(t('companies.phonesNotFound', { phones: notFound.join(', ') }));
+    if (notChosen.length) parts.push(t('companies.phonesNotChosen', { phones: notChosen.join(', ') }));
+    return fail(parts.join(' '));
+  }
+  return ok('saved', { count: String(typed.length) });
 }
 
 /**
  * A plain form action (no useActionState, no per-row error UI) — same shape
- * as signOutAction in the app layout. Removing a phone from an "accepted"
- * list is low-stakes and reversible by pasting it back in, so it does not
- * need a confirmation dialog or its own feedback state.
+ * as signOutAction in the app layout. Removing someone from an "accepted"
+ * list is low-stakes and reversible by pasting their number back in, so it
+ * does not need a confirmation dialog or its own feedback state. Puts their
+ * preference for this company back to pending (decide_preference again).
  */
 export async function unacceptPhoneAction(formData: FormData): Promise<void> {
   const g = await guard(formData, can.decide);
   if ('error' in g) return;
 
   const db = createInterviewsClient();
-  await db.rpc('unaccept_phone', {
-    p_edition: g.access.edition.id,
+  await db.rpc('decide_preference', {
+    p_application: requiredText(formData, 'application_id'),
     p_company: requiredText(formData, 'company_id'),
-    p_phone: requiredText(formData, 'phone'),
+    p_decision: 'pending',
+    p_note: '',
     p_actor: g.access.actor,
   });
 

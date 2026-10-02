@@ -5,6 +5,7 @@ import { Card, EmptyState } from '@/components/ui';
 import { localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { resolveApplyFields } from '@/lib/interviews/applyFields';
+import { fullCompanyIds } from '@/lib/interviews/fullCompanies';
 import { loadCompanies } from '@/lib/interviews/queries';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { RegisterForm } from './RegisterForm';
@@ -16,9 +17,9 @@ import { RegisterForm } from './RegisterForm';
  * The form asks what the public form asks (the edition's questions, set on
  * the Applicants tab) and goes through the same submit_application, so every
  * rule holds: the limit on companies, one application per email, and full
- * companies (0010), which stay on the grid, blurred, and cannot be chosen.
- * The public link, the questions and the companies are managed on the
- * Applicants tab.
+ * companies (fullCompanies.ts), which stay on the grid, blurred, and cannot
+ * be chosen. The public link, the questions and the companies are managed on
+ * the Applicants tab.
  */
 export default async function InterviewsRegisterPage({
   params,
@@ -40,6 +41,7 @@ export default async function InterviewsRegisterPage({
   }
 
   const companies = await loadCompanies(createInterviewsClient(), edition.id);
+  const full = fullCompanyIds(settings);
 
   return (
     <Card className="max-w-3xl">
@@ -64,7 +66,7 @@ export default async function InterviewsRegisterPage({
               id: c.id,
               name: localized(c, 'name', locale),
               logo_url: c.logo_url,
-              is_full: Boolean(c.is_full),
+              is_full: full.has(c.id),
             }))}
         />
       )}

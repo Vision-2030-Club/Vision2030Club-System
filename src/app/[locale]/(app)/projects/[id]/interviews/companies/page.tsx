@@ -3,10 +3,11 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { ActionForm } from '@/components/ActionForm';
 import { ConfirmForm } from '@/components/ConfirmForm';
 import { Disclosure } from '@/components/Disclosure';
-import { Card, EmptyState, Input, Label, Textarea } from '@/components/ui';
+import { Card, EmptyState, Input, Label, Select, Textarea } from '@/components/ui';
 import { localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { siteUrl } from '@/lib/interviews/email';
+import { roomLinks } from '@/lib/interviews/roomLinks';
 import {
   loadAcceptedPhones,
   loadCompanies,
@@ -22,6 +23,7 @@ import { CopyField } from '../CopyField';
 import {
   acceptPhonesAction,
   createRoomAction,
+  createRoomLinkAction,
   renameRoomAction,
   rotateCompanyTokenAction,
   setRoomDeletedAction,
@@ -51,7 +53,7 @@ export default async function InterviewsCompaniesPage({
 
   const access = await getInterviewAccess(id);
   if (!access?.edition) notFound();
-  const { edition, role } = access;
+  const { edition, settings, role } = access;
 
   const t = await getTranslations('interviews');
   const tCommon = await getTranslations('common');
@@ -86,8 +88,13 @@ export default async function InterviewsCompaniesPage({
 
   const manage = can.manage(role);
   const decide = can.decide(role);
-  const candidateLinkFor = (company: Company) =>
-    company.candidate_token ? `${siteUrl()}/${locale}/interviews/room/${company.candidate_token}` : null;
+  // Each room's public link (roomLinks.ts, kept in the edition's settings);
+  // a candidate_token from 0005, where that migration ran, as a fallback.
+  const links = roomLinks(settings);
+  const candidateLinkFor = (company: Company) => {
+    const token = links[company.id] ?? company.candidate_token;
+    return token ? `${siteUrl()}/${locale}/interviews/room/${token}` : null;
+  };
   const interviewerLinkFor = (company: Company) => `${siteUrl()}/${locale}/interviews/c/${company.access_token}`;
 
   return (
@@ -103,6 +110,17 @@ export default async function InterviewsCompaniesPage({
                 <Input id="new-room-name" name="name" required />
               </div>
               <div>
+                <Label htmlFor="new-room-company-id">{t('companies.roomCompany')}</Label>
+                <Select id="new-room-company-id" name="company_id" defaultValue="">
+                  <option value="">{t('companies.roomCompanyNew')}</option>
+                  {activeCompanies.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {localized(c, 'name', locale)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div>
                 <Label htmlFor="new-room-company">{t('companies.companyName')}</Label>
                 <Input id="new-room-company" name="company_name" placeholder={t('companies.companyNameHint')} />
               </div>
@@ -112,7 +130,7 @@ export default async function InterviewsCompaniesPage({
               </div>
               <div>
                 <Label htmlFor="new-room-logo">{t('companies.logoUrl')}</Label>
-                <Input id="new-room-logo" name="logo_url" inputMode="url" dir="ltr" />
+                <Input id="new-room-logo" name="logo_url" type="url" dir="ltr" />
               </div>
               <div>
                 <Label htmlFor="new-room-day">{t('companies.roomDay')}</Label>
@@ -167,9 +185,24 @@ export default async function InterviewsCompaniesPage({
                   </div>
                 </div>
 
-                {decide && candidateLinkFor(company) ? (
+                {/* Only the candidate link needs 0005 (candidate_token); everything
+                    else here runs on 0001's functions, so it shows on every room. */}
+                {decide ? (
                   <div className="mt-4 space-y-3 border-t border-line pt-3">
-                    <CopyField label={t('companies.candidateLink')} value={candidateLinkFor(company)!} />
+                    {candidateLinkFor(company) ? (
+                      <CopyField label={t('companies.candidateLink')} value={candidateLinkFor(company)!} />
+                    ) : manage ? (
+                      <ActionForm
+                        action={createRoomLinkAction}
+                        submitLabel={t('companies.createLink')}
+                        variant="secondary"
+                        className="space-y-2"
+                      >
+                        <input type="hidden" name="locale" value={locale} />
+                        <input type="hidden" name="project_id" value={id} />
+                        <input type="hidden" name="company_id" value={company.id} />
+                      </ActionForm>
+                    ) : null}
 
                     {manage ? (
                       <div className="flex flex-wrap items-center gap-2">
@@ -299,15 +332,25 @@ function RoomForm({
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor={`${company.id}-logo_url`}>{t('companies.logoUrl')}</Label>
-          <Input
-            id={`${company.id}-logo_url`}
-            name="logo_url"
-            // Text, not type="url": a logo uploaded on the Applicants tab is
-            // stored as a relative /api/interviews/logo address.
-            inputMode="url"
-            dir="ltr"
-            defaultValue={company.logo_url ?? ''}
-          />
+          {company.logo_url?.startsWith('data:') ? (
+            // Uploaded on the Applicants tab and stored as the image itself
+            // (LogoInput): carried through unchanged rather than shown as a
+            // page of base64 in a text box.
+            <>
+              <input type="hidden" name="logo_url" value={company.logo_url} />
+              <p id={`${company.id}-logo_url`} className="text-xs text-ink-muted">
+                {t('companies.logoUploaded')}
+              </p>
+            </>
+          ) : (
+            <Input
+              id={`${company.id}-logo_url`}
+              name="logo_url"
+              type="url"
+              dir="ltr"
+              defaultValue={company.logo_url ?? ''}
+            />
+          )}
         </div>
       </div>
     </ActionForm>
@@ -315,9 +358,8 @@ function RoomForm({
 }
 
 /**
- * HR's pre-approval list for one room's candidate link (0005): phone numbers
- * pasted in ahead of time are what "already chosen by HR" checks against when
- * someone visits the link and identifies themselves.
+ * Who HR accepted for this room's company, and a box to accept more by phone
+ * number (acceptPhonesAction). Starts empty: only numbers HR types are used.
  */
 function AcceptedPhones({
   locale,
@@ -339,7 +381,7 @@ function AcceptedPhones({
       {phones.length ? (
         <ul className="space-y-1 text-sm">
           {phones.map((p) => (
-            <li key={p.phone} className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-1.5">
+            <li key={p.application_id} className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-1.5">
               <span className="ltr-nums">
                 {p.phone}
                 {p.name ? ` · ${p.name}` : ''}
@@ -348,7 +390,7 @@ function AcceptedPhones({
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="project_id" value={projectId} />
                 <input type="hidden" name="company_id" value={company.id} />
-                <input type="hidden" name="phone" value={p.phone} />
+                <input type="hidden" name="application_id" value={p.application_id} />
                 <button type="submit" className="text-xs text-ink-muted hover:text-danger-600">
                   {tCommon('delete')}
                 </button>
