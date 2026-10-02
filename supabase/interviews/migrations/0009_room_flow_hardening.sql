@@ -72,6 +72,13 @@ create index if not exists applications_edition_phone_idx
 
 -- The one application a phone number means in an edition: the fullest record
 -- first (an email means it came through the apply form), then the newest.
+--
+-- Corrected in place on 2026-10-02: this read `a.created_at`, a column
+-- `applications` never had, so the whole file failed and rolled back on every
+-- database (db-push and the SQL editor both run a file as one transaction).
+-- It cannot have been recorded as applied anywhere, which is the only reason
+-- editing a merged migration is safe here. 0010 redefines this function too,
+-- in case it was ever created with body checks switched off.
 create or replace function app.application_by_phone(p_edition uuid, p_phone text)
 returns applications
 language sql
@@ -84,7 +91,7 @@ as $$
    where a.edition_id = p_edition
      and a.phone is not null
      and app.normalise_phone(a.phone) = app.normalise_phone(p_phone)
-   order by (a.email is not null) desc, a.created_at desc
+   order by (a.email is not null) desc, a.submitted_at desc
    limit 1
 $$;
 

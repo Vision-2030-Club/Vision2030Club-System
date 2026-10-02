@@ -25,6 +25,7 @@ export type NavIconName =
   | 'interviews'
   | 'company'
   | 'stage'
+  | 'register'
   | 'mail'
   | 'back'
   | 'menu';
@@ -137,6 +138,14 @@ const GLYPHS: Record<NavIconName, ReactNode> = {
       <circle cx="8" cy="8.5" r="2.25" />
       <path d="M3.5 19.5a4.5 4.5 0 0 1 9 0" />
       <path d="M11.5 12h5.5m-2.25-2.25L17 12l-2.25 2.25" />
+    </>
+  ),
+  // A person with a plus: registering a student.
+  register: (
+    <>
+      <circle cx="9.5" cy="8" r="3.75" />
+      <path d="M2.75 20a6.75 6.75 0 0 1 13.5 0" />
+      <path d="M19 8.5v6M16 11.5h6" />
     </>
   ),
   mail: (

@@ -1007,7 +1007,7 @@ short version:
   signs a ten-minute URL for HR, managers, or the company that holds the
   booking (past its PIN if one is set).
 
-Pages: signed-in under `/projects/[id]/interviews/…` (overview, applicants,
+Pages: signed-in under `/projects/[id]/interviews/…` (overview, applicants, register,
 companies, schedule with the session generator, floor board, bookings, people,
 settings, log, messages — tabs filtered by role); public under `/interviews/…`
 (`apply/<slug>`, `s/<token>` the student, `c/<token>` the interviewer,
@@ -1154,6 +1154,78 @@ from a network where 5432 works, or paste each file into the dashboard's
 SQL editor and insert its name into `schema_migrations` as was done for
 0001–0004. The teammate's `scripts/interviews-tests.mjs` coverage was not
 extended; the room flow is untested by script.
+
+### Registering, full companies, and the registrations sheet (0010)
+
+- **Applicants tab** now opens with the application form (the public link,
+  whether it is taking applications, and the questions it asks) and, for
+  managers, the companies students choose from (their رغبات): add, edit,
+  logo, Mark as full, Remove/Restore (`CompanyManager.tsx`).
+- **The questions are a setting.** `editions.settings.apply_fields`, edited
+  under *Edit questions* on the Applicants tab, says for phone, university,
+  year (`level`), major, college, GPA, English, club member and "why your
+  first choice" whether each is not asked, optional or required
+  (`src/lib/interviews/applyFields.ts`). Name, email, the companies and the
+  CV are always asked. An edition that never saved a choice gets the club's
+  October 2026 list: phone, university, year, major required, the rest off.
+  Both forms draw the questions from it (`ApplicationQuestions.tsx`), and
+  both actions check required answers and drop unasked ones on the server
+  (`applyPayload.ts`); the database itself still only insists on name,
+  email, companies and CV. No migration: settings is a jsonb that
+  `update_edition` merges.
+- **Register tab** (`/projects/<id>/interviews/register`, HR and managers).
+  The same questions as the public form, the companies as cards, and the CV,
+  for a student registering at the stand. It goes through the same
+  `submit_application` as the public form, with the staff member as
+  `p_actor`. 0010 lets a **member** actor register outside the public window
+  (draft or closed editions; archived still refuses) and records them as the
+  author; the public form passes no actor and keeps the window. Every other
+  rule holds for both: the company limit, one application per email, the CV.
+- **Company cards** (`src/components/CompanyPicker.tsx`) replace the numbered
+  selects on the public apply form too. The order companies are tapped in is
+  their rank.
+- **Full companies.** `companies.is_full`, set by `set_company_full` (Mark as
+  full / Mark as open on the Applicants tab, managers only). A full company is
+  NOT hidden: it stays on both forms, blurred and unclickable, and
+  `submit_application` refuses it (`company_full`) unless that application
+  already held it, so fixing a typo never costs a student a company they had.
+  Remove on the Applicants tab is the old soft-delete (`is_hidden`, plus the
+  room if it has one, the same action as the Rooms tab), restorable.
+- **Logos** can be uploaded (PNG/JPG/WebP/GIF, 1 MB) into the private `logos`
+  bucket. `logo_url` stores the RELATIVE `/api/interviews/logo?path=…`, which
+  streams the file (public, cached forever: every upload gets a new name), so
+  a logo uploaded on a preview works on production. Pasted external URLs still
+  work; the Rooms tab's logo field is plain text now so it accepts both.
+- **Registrations sheet.** `src/lib/interviews/registrationSheet.ts`. Every
+  accepted submission (public form and Register tab) appends one row through
+  `after()`: submitted, name, email, phone, university, year, major,
+  companies in rank order, CV, note ("Updated" for a re-submission),
+  application id. University and year are written as the English labels. The first submission
+  creates the sheet; its link is on the Applicants tab (and in Settings), and
+  *Rebuild* in either place rewrites it from the database (one
+  row per application), which repairs any row Google missed. Same rules as the
+  floor sheet: owned by the club's Google account, shared by name only, link
+  sharing revoked on every rebuild. The CV column links to `/api/interviews/cv`,
+  which needs a signed-in HR person or manager, so the link never expires and
+  is useless to someone the sheet was forwarded to. User text is written with
+  a leading apostrophe so a name starting with `=` stays text and `05…` keeps
+  its zero.
+
+**Not applied yet.** `0010_register_full_companies.sql` must be applied to
+the interviews project after 0005–0009 (0009 is fixed now, see below). Until then nothing crashes: the full
+toggle answers with a database error, staff registration follows the public
+window, and Rebuild refuses rather than creating a sheet it cannot remember.
+Create the `logos` bucket by hand if the SQL cannot (the migration warns).
+
+**0009 was corrected in place (2026-10-02).** `app.application_by_phone`
+ordered by `a.created_at`, a column `applications` never had, so 0009 failed
+and rolled back on every database (db-push and the SQL editor both run a file
+as one transaction). It now orders by `submitted_at`. Editing a merged
+migration is normally forbidden because a recorded one would never re-run;
+0009 could not have been recorded anywhere, so the edit is what lets it apply
+at all. 0010 redefines the same function as a backstop. All ten interviews
+migrations now apply in order to an empty Postgres 16, each in one
+transaction.
 
 ### Verified
 

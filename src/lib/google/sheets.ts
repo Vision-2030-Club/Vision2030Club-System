@@ -52,6 +52,20 @@ export async function createFloorSheet(title: string): Promise<{ id: string; url
 }
 
 /**
+ * Like createFloorSheet, with the first tab named up front — Google names it
+ * after the account's language otherwise ("Sheet1", "ورقة1"), and an append
+ * has to address the tab by name.
+ */
+export async function createSpreadsheet(title: string, tabTitle: string): Promise<{ id: string; url: string }> {
+  const created = await googleFetch(SHEETS_API, '/spreadsheets', {
+    method: 'POST',
+    body: JSON.stringify({ properties: { title }, sheets: [{ properties: { title: tabTitle } }] }),
+  });
+  const id = created.spreadsheetId as string;
+  return { id, url: `https://docs.google.com/spreadsheets/d/${id}/edit` };
+}
+
+/**
  * Removes any "anyone with the link" permission from a sheet. Sheets created
  * before this rule were shared that way; every sync calls this, so an old
  * sheet is closed the first time the floor changes after the deploy, and a
@@ -204,4 +218,18 @@ export async function writeTab(
     method: 'POST',
     body: JSON.stringify({ requests: formatRequests }),
   });
+}
+
+/**
+ * Adds rows under the last filled row of a tab. Google applies each append
+ * on its own, so two submissions a second apart both land, one under the
+ * other. `USER_ENTERED` for the same reason as writeTab (the CV hyperlink).
+ */
+export async function appendRows(spreadsheetId: string, sheetTitle: string, rows: string[][]): Promise<void> {
+  const range = `${quoted(sheetTitle)}!A1`;
+  await googleFetch(
+    SHEETS_API,
+    `/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    { method: 'POST', body: JSON.stringify({ values: rows }) },
+  );
 }

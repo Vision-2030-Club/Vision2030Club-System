@@ -14,6 +14,8 @@ export type EditionSettings = {
   tv_call_minutes: number;
   feedback_email_mode: 'on_release' | 'immediately';
   rating_labels: RatingLabel[];
+  /** Which questions the application form asks; read through resolveApplyFields (applyFields.ts). */
+  apply_fields?: Partial<Record<string, string>>;
 };
 
 export type Edition = {
@@ -31,6 +33,9 @@ export type Edition = {
   tv_token: string | null;
   floor_sheet_id: string | null;
   floor_sheet_url: string | null;
+  /** 0010; absent until that migration is applied. */
+  registrations_sheet_id?: string | null;
+  registrations_sheet_url?: string | null;
   settings: Partial<EditionSettings>;
   created_at: string;
   updated_at: string;
@@ -54,6 +59,8 @@ export type Company = {
   desc_en: string | null;
   desc_ar: string | null;
   is_hidden: boolean;
+  /** 0010: still listed, but no longer choosable. Absent until that migration is applied. */
+  is_full?: boolean;
   sort_order: number;
   access_token: string;
   access_pin: string | null;

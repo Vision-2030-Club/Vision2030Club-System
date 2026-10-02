@@ -4,9 +4,12 @@ import { Link } from '@/i18n/navigation';
 import { Badge, Button, Card, EmptyState, Input, Label, Select } from '@/components/ui';
 import { formatDateTime, localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
+import { resolveApplyFields } from '@/lib/interviews/applyFields';
 import { loadApplicants, loadCompanies } from '@/lib/interviews/queries';
 import { DECISION_TONES } from '@/lib/interviews/ui';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
+import { ApplicationFormCard } from '../ApplicationFormCard';
+import { CompanyManager } from '../CompanyManager';
 
 export default async function InterviewsApplicantsPage({
   params,
@@ -21,7 +24,7 @@ export default async function InterviewsApplicantsPage({
 
   const access = await getInterviewAccess(id);
   if (!access?.edition) notFound();
-  const { edition, role } = access;
+  const { edition, settings, role } = access;
 
   const t = await getTranslations('interviews');
   const tCommon = await getTranslations('common');
@@ -50,8 +53,26 @@ export default async function InterviewsApplicantsPage({
 
   const base = `/projects/${id}/interviews/applicants`;
 
+  const manage = can.manage(role);
+  const fields = resolveApplyFields(settings?.apply_fields);
+  const now = new Date().getTime();
+
   return (
     <div className="space-y-4">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <ApplicationFormCard
+          locale={locale}
+          projectId={id}
+          edition={edition}
+          fields={fields}
+          manage={manage}
+          now={now}
+          t={t}
+          tCommon={tCommon}
+        />
+        {manage ? <CompanyManager locale={locale} projectId={id} companies={companies} /> : null}
+      </div>
+
       <Card>
         <form className="grid gap-3 sm:grid-cols-4">
           <div className="sm:col-span-2">
@@ -98,7 +119,7 @@ export default async function InterviewsApplicantsPage({
                 <th className="px-3 py-2 text-start font-medium">{t('applicants.name')}</th>
                 <th className="px-3 py-2 text-start font-medium">{t('applicants.university')}</th>
                 <th className="px-3 py-2 text-start font-medium">{t('applicants.level')}</th>
-                <th className="px-3 py-2 text-start font-medium">{t('applicants.gpa')}</th>
+                <th className="px-3 py-2 text-start font-medium">{t('applicants.major')}</th>
                 <th className="px-3 py-2 text-start font-medium">{t('applicants.choices')}</th>
                 <th className="px-3 py-2 text-start font-medium">{t('applicants.submitted')}</th>
               </tr>
@@ -118,7 +139,7 @@ export default async function InterviewsApplicantsPage({
                     {a.university === 'other' ? a.university_other : a.university ? t(`universities.${a.university}`) : '—'}
                   </td>
                   <td className="px-3 py-2 text-xs">{a.level ? t(`levels.${a.level}`) : '—'}</td>
-                  <td className="ltr-nums px-3 py-2 text-xs">{a.gpa ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs">{a.major ?? '—'}</td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-1">
                       {(prefsOf.get(a.id) ?? []).map((p) => (

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Alert, Card } from '@/components/ui';
 import { formatDateTime, localized } from '@/lib/format';
+import { resolveApplyFields } from '@/lib/interviews/applyFields';
 import { loadCompanies } from '@/lib/interviews/queries';
 import type { Edition, EditionSettings } from '@/lib/interviews/types';
 import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/interviews';
@@ -54,6 +55,7 @@ export default async function ApplyPage({
     db.rpc('edition_settings', { p_edition: edition.id }),
   ]);
   const maxPreferences = (settings as EditionSettings | null)?.max_preferences ?? 4;
+  const fields = resolveApplyFields((settings as EditionSettings | null)?.apply_fields);
 
   return (
     <>
@@ -67,6 +69,7 @@ export default async function ApplyPage({
           locale={locale}
           editionId={edition.id}
           maxPreferences={maxPreferences}
+          fields={fields}
           companies={companies
             .filter((c) => !c.is_hidden)
             .map((c) => ({
@@ -74,6 +77,7 @@ export default async function ApplyPage({
               name: localized(c, 'name', locale),
               description: localized(c, 'desc', locale),
               logo_url: c.logo_url,
+              is_full: Boolean(c.is_full),
             }))}
         />
       </Card>
