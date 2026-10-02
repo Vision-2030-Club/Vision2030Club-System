@@ -793,7 +793,7 @@
       "acceptedPhones": "Accepted phone numbers",
       "noAcceptedPhones": "No phone numbers accepted yet.",
       "addPhones": "Add phone numbers",
-      "addPhonesHint": "One per line. Anyone who logs in on the room link with one of these numbers sees the available times right away.",
+      "addPhonesHint": "One per line. Each number is matched to the student who applied with it and accepted for this company; they must have chosen this company on the form.",
       "roomDay": "Day",
       "delete": "Delete room",
       "deleteTitle": "Delete this room?",
@@ -806,7 +806,11 @@
       "companyNameHint": "Defaults to the room name if left blank",
       "companyNameAr": "Company name (Arabic)",
       "interviewerSide": "Interviewer link and PIN",
-      "logoUploaded": "Logo uploaded on the Applicants tab. Change it there."
+      "logoUploaded": "Logo uploaded on the Applicants tab. Change it there.",
+      "phonesEmpty": "Enter at least one phone number.",
+      "phonesAccepted": "Accepted {count}.",
+      "phonesNotFound": "No applicant has these numbers: {phones}.",
+      "phonesNotChosen": "These applicants did not choose this company: {phones}."
     },
     "people": {
       "add": "Add",

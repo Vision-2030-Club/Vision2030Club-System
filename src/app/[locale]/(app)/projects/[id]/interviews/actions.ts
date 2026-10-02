@@ -21,6 +21,7 @@ import { kickRegistrationAppend, syncRegistrationSheet } from '@/lib/interviews/
 import { APPLY_FIELDS, FIELD_LABELS, FIELD_MODES, resolveApplyFields, type FieldMode } from '@/lib/interviews/applyFields';
 import { applicationPayload } from '@/lib/interviews/applyPayload';
 import { choosesFullCompany, fullCompanyIds } from '@/lib/interviews/fullCompanies';
+import { normalisePhone } from '@/lib/interviews/phone';
 import type { EditionSettings, Stage } from '@/lib/interviews/types';
 import { fromClubWallClock } from '@/lib/time';
 
@@ -654,56 +655,111 @@ export async function createRoomAction(
   return ok('created');
 }
 
-/** HR's pre-approval list for one room: phone numbers, one per line. */
+/**
+ * HR's accepted list for one room, pasted as phone numbers (one per line, or
+ * separated by commas). Nothing is added automatically: only the numbers HR
+ * types are used. Each is matched to the applicant who applied with it
+ * (normalised, so +966 5… and 05… are the same number; an application with an
+ * email first, then the newest) and accepted for this room's company with
+ * `decide_preference`, the same function as the Accept button on an
+ * applicant's page, which needs no migration after 0001. That also queues the
+ * student's acceptance email with their personal booking link, delivered once
+ * email is configured.
+ *
+ * A number that matches nobody, or a student who did not choose this
+ * company, is listed back rather than accepted.
+ */
 export async function acceptPhonesAction(
   _previous: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
   const g = await guard(formData, can.decide);
   if ('error' in g) return fail(g.error);
+  const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
 
   const companyId = requiredText(formData, 'company_id');
-  const phones = Array.from(
+  const typed = Array.from(
     new Set(
       (text(formData, 'phones') ?? '')
-        .split(/[\s,]+/)
+        .split(/[\n,;]+/)
         .map((p) => p.trim())
         .filter(Boolean),
     ),
   );
-  if (phones.length === 0) return fail('Enter at least one phone number.');
+  if (typed.length === 0) return fail(t('companies.phonesEmpty'));
 
+  const editionId = g.access.edition.id;
   const db = createInterviewsClient();
-  for (const phone of phones) {
-    const { error } = await db.rpc('accept_phone', {
-      p_edition: g.access.edition.id,
+
+  type Candidate = { id: string; phone: string | null; email: string | null; submitted_at: string };
+  const byPhone = new Map<string, Candidate>();
+  for (let from = 0; ; from += 1000) {
+    const { data } = await db
+      .from('applications')
+      .select('id, phone, email, submitted_at')
+      .eq('edition_id', editionId)
+      .not('phone', 'is', null)
+      .range(from, from + 999);
+    const rows = (data ?? []) as Candidate[];
+    for (const row of rows) {
+      const key = normalisePhone(row.phone);
+      if (!key) continue;
+      const held = byPhone.get(key);
+      const better =
+        !held ||
+        (row.email !== null && held.email === null) ||
+        ((row.email !== null) === (held.email !== null) && row.submitted_at > held.submitted_at);
+      if (better) byPhone.set(key, row);
+    }
+    if (rows.length < 1000) break;
+  }
+
+  const notFound: string[] = [];
+  const notChosen: string[] = [];
+  for (const phone of typed) {
+    const match = byPhone.get(normalisePhone(phone) ?? '');
+    if (!match) {
+      notFound.push(phone);
+      continue;
+    }
+    const { error } = await db.rpc('decide_preference', {
+      p_application: match.id,
       p_company: companyId,
-      p_phone: phone,
-      p_token: newToken(),
+      p_decision: 'accepted',
+      p_note: '',
       p_actor: g.access.actor,
     });
-    if (error) return fromPostgrest(error);
+    if (error?.hint === 'not_found') notChosen.push(phone);
+    else if (error) return fromPostgrest(error);
   }
 
   revalidate(g.locale, g.projectId);
-  return ok('saved', { count: String(phones.length) });
+  if (notFound.length || notChosen.length) {
+    const parts = [t('companies.phonesAccepted', { count: typed.length - notFound.length - notChosen.length })];
+    if (notFound.length) parts.push(t('companies.phonesNotFound', { phones: notFound.join(', ') }));
+    if (notChosen.length) parts.push(t('companies.phonesNotChosen', { phones: notChosen.join(', ') }));
+    return fail(parts.join(' '));
+  }
+  return ok('saved', { count: String(typed.length) });
 }
 
 /**
  * A plain form action (no useActionState, no per-row error UI) — same shape
- * as signOutAction in the app layout. Removing a phone from an "accepted"
- * list is low-stakes and reversible by pasting it back in, so it does not
- * need a confirmation dialog or its own feedback state.
+ * as signOutAction in the app layout. Removing someone from an "accepted"
+ * list is low-stakes and reversible by pasting their number back in, so it
+ * does not need a confirmation dialog or its own feedback state. Puts their
+ * preference for this company back to pending (decide_preference again).
  */
 export async function unacceptPhoneAction(formData: FormData): Promise<void> {
   const g = await guard(formData, can.decide);
   if ('error' in g) return;
 
   const db = createInterviewsClient();
-  await db.rpc('unaccept_phone', {
-    p_edition: g.access.edition.id,
+  await db.rpc('decide_preference', {
+    p_application: requiredText(formData, 'application_id'),
     p_company: requiredText(formData, 'company_id'),
-    p_phone: requiredText(formData, 'phone'),
+    p_decision: 'pending',
+    p_note: '',
     p_actor: g.access.actor,
   });
 

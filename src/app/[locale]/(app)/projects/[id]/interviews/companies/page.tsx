@@ -167,9 +167,13 @@ export default async function InterviewsCompaniesPage({
                   </div>
                 </div>
 
-                {decide && candidateLinkFor(company) ? (
+                {/* Only the candidate link needs 0005 (candidate_token); everything
+                    else here runs on 0001's functions, so it shows on every room. */}
+                {decide ? (
                   <div className="mt-4 space-y-3 border-t border-line pt-3">
-                    <CopyField label={t('companies.candidateLink')} value={candidateLinkFor(company)!} />
+                    {candidateLinkFor(company) ? (
+                      <CopyField label={t('companies.candidateLink')} value={candidateLinkFor(company)!} />
+                    ) : null}
 
                     {manage ? (
                       <div className="flex flex-wrap items-center gap-2">
@@ -325,9 +329,8 @@ function RoomForm({
 }
 
 /**
- * HR's pre-approval list for one room's candidate link (0005): phone numbers
- * pasted in ahead of time are what "already chosen by HR" checks against when
- * someone visits the link and identifies themselves.
+ * Who HR accepted for this room's company, and a box to accept more by phone
+ * number (acceptPhonesAction). Starts empty: only numbers HR types are used.
  */
 function AcceptedPhones({
   locale,
@@ -349,7 +352,7 @@ function AcceptedPhones({
       {phones.length ? (
         <ul className="space-y-1 text-sm">
           {phones.map((p) => (
-            <li key={p.phone} className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-1.5">
+            <li key={p.application_id} className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-1.5">
               <span className="ltr-nums">
                 {p.phone}
                 {p.name ? ` · ${p.name}` : ''}
@@ -358,7 +361,7 @@ function AcceptedPhones({
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="project_id" value={projectId} />
                 <input type="hidden" name="company_id" value={company.id} />
-                <input type="hidden" name="phone" value={p.phone} />
+                <input type="hidden" name="application_id" value={p.application_id} />
                 <button type="submit" className="text-xs text-ink-muted hover:text-danger-600">
                   {tCommon('delete')}
                 </button>

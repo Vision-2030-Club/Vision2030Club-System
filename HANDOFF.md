@@ -1136,6 +1136,22 @@ apply form → HR selection → personal link flow decided on 2026-09-16:
   link* (behind *Interviewer link and PIN*), and takes an Arabic company
   name, so the apply-form flow stays manageable.
 
+**The Rooms tab without 0005 (2026-10-02).** 0005–0009 were never applied to
+the real project, so rooms had no candidate link, and the tab hid Edit,
+Delete, the accepted-phones list and the interviewer link behind that link.
+Now only the candidate link waits on 0005; everything else shows on every
+room. The accepted-phones list no longer uses 0005's `accept_phone`,
+`unaccept_phone` and `accepted_phones`: HR pastes numbers (nothing is filled
+in automatically), each is matched in the app to the applicant who applied
+with it (`src/lib/interviews/phone.ts`, the same rule as
+`app.normalise_phone`; an application with an email first, then the newest),
+and accepted for the room's company with 0001's `decide_preference`, the
+Accept button's own function. A number that matches nobody, or a student who
+did not choose that company, is listed back instead. The list is read
+straight from `application_preferences`, so a student accepted from their
+applicant page shows there too. Accepting queues the acceptance email with the
+personal booking link, which goes out once Resend is configured.
+
 **Open decision for the club (not taken in code):** run the event on the
 room flow (phone list at the door), on the apply-form flow (HR selects
 applicants, students get a personal link by email), or both. Until it is
