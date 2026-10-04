@@ -6,6 +6,7 @@ import { Disclosure } from '@/components/Disclosure';
 import { Card, EmptyState, Input, Label, Select, Textarea } from '@/components/ui';
 import { localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
+import { companySheets } from '@/lib/interviews/companySheets';
 import { siteUrl } from '@/lib/interviews/email';
 import { roomLinks } from '@/lib/interviews/roomLinks';
 import {
@@ -27,6 +28,7 @@ import {
   renameRoomAction,
   rotateCompanyTokenAction,
   setRoomDeletedAction,
+  syncCompanySheetAction,
   unacceptPhoneAction,
 } from '../actions';
 
@@ -91,6 +93,7 @@ export default async function InterviewsCompaniesPage({
   // Each room's public link (roomLinks.ts, kept in the edition's settings);
   // a candidate_token from 0005, where that migration ran, as a fallback.
   const links = roomLinks(settings);
+  const sheets = companySheets(settings);
   const candidateLinkFor = (company: Company) => {
     const token = links[company.id] ?? company.candidate_token;
     return token ? `${siteUrl()}/${locale}/interviews/room/${token}` : null;
@@ -256,6 +259,35 @@ export default async function InterviewsCompaniesPage({
                             <input type="hidden" name="project_id" value={id} />
                             <input type="hidden" name="company_id" value={company.id} />
                           </ConfirmForm>
+                        </div>
+                      </Disclosure>
+                    ) : null}
+
+                    {manage ? (
+                      <Disclosure label={t('companies.sheet')}>
+                        <div className="space-y-3">
+                          <p className="text-xs text-ink-muted">{t('companies.sheetHint')}</p>
+                          {sheets[company.id] ? (
+                            <a
+                              href={sheets[company.id].url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block break-all text-sm font-medium text-brand-600 hover:underline"
+                              dir="ltr"
+                            >
+                              {sheets[company.id].url}
+                            </a>
+                          ) : null}
+                          <ActionForm
+                            action={syncCompanySheetAction}
+                            submitLabel={sheets[company.id] ? t('companies.sheetSync') : t('companies.sheetCreate')}
+                            variant="secondary"
+                            className="space-y-2"
+                          >
+                            <input type="hidden" name="locale" value={locale} />
+                            <input type="hidden" name="project_id" value={id} />
+                            <input type="hidden" name="company_id" value={company.id} />
+                          </ActionForm>
                         </div>
                       </Disclosure>
                     ) : null}

@@ -1,9 +1,9 @@
 import 'server-only';
-import { after } from 'next/server';
-import { GoogleNotConnectedError, isGoogleConfigured } from '@/lib/google/auth';
+import { isGoogleConfigured } from '@/lib/google/auth';
 import { addTab, createFloorSheet, deleteOtherTabs, listTabs, readTab, renameTab, revokeLinkSharing, writeTab } from '@/lib/google/sheets';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { signCvLong } from '@/lib/interviews/cv';
+import { dayOf, headerRowFormat, pages, plain, stamp, STAGE_NAMES, timeOf } from '@/lib/interviews/sheetFormat';
 import type { Actor } from '@/lib/interviews/access';
 import type { Edition, EditionSettings, Room, SlotStatus, Stage } from '@/lib/interviews/types';
 import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/interviews/queries';
@@ -24,7 +24,9 @@ import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/inter
  * so a day is naturally a whole separate sheet of rooms, not a label
  * repeated down one column. The date is read straight off sessions.day —
  * add a room for today and its tab is named today's date automatically.
- * A plain centred date line ("April 19") sits above the grid itself.
+ * A plain centred date line ("April 19") sits above the grid itself. After
+ * the day tabs, one "All bookings" tab lists every booking flat, for
+ * filtering and counting (buildAllBookings).
  *
  * Within a tab, two rooms per row, each its own block: a merged, centred,
  * CORAL title bar naming the ROOM (its booth label, e.g. "Room 1") — not
@@ -58,6 +60,23 @@ const STAGE_COLORS: Record<string, { bg: { red: number; green: number; blue: num
 };
 
 const COLUMNS = ['Time', 'Company', 'Student Name', 'Student Phone Number', 'CV', 'Status'];
+
+/** The flat tab after the day tabs (buildAllBookings). */
+const ALL_TAB = 'All bookings';
+const ALL_COLUMNS = [
+  'Day',
+  'Time',
+  'Room',
+  'Company',
+  'Student',
+  'Phone',
+  'Status',
+  'Arrived',
+  'Started',
+  'Finished',
+  'Booked at',
+  'Booked by',
+];
 const STAGE_COL = COLUMNS.length - 1; // "Status" is always the last visible column
 const VISIBLE_COLS = COLUMNS.length;
 const ID_COL = VISIBLE_COLS; // the hidden 7th column, 0-based index within a block
@@ -461,7 +480,7 @@ async function loadFloorData(db: ReturnType<typeof createInterviewsClient>, edit
   return { rooms, sessions, slots: (slotRows ?? []) as SlotStatus[] };
 }
 
-/** Rebuilds one edition's floor sheet from scratch. Call via kickFloorSheetSync. */
+/** Rebuilds one edition's floor sheet from scratch. Call via kickSheetsSync (sheetsSync.ts). */
 export async function syncFloorSheet(editionId: string): Promise<void> {
   if (!isGoogleConfigured()) return;
 
@@ -528,6 +547,12 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
 
   const claimed = new Set<number>();
   const keepIds = new Set<number>();
+  // Spoken for before the days are, so a new day never renames it.
+  const allTab = tabs.find((t) => t.title === ALL_TAB);
+  if (allTab) {
+    claimed.add(allTab.sheetId);
+    keepIds.add(allTab.sheetId);
+  }
 
   for (let i = 0; i < days.length; i++) {
     const day = days[i];
@@ -558,7 +583,75 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
     await syncDayTab(db, spreadsheetId, sheetId, label, titleText, dayRooms, slotsByRoom, companyNameByRoom, cvPathByApplication, zone);
   }
 
+  const allSheetId = allTab?.sheetId ?? (await addTab(spreadsheetId, ALL_TAB));
+  keepIds.add(allSheetId);
+  const allRows = await buildAllBookings(db, editionId, sessions, slots, roomById, companyNameByRoom, zone);
+  await writeTab(spreadsheetId, allSheetId, ALL_TAB, allRows, headerRowFormat(allSheetId));
+
   await deleteOtherTabs(spreadsheetId, keepIds);
+}
+
+/**
+ * The "All bookings" tab: every live booking of the edition on one flat,
+ * filterable list, with the times the floor recorded for it — what the day
+ * tabs, laid out room by room for the people at the door, cannot be sorted
+ * or counted by. Same rooms as the day tabs: a deleted room or company is
+ * left out. Its Status column is NOT read back by Pull from Sheet; that is
+ * the day tabs' job.
+ */
+async function buildAllBookings(
+  db: ReturnType<typeof createInterviewsClient>,
+  editionId: string,
+  sessions: { id: string; room_id: string }[],
+  slots: SlotStatus[],
+  roomById: Map<string, Room>,
+  companyNameByRoom: Map<string, string>,
+  zone: string,
+): Promise<string[][]> {
+  const liveSessions = new Set(sessions.map((s) => s.id));
+  const slotById = new Map(slots.filter((s) => liveSessions.has(s.session_id)).map((s) => [s.id, s]));
+
+  const bookings = await pages<{
+    id: string;
+    slot_id: string;
+    starts_at: string;
+    stage: Stage;
+    arrived_at: string | null;
+    started_at: string | null;
+    finished_at: string | null;
+    booked_at: string;
+    booked_by_kind: string;
+  }>((from, to) =>
+    db
+      .from('bookings')
+      .select('id, slot_id, starts_at, stage, arrived_at, started_at, finished_at, booked_at, booked_by_kind')
+      .eq('edition_id', editionId)
+      .is('cancelled_at', null)
+      .order('starts_at')
+      .order('id')
+      .range(from, to),
+  );
+
+  const rows: string[][] = [ALL_COLUMNS];
+  for (const booking of bookings) {
+    const slot = slotById.get(booking.slot_id);
+    if (!slot) continue;
+    rows.push([
+      dayOf(booking.starts_at, zone),
+      timeOf(booking.starts_at, zone),
+      plain(roomById.get(slot.room_id)?.name),
+      plain(companyNameByRoom.get(slot.room_id)),
+      plain(slot.student_name),
+      plain(slot.student_phone),
+      STAGE_NAMES[booking.stage] ?? booking.stage,
+      timeOf(booking.arrived_at, zone),
+      timeOf(booking.started_at, zone),
+      timeOf(booking.finished_at, zone),
+      stamp(booking.booked_at, zone),
+      booking.booked_by_kind === 'staff' ? 'Staff' : 'Student',
+    ]);
+  }
+  return rows;
 }
 
 /**
@@ -588,6 +681,7 @@ export async function pullFloorSheetStages(
   let skipped = 0;
 
   for (const tab of tabs) {
+    if (tab.title === ALL_TAB) continue;
     const rows = await readTab(sheetId, tab.title);
     for (const row of rows) {
       for (const startCol of [0, BLOCK_COLS + 1]) {
@@ -614,50 +708,4 @@ export async function pullFloorSheetStages(
   }
 
   return { updated, skipped };
-}
-
-/**
- * Syncs in flight, per edition, on this server instance. A rebuild is a
- * dozen Google calls; two bookings seconds apart used to start two rebuilds
- * that raced each other over the same tabs (both claiming the spare tab,
- * one deleting what the other had just written). Now a second request that
- * arrives while one is running only leaves a note, and the running one goes
- * round once more when it finishes — so the sheet ends up reflecting the
- * latest state, with at most two rebuilds for any burst.
- */
-const inFlight = new Map<string, { again: boolean }>();
-
-async function syncCoalesced(editionId: string): Promise<void> {
-  const running = inFlight.get(editionId);
-  if (running) {
-    running.again = true;
-    return;
-  }
-  const state = { again: false };
-  inFlight.set(editionId, state);
-  try {
-    do {
-      state.again = false;
-      await syncFloorSheet(editionId);
-    } while (state.again);
-  } finally {
-    inFlight.delete(editionId);
-  }
-}
-
-/**
- * Fire-and-forget, after the response has gone out — same pattern as
- * kickEmailDelivery. A Google hiccup (not connected yet, a revoked token,
- * a rate limit) must never fail the booking action that triggered it; it is
- * logged and the next change tries again.
- */
-export function kickFloorSheetSync(editionId: string): void {
-  after(async () => {
-    try {
-      await syncCoalesced(editionId);
-    } catch (error) {
-      if (error instanceof GoogleNotConnectedError) return;
-      console.error('[interviews/floorSheet] sync failed', error);
-    }
-  });
 }

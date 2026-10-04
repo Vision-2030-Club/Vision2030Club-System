@@ -768,14 +768,14 @@
       "notes": "How this works",
       "notesBody": "Applications and booking follow the windows above. A student who applies twice with the same email updates their form until HR decides or they book. Organizers move students through the stages on the Floor tab. Every change is logged with who made it; nothing is ever deleted.",
       "floorSheet": "Live Google Sheet",
-      "floorSheetHint": "A mirror of every booked slot, across every room and day, kept in sync automatically. The Stage column is editable in the Sheet — press “Pull from Sheet” to bring those changes back in. Requires the club's Google account to be connected under Admin → Google. The sheet holds names, phone numbers and CV links: it is shared with nobody by default, so open it from that account and share it with named people only. Link sharing is switched off again on every sync.",
+      "floorSheetHint": "A mirror of every booked slot, across every room and day, kept in sync automatically, plus an “All bookings” tab listing every booking on one filterable list with its arrived, started and finished times. The Stage column of the day tabs is editable in the Sheet — press “Pull from Sheet” to bring those changes back in. Requires the club's Google account to be connected under Admin → Google. The sheet holds names, phone numbers and CV links: it is shared with nobody by default, so open it from that account and share it with named people only. Link sharing is switched off again on every sync.",
       "floorSheetNone": "Not created yet — it appears the first time the floor changes, or press Sync now.",
       "floorSheetSync": "Sync now",
       "floorSheetPull": "Pull from Sheet",
       "floorSheetPulled": "Stage changes from the Sheet were applied, and the Sheet was refreshed to match.",
       "floorSheetPullHint": "Reads the Stage column of every day tab and applies any changes (Not Arrived / Arrived / In Interview / Finished / No Show) to the matching booking. Nothing happens automatically — only when this is pressed.",
       "registrationsSheet": "Registrations Google Sheet",
-      "registrationsSheetHint": "Every application, from the public form and the Register tab, is added as a row: submitted, name, email, phone, university, year, major, companies, CV. A student who applies again with the same email gets a second row marked “Updated”. Sync now rewrites the sheet from the system, one row per student, which also fills in any row Google missed. Uses the Google account connected under Admin → Google, like the Live Google Sheet. The sheet holds personal data: it is shared with nobody by default, so share it with named people only. The CV links open only for signed-in HR and managers.",
+      "registrationsSheetHint": "Every application, from the public form and the Register tab, is added as a row with every answer on the form, the companies in order, which of them accepted or rejected the student, and what the student booked. The column of a question the form does not ask is hidden. Accepted, Rejected and Booked update themselves after HR decisions and bookings. A student who applies again with the same email gets a second row marked “Updated” until the next update folds it away. Sync now rewrites the sheet from the system, one row per student, which also fills in any row Google missed. Uses the Google account connected under Admin → Google, like the Live Google Sheet. The sheet holds personal data: it is shared with nobody by default, so share it with named people only. The CV links open only for signed-in HR and managers.",
       "registrationsSheetNone": "Not created yet — it appears with the first application, or press Sync now.",
       "registrationsSheetSync": "Sync now"
     },
@@ -829,7 +829,11 @@
       "phonesNotChosen": "These applicants did not choose this company: {phones}.",
       "roomCompany": "Company",
       "roomCompanyNew": "New company (type its name)",
-      "createLink": "Create room link"
+      "createLink": "Create room link",
+      "sheet": "Google Sheet for the company",
+      "sheetHint": "A sheet with only this company’s schedule: day, time, room, student name, university, year, major, CV link and status. No phone numbers or emails. It updates itself after every booking and stage change. Nobody gets access automatically: open it from the club’s Google account and share it with the company’s people by name. The CV links work like the interviewer link: without a PIN, anyone who can see the sheet can open them; with one, only a browser that has entered the PIN.",
+      "sheetCreate": "Create Google Sheet",
+      "sheetSync": "Sync now"
     },
     "people": {
       "add": "Add",

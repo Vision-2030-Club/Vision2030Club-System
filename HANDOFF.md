@@ -1103,7 +1103,7 @@ apply form → HR selection → personal link flow decided on 2026-09-16:
   room's whole day, taken times greyed. `rooms(edition_id, name)` is no
   longer unique (0007).
 - **The floor sheet (0006).** One Google Sheet per edition, rebuilt after
-  every booking/stage change (`kickFloorSheetSync`, fire-and-forget) and on
+  every booking/stage change (`kickSheetsSync` since 2026-10-05, fire-and-forget) and on
   *Sync now* in Settings; one tab per day, two rooms per row, a hidden
   booking-id column. Its Status column is the one thing read BACK, and only
   when someone presses *Pull from Sheet*. Needs the club's Google account
@@ -1297,6 +1297,58 @@ under Admin → Google (any account; the sheets belong to it) and need the
 Google Sheets API and Google Drive API enabled in that Google Cloud project
 as well as the Calendar API. Both have a **Sync now** button, which shows
 Google's error if one comes back; the automatic syncs only log it.
+
+### More in the Google Sheets: company sheets, full answers, All bookings (2026-10-05)
+
+No migration; everything new is kept in the edition's settings.
+
+- **Company sheets** (`src/lib/interviews/companySheets.ts`). One spreadsheet
+  per company, created only when a manager presses *Create Google Sheet* in
+  the company's card on the Rooms tab. It holds that company's schedule and
+  nothing else: day, time, room, student name, university, year, major, CV,
+  status. **No phone or email, on purpose.** Nothing is shared
+  automatically; HR opens it from the club's Google account and shares it by
+  name, and link sharing is revoked on every rebuild as with the other two.
+  The CV link is the interviewer page's own
+  (`/api/interviews/cv?token=<company token>&booking=…`), so it behaves like
+  the interviewer link: open to whoever sees the sheet when the company has no
+  PIN, only after the PIN when it has one. A new interviewer link changes
+  every CV link, and the sync that follows rewrites them. Kept in settings as
+  `company_sheets` (`{ company id: { id, url } }`).
+- **Registrations sheet, wider.** Every question the form can ask now has a
+  column (college, GPA, English, club member, why first choice), plus
+  **Accepted**, **Rejected** and **Booked**. The column of a question the
+  edition does not ask is hidden unless somebody answered it. Because those
+  three columns change after the row was appended, the sheet is now also
+  rewritten after HR decisions (Accept/Reject, the accepted-phones list) and
+  after bookings, which also folds "Updated" duplicates away.
+- **Floor sheet, "All bookings" tab.** After the day tabs: every live booking
+  on one flat list with arrived, started and finished times, booked at and
+  by whom. Same rooms as the day tabs. *Pull from Sheet* skips this tab; only
+  the day tabs' Status column is read back.
+- **One background sync for all of them** (`src/lib/interviews/sheetsSync.ts`,
+  `kickSheetsSync`). It replaces `kickFloorSheetSync` at every call site and
+  keeps its coalescing (at most two rebuilds per burst, per instance). It
+  runs floor, then company sheets, then registrations, each on its own so one
+  broken sheet does not stop the others.
+
+**Quota is the thing to watch.** Everything shares one Google account, and
+Sheets allows roughly sixty write requests a minute per account. A booking
+already cost the floor sheet about four writes per day tab; it now adds about
+four for the All bookings tab, four for the affected company's sheet, and four
+for the registrations sheet when its Booked column changes. To keep that down,
+the company and registrations sheets hash what they would write and skip
+Google entirely when it matches what this instance last wrote
+(`writtenAlready` / `rememberWritten` in `src/lib/google/sheets.ts`). The memory
+is per instance and lasts ten minutes, so a hand edit or another instance's
+write can survive up to ten minutes; *Sync now* never skips. If the logs show
+`429` / "Quota exceeded" during a booking rush, the first fix is to stop
+rebuilding the registrations sheet on bookings (drop it from `syncAll`) and
+rely on *Sync now*.
+
+**Not exercised against Google yet**, like the rest of the Google code: the
+calls are the same `writeTab` / `createSpreadsheet` the existing sheets use,
+but nobody has watched a company sheet appear.
 
 ### Things easy to break
 

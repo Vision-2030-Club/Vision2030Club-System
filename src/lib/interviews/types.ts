@@ -26,6 +26,8 @@ export type EditionSettings = {
   floor_sheet_url?: string;
   /** Each room's public link token, by company id; read through roomLinks (roomLinks.ts). */
   room_links?: Record<string, string>;
+  /** Each company's own Google Sheet, by company id; read through companySheets (companySheets.ts). */
+  company_sheets?: Record<string, { id: string; url: string }>;
 };
 
 export type Edition = {

@@ -1,4 +1,5 @@
 import 'server-only';
+import { createHash } from 'node:crypto';
 import { getAccessToken } from './auth';
 
 /**
@@ -218,6 +219,38 @@ export async function writeTab(
     method: 'POST',
     body: JSON.stringify({ requests: formatRequests }),
   });
+}
+
+/**
+ * What this server instance last wrote to each sheet, as a hash, so an
+ * automatic sync can skip a sheet whose content has not changed. Every
+ * booking change re-syncs every sheet of the edition, and the one Google
+ * account they all share has a write quota of about sixty requests a
+ * minute; most of those syncs change one company's sheet and leave the rest
+ * as they were.
+ *
+ * Per instance and forgotten after ten minutes, so a sheet written by
+ * another instance, or edited by hand, is at most ten minutes from being
+ * rewritten. "Sync now" never consults it.
+ */
+const lastWritten = new Map<string, { hash: string; at: number }>();
+const REMEMBER_MS = 10 * 60 * 1000;
+
+function hashOf(content: unknown): string {
+  return createHash('sha1').update(JSON.stringify(content)).digest('hex');
+}
+
+export function writtenAlready(key: string, content: unknown): boolean {
+  const seen = lastWritten.get(key);
+  return Boolean(seen && Date.now() - seen.at < REMEMBER_MS && seen.hash === hashOf(content));
+}
+
+export function rememberWritten(key: string, content: unknown): void {
+  lastWritten.set(key, { hash: hashOf(content), at: Date.now() });
+}
+
+export function forgetWritten(key: string): void {
+  lastWritten.delete(key);
 }
 
 /**
