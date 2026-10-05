@@ -1302,19 +1302,45 @@ Google's error if one comes back; the automatic syncs only log it.
 
 No migration; everything new is kept in the edition's settings.
 
-- **Company sheets** (`src/lib/interviews/companySheets.ts`). One spreadsheet
-  per company, created only when a manager presses *Create Google Sheet* in
-  the company's card on the Rooms tab. It holds that company's schedule and
-  nothing else: day, time, room, student name, university, year, major, CV,
-  status. **No phone or email, on purpose.** Nothing is shared
+- **Both layouts follow the club's 5th-edition templates** ("Rooms" and
+  "Company Template", the .xlsx files the organizers made). The colours,
+  merges, dropdowns and widths are Sheets API requests built in
+  `floorSheet.ts` / `companySheets.ts` from the helpers at the bottom of
+  `src/lib/interviews/sheetFormat.ts`. If the template changes, change those;
+  there is no template file read at run time.
+- **Floor sheet, per the Rooms template.** One tab per day; a teal
+  `DAY 1 · OCTOBER 12` banner; rooms two side by side, each with a teal
+  title bar, the mint / lavender / lime header (Time, Company, Student Name,
+  Student Phone Number, Status, Notes), one row per slot of the room's
+  session, and a ROOM SUMMARY (total, booked, available) under it. **The CV
+  column is gone**, because the template has none, and with it the 30-day
+  signed CV URLs (`signCvLong` is deleted). Status uses the template's words:
+  Arrived, In-interview, Completed, Late (= no-show), Gap (a slot closed for
+  a break), blank for booked-but-not-arrived. *Pull from Sheet* reads the
+  first four back, and only calls `advance_stage` for rows that differ from
+  the database. **Notes are the organizers'**: each rewrite reads the tab
+  first and puts every note back on its row, matched by the hidden eighth
+  column (booking id, or `slot:<id>` for a free slot). A note typed in the
+  second or two between that read and the write is lost.
+- **Company sheets** (`src/lib/interviews/companySheets.ts`), per the Company
+  template. One spreadsheet per company, created only when a manager presses
+  *Create Google Sheet* in the company's card on the Rooms tab; one tab per
+  day the company interviews. The edition's Arabic name on the banner, the
+  COMPANY / DATE / ROOM band, then a row per slot: Time, Interviewer, Student
+  Name, **Phone Number** (the club decided on 2026-10-05 that companies get
+  it, as the template shows), Student CV, Feedback Link, Status. Status is the
+  system's (Interview Done / No Show / In-progress, from the floor) and is
+  never read back; Interviewer is the company's and is carried across
+  rewrites like the floor's Notes (keyed by slot). Nothing is shared
   automatically; HR opens it from the club's Google account and shares it by
-  name, and link sharing is revoked on every rebuild as with the other two.
-  The CV link is the interviewer page's own
-  (`/api/interviews/cv?token=<company token>&booking=…`), so it behaves like
-  the interviewer link: open to whoever sees the sheet when the company has no
-  PIN, only after the PIN when it has one. A new interviewer link changes
-  every CV link, and the sync that follows rewrites them. Kept in settings as
-  `company_sheets` (`{ company id: { id, url } }`).
+  name, and link sharing is revoked on every rebuild. The CV link is the
+  interviewer page's own (`/api/interviews/cv?token=<company token>&booking=…`)
+  and the Feedback link opens `/interviews/c/<token>?day=…&open=<booking>`,
+  which the company page now honours by opening that student's feedback form.
+  Both behave like the interviewer link: open to whoever sees the sheet when
+  the company has no PIN, only after the PIN when it has one. A new
+  interviewer link changes both, and the sync that follows rewrites them. Kept
+  in settings as `company_sheets` (`{ company id: { id, url } }`).
 - **Registrations sheet, wider.** Every question the form can ask now has a
   column (college, GPA, English, club member, why first choice), plus
   **Accepted**, **Rejected** and **Booked**. The column of a question the
@@ -1334,7 +1360,8 @@ No migration; everything new is kept in the edition's settings.
 
 **Quota is the thing to watch.** Everything shares one Google account, and
 Sheets allows roughly sixty write requests a minute per account. A booking
-already cost the floor sheet about four writes per day tab; it now adds about
+already cost the floor sheet about four writes and one read (the Notes) per
+day tab; it now adds about
 four for the All bookings tab, four for the affected company's sheet, and four
 for the registrations sheet when its Booked column changes. To keep that down,
 the company and registrations sheets hash what they would write and skip
@@ -1346,9 +1373,13 @@ write can survive up to ten minutes; *Sync now* never skips. If the logs show
 rebuilding the registrations sheet on bookings (drop it from `syncAll`) and
 rely on *Sync now*.
 
-**Not exercised against Google yet**, like the rest of the Google code: the
-calls are the same `writeTab` / `createSpreadsheet` the existing sheets use,
-but nobody has watched a company sheet appear.
+**Not exercised against Google yet**, like the rest of the Google code. What
+was checked: the real sync code was run against a fake Google and a fake
+interviews database (invented data), its requests replayed into a picture
+and compared with both templates, and the behaviour confirmed: Pull applies
+only the changed Status, Notes and Interviewer survive a rewrite, and an
+unchanged company sheet costs no Google calls. What a fake cannot show is
+Google refusing a request; expect to fix something on the first real sync.
 
 ### Things easy to break
 

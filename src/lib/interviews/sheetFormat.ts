@@ -110,3 +110,146 @@ export function columnVisibility(sheetId: number, hidden: boolean[]): object[] {
     },
   }));
 }
+
+// -----------------------------------------------------------------------------
+// Drawing: the club's sheet templates (5th edition) as Sheets API requests
+// -----------------------------------------------------------------------------
+
+export type Rgb = { red: number; green: number; blue: number };
+
+/** "0E5A67" → the 0–1 RGB the Sheets API takes. */
+export function hex(value: string): Rgb {
+  const n = parseInt(value, 16);
+  return { red: ((n >> 16) & 255) / 255, green: ((n >> 8) & 255) / 255, blue: (n & 255) / 255 };
+}
+
+export type Box = { sheetId: number; r0: number; r1: number; c0: number; c1: number };
+
+function gridRange(b: Box) {
+  return { sheetId: b.sheetId, startRowIndex: b.r0, endRowIndex: b.r1, startColumnIndex: b.c0, endColumnIndex: b.c1 };
+}
+
+export type CellStyle = {
+  bg?: Rgb;
+  fg?: Rgb;
+  bold?: boolean;
+  size?: number;
+  align?: 'LEFT' | 'CENTER' | 'RIGHT';
+};
+
+/** One style over a box. Every property is written, so a box can be restyled without leftovers. */
+export function paint(b: Box, style: CellStyle): object {
+  return {
+    repeatCell: {
+      range: gridRange(b),
+      cell: {
+        userEnteredFormat: {
+          backgroundColor: style.bg ?? hex('FFFFFF'),
+          textFormat: {
+            foregroundColor: style.fg ?? hex('000000'),
+            bold: style.bold ?? false,
+            fontSize: style.size ?? 10,
+          },
+          horizontalAlignment: style.align ?? 'LEFT',
+          verticalAlignment: 'MIDDLE',
+        },
+      },
+      fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+    },
+  };
+}
+
+export function merge(b: Box): object {
+  return { mergeCells: { range: gridRange(b), mergeType: 'MERGE_ALL' } };
+}
+
+/** The same row-by-row merge over each row of a box (a Notes cell spanning two columns). */
+export function mergeRows(b: Box): object {
+  return { mergeCells: { range: gridRange(b), mergeType: 'MERGE_ROWS' } };
+}
+
+/** Thin lines around and inside a box. */
+export function grid(b: Box, color: Rgb): object {
+  const line = { style: 'SOLID', color };
+  return {
+    updateBorders: {
+      range: gridRange(b),
+      top: line,
+      bottom: line,
+      left: line,
+      right: line,
+      innerHorizontal: line,
+      innerVertical: line,
+    },
+  };
+}
+
+/** A strict dropdown. Values the system writes that are not in the list are still accepted from the API. */
+export function dropdown(b: Box, values: string[]): object {
+  return {
+    setDataValidation: {
+      range: gridRange(b),
+      rule: {
+        condition: { type: 'ONE_OF_LIST', values: values.map((v) => ({ userEnteredValue: v })) },
+        showCustomUi: true,
+        strict: true,
+      },
+    },
+  };
+}
+
+/** Colours a cell by its exact text, recalculated the moment the text changes. */
+export function whenText(b: Box, text: string, style: { bg: Rgb; fg?: Rgb }): object {
+  return {
+    addConditionalFormatRule: {
+      index: 0,
+      rule: {
+        ranges: [gridRange(b)],
+        booleanRule: {
+          condition: { type: 'TEXT_EQ', values: [{ userEnteredValue: text }] },
+          format: { backgroundColor: style.bg, ...(style.fg ? { textFormat: { foregroundColor: style.fg } } : {}) },
+        },
+      },
+    },
+  };
+}
+
+/** Pixel widths from `startCol` on. */
+export function widths(sheetId: number, startCol: number, px: number[]): object[] {
+  return px.map((pixelSize, i) => ({
+    updateDimensionProperties: {
+      range: { sheetId, dimension: 'COLUMNS', startIndex: startCol + i, endIndex: startCol + i + 1 },
+      properties: { pixelSize },
+      fields: 'pixelSize',
+    },
+  }));
+}
+
+export function hideColumn(sheetId: number, col: number): object {
+  return {
+    updateDimensionProperties: {
+      range: { sheetId, dimension: 'COLUMNS', startIndex: col, endIndex: col + 1 },
+      properties: { hiddenByUser: true },
+      fields: 'hiddenByUser',
+    },
+  };
+}
+
+/**
+ * What people typed by hand into a column the system leaves to them (the
+ * floor's Notes, a company's Interviewer), read off the sheet before a
+ * rewrite and keyed by the hidden key column of the same row, so the rewrite
+ * can put each value back on the row it belongs to. `blocks` is the starting
+ * column of each block of a row (the floor has two rooms side by side).
+ */
+export function keptValues(rows: string[][], blocks: number[], keyCol: number, valueCol: number): Map<string, string> {
+  const kept = new Map<string, string>();
+  for (const row of rows) {
+    for (const start of blocks) {
+      const key = row[start + keyCol];
+      const value = row[start + valueCol];
+      if (key && value) kept.set(key, value);
+    }
+  }
+  return kept;
+}
