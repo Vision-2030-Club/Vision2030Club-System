@@ -1321,11 +1321,20 @@ No migration; everything new is kept in the edition's settings.
   the database. **Notes are the organizers'**: each rewrite reads the tab
   first and puts every note back on its row, matched by the hidden eighth
   column (booking id, or `slot:<id>` for a free slot). A note typed in the
-  second or two between that read and the write is lost.
+  second or two between that read and the write is lost. **A room can hold
+  two companies in one day** (STC 2–5, PwC 5–8: two sessions in one room,
+  made on the Schedule tab; the Rooms tab's *Add room* always makes a new
+  room). Their slots run on in time order and each row names the company of
+  its own slot.
 - **Company sheets** (`src/lib/interviews/companySheets.ts`), per the Company
-  template. One spreadsheet per company, created only when a manager presses
-  *Create Google Sheet* in the company's card on the Rooms tab; one tab per
-  day the company interviews. The edition's Arabic name on the banner, the
+  template. **One spreadsheet per company AND room**: STC in Room 1 and Room
+  2 has two files. Each file has one tab per day and shows only that
+  company's own hours in that room, so when PwC takes Room 1 after STC, each
+  sees only its own students. Created when a manager presses *Create Google
+  Sheets* in the company's card on the Rooms tab (one file per room the
+  company has a session in); from then on the company is opted in, and a
+  room it is given later gets its file on the next sync — HR still has to
+  share that new file. The edition's Arabic name on the banner, the
   COMPANY / DATE / ROOM band, then a row per slot: Time, Interviewer, Student
   Name, **Phone Number** (the club decided on 2026-10-05 that companies get
   it, as the template shows), Student CV, Feedback Link, Status. Status is the
@@ -1340,7 +1349,7 @@ No migration; everything new is kept in the edition's settings.
   Both behave like the interviewer link: open to whoever sees the sheet when
   the company has no PIN, only after the PIN when it has one. A new
   interviewer link changes both, and the sync that follows rewrites them. Kept
-  in settings as `company_sheets` (`{ company id: { id, url } }`).
+  in settings as `company_sheets` (`{ "<company id>:<room id>": { id, url } }`).
 - **Registrations sheet, wider.** Every question the form can ask now has a
   column (college, GPA, English, club member, why first choice), plus
   **Accepted**, **Rejected** and **Booked**. The column of a question the

@@ -57,8 +57,10 @@ import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/inter
  * Within a day tab: a teal "DAY 1 · OCTOBER 12" banner, then rooms two side
  * by side. Each room is a block: a teal title bar naming the ROOM (its booth
  * label, uppercased) — not the company — a header row in the template's
- * mint / lavender / lime, then one row per slot of that room's session,
- * booked or not, then a ROOM SUMMARY (total, booked, available).
+ * mint / lavender / lime, then one row per slot of every session in that
+ * room that day, booked or not, then a ROOM SUMMARY (total, booked,
+ * available). Two companies can share a room in one day (STC 2–5, PwC
+ * 5–8): their slots run on in time order and each row names its company.
  *
  * Status shows the template's words, not the app's: Arrived, In-interview,
  * Completed, Late (a no-show), and Gap for a slot closed for a break; a
@@ -149,13 +151,13 @@ function statusOf(slot: SlotStatus): string {
 type RoomBlock = { title: string; slots: SlotStatus[]; rows: string[][] };
 
 /** One row per slot of the room's session, booked or not, always BLOCK_COLS wide. */
-function buildRoomBlock(room: Room, companyName: string, slots: SlotStatus[], notes: Map<string, string>, zone: string): RoomBlock {
+function buildRoomBlock(room: Room, companyNames: Map<string, string>, slots: SlotStatus[], notes: Map<string, string>, zone: string): RoomBlock {
   return {
     title: room.name.toUpperCase(),
     slots,
     rows: slots.map((slot) => [
       timeOf(slot.starts_at, zone),
-      plain(companyName),
+      plain(companyNames.get(slot.company_id)),
       plain(slot.student_name),
       plain(slot.student_phone),
       statusOf(slot),
@@ -224,7 +226,7 @@ async function syncDayTab(
   titleText: string,
   dayRooms: Room[],
   slotsByRoom: Map<string, SlotStatus[]>,
-  companyNameByRoom: Map<string, string>,
+  companyNames: Map<string, string>,
   zone: string,
 ): Promise<void> {
   // Notes are the organizers' own; carry them across the rewrite.
@@ -252,7 +254,7 @@ async function syncDayTab(
     const left = dayRooms[i];
     const right = dayRooms[i + 1] as Room | undefined;
     const blockOf = (room: Room) =>
-      buildRoomBlock(room, companyNameByRoom.get(room.id) ?? '', slotsByRoom.get(room.id) ?? [], notes, zone);
+      buildRoomBlock(room, companyNames, slotsByRoom.get(room.id) ?? [], notes, zone);
     const leftBlock = blockOf(left);
     const rightBlock = right ? blockOf(right) : undefined;
 
@@ -357,12 +359,9 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
     (s) => roomById.get(s.room_id)?.is_active && !companyById.get(s.company_id)?.is_hidden,
   );
 
-  const companyNameByRoom = new Map<string, string>();
-  for (const session of sessions) {
-    if (companyNameByRoom.has(session.room_id)) continue;
-    const company = companyById.get(session.company_id);
-    if (company) companyNameByRoom.set(session.room_id, company.name_en);
-  }
+  // A room can hold two companies in one day (STC 2–5, PwC 5–8), so every
+  // row names the company of its own slot, not one company per room.
+  const companyNames = new Map(companies.map((c) => [c.id, c.name_en]));
 
   const zone = edition.time_zone;
   const days = sessionDays(sessions); // sorted 'YYYY-MM-DD', one per calendar day with a session
@@ -422,12 +421,12 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
 
     const sheetId = await ensureNamedTab(spreadsheetId, tabs, claimed, label);
     keepIds.add(sheetId);
-    await syncDayTab(spreadsheetId, sheetId, label, `DAY ${i + 1} · ${dayTitle(day)}`, dayRooms, slotsByRoom, companyNameByRoom, zone);
+    await syncDayTab(spreadsheetId, sheetId, label, `DAY ${i + 1} · ${dayTitle(day)}`, dayRooms, slotsByRoom, companyNames, zone);
   }
 
   const allSheetId = allTab?.sheetId ?? (await addTab(spreadsheetId, ALL_TAB));
   keepIds.add(allSheetId);
-  const allRows = await buildAllBookings(db, editionId, liveSessions, slots, roomById, companyNameByRoom, zone);
+  const allRows = await buildAllBookings(db, editionId, liveSessions, slots, roomById, companyNames, zone);
   const header: Box = { sheetId: allSheetId, r0: 0, r1: 1, c0: 0, c1: ALL_COLUMNS.length };
   await writeTab(spreadsheetId, allSheetId, ALL_TAB, allRows, [
     paint(header, { bg: TEAL, fg: WHITE, bold: true }),
@@ -456,7 +455,7 @@ async function buildAllBookings(
   liveSessions: Set<string>,
   slots: SlotStatus[],
   roomById: Map<string, Room>,
-  companyNameByRoom: Map<string, string>,
+  companyNames: Map<string, string>,
   zone: string,
 ): Promise<string[][]> {
   const slotById = new Map(slots.filter((s) => liveSessions.has(s.session_id)).map((s) => [s.id, s]));
@@ -490,7 +489,7 @@ async function buildAllBookings(
       dayOf(booking.starts_at, zone),
       timeOf(booking.starts_at, zone),
       plain(roomById.get(slot.room_id)?.name),
-      plain(companyNameByRoom.get(slot.room_id)),
+      plain(companyNames.get(slot.company_id)),
       plain(slot.student_name),
       plain(slot.student_phone),
       STAGE_NAMES[booking.stage] ?? booking.stage,

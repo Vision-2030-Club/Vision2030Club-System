@@ -830,10 +830,13 @@
       "roomCompany": "Company",
       "roomCompanyNew": "New company (type its name)",
       "createLink": "Create room link",
-      "sheet": "Google Sheet for the company",
-      "sheetHint": "Laid out like the club’s Company template: one tab per day, with a row for every time slot — the student’s name, phone number, CV link, a link to their feedback form, and the status from the floor. The Interviewer column is the company’s to fill in and is kept across updates; Status always shows the floor and is not read back. It updates itself after every booking and stage change. Nobody gets access automatically: open it from the club’s Google account and share it with the company’s people by name — it holds students’ phone numbers. The CV and feedback links work like the interviewer link: without a PIN, anyone who can see the sheet can open them; with one, only a browser that has entered the PIN.",
-      "sheetCreate": "Create Google Sheet",
-      "sheetSync": "Sync now"
+      "sheet": "Google Sheets for the company",
+      "sheetHint": "One sheet per room this company interviews in, laid out like the club’s Company template: one tab per day, with a row for each of the company’s own time slots in that room — the student’s name, phone number, CV link, a link to their feedback form, and the status from the floor. When two companies share a room, each sees only its own hours. The Interviewer column is the company’s to fill in and is kept across updates. A room added for the company later gets its sheet automatically. The sheets update themselves after every booking and stage change. Nobody gets access automatically: open each sheet from the club’s Google account and share it with the company’s people by name — it holds students’ phone numbers. The CV and feedback links work like the interviewer link: without a PIN, anyone who can see the sheet can open them; with one, only a browser that has entered the PIN.",
+      "sheetCreate": "Create Google Sheets",
+      "sheetSync": "Sync now",
+      "sheetOpen": "Open sheet",
+      "sheetNone": "not created yet",
+      "sheetNoRooms": "This company has no room with a session yet."
     },
     "people": {
       "add": "Add",

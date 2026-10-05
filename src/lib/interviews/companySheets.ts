@@ -12,7 +12,7 @@ import {
   writtenAlready,
 } from '@/lib/google/sheets';
 import { siteUrl } from '@/lib/interviews/email';
-import { loadCompanies, loadRooms } from '@/lib/interviews/queries';
+import { loadCompanies, loadRooms, loadSessions } from '@/lib/interviews/queries';
 import {
   dayOf,
   dropdown,
@@ -29,30 +29,34 @@ import {
   widths,
   type Box,
 } from '@/lib/interviews/sheetFormat';
-import type { Company, Edition, EditionSettings, SlotStatus, Stage } from '@/lib/interviews/types';
+import type { Company, Edition, EditionSettings, Room, SlotStatus, Stage } from '@/lib/interviews/types';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 
 /**
- * A Google Sheet per company, drawn after the club's "Company Template —
- * 5th edition": one tab per day the company interviews, named by its date
- * ("10/12") like the floor sheet's tabs.
+ * A Google Sheet per company AND room, drawn after the club's "Company
+ * Template — 5th edition": STC interviewing in Room 1 and Room 2 has two
+ * files, one per room, each with one tab per day ("10/12") like the floor
+ * sheet's tabs. A file shows only its company's own hours in that room: when
+ * STC has Room 1 from 2 to 5 and PwC from 5 to 8, STC's file lists 2–5 and
+ * PwC's lists 5–8. The floor sheet is where the whole room is seen.
  *
  * Each tab: the edition's name on a teal banner, a lime stripe, the
  * COMPANY / DATE / ROOM labels with their values, then one row per slot of
- * the company's session that day, booked or not — Time, Interviewer,
- * Student Name, Phone Number, Student CV, Feedback Link, Status.
+ * the company's session in that room that day, booked or not — Time,
+ * Interviewer, Student Name, Phone Number, Student CV, Feedback Link, Status.
  *
- * Created only when a manager presses "Create Google Sheet" on that
- * company's card on the Rooms tab, and owned by the club's Google account
- * like the other sheets. Nothing shares it automatically: HR opens it from
- * that account and shares it with the company's people by name. Link
- * sharing is switched off on every rebuild. It carries students' phone
- * numbers, by the club's decision of 2026-10-05, as the template does.
+ * Created when a manager presses "Create Google Sheets" on the company's card
+ * on the Rooms tab: one file for every room the company has a session in.
+ * From then on the company counts as opted in, and a room it is given later
+ * gets its file on the next sync. Owned by the club's Google account like the
+ * other sheets. Nothing shares a file automatically: HR opens it from that
+ * account and shares it with the company's people by name. Link sharing is
+ * switched off on every rebuild. It carries students' phone numbers, by the
+ * club's decision of 2026-10-05, as the template does.
  *
  * Who writes what:
  *   - Status is the system's: the floor's stage as the template's words
- *     (Interview Done, No Show, In-progress), blank before that. Anything
- *     typed there is overwritten by the next sync, and nothing is read back.
+ *     (Interview Done, No Show, In-progress), blank before that.
  *   - Interviewer is the company's: the system has no such data, so it
  *     reads the column before each rewrite and puts each name back on its
  *     time slot (keyed by the hidden eighth column, the slot id).
@@ -64,9 +68,9 @@ import { createInterviewsClient } from '@/lib/supabase/interviews';
  *     sync rewrites them.
  *
  * Rebuilt after every booking or stage change (sheetsSync.ts), skipping
- * Google entirely for a company whose rows did not change; "Sync now" on
- * the card always rewrites. Kept in the edition's settings as
- * `company_sheets` ({ company id: { id, url } }), so it needs no migration.
+ * Google entirely for a file whose rows did not change; "Sync now" on the
+ * card always rewrites. Kept in the edition's settings as `company_sheets`
+ * ({ "<company id>:<room id>": { id, url } }), so it needs no migration.
  */
 
 const HEADERS = ['Time', 'Interviewer', 'Student Name', 'Phone Number', 'Student CV', 'Feedback Link', 'Status'];
@@ -95,19 +99,32 @@ const LINE = hex('AAC1C1');
 type Db = ReturnType<typeof createInterviewsClient>;
 type Saved = { id: string; url: string };
 
-/** One day of one company: what its tab says, before any hand-typed Interviewer is put back. */
+/** One company in one room: the unit a file is made for. */
+type Pair = { company: Company; room: Room };
+
+/** One day of one pair: what its tab says, before any hand-typed Interviewer is put back. */
 type DayTab = { label: string; rows: string[][] };
 
-/** The edition's company sheets, by company id, ignoring anything malformed. */
+/** How a pair is keyed in the edition's `company_sheets` setting. */
+export function sheetKey(companyId: string, roomId: string): string {
+  return `${companyId}:${roomId}`;
+}
+
+/** The edition's company sheets, by sheetKey, ignoring anything malformed. */
 export function companySheets(settings: { company_sheets?: unknown } | null | undefined): Record<string, Saved> {
   const saved = settings?.company_sheets;
   if (!saved || typeof saved !== 'object') return {};
   return Object.fromEntries(
     Object.entries(saved as Record<string, unknown>).filter((entry): entry is [string, Saved] => {
       const v = entry[1] as Partial<Saved> | null;
-      return Boolean(v && typeof v.id === 'string' && typeof v.url === 'string');
+      return entry[0].includes(':') && Boolean(v && typeof v.id === 'string' && typeof v.url === 'string');
     }),
   );
+}
+
+/** True once any of the company's rooms has a file: its later rooms get one automatically. */
+function optedIn(sheets: Record<string, Saved>, companyId: string): boolean {
+  return Object.keys(sheets).some((key) => key.startsWith(`${companyId}:`));
 }
 
 async function savedSheets(db: Db, editionId: string): Promise<Record<string, Saved>> {
@@ -115,9 +132,9 @@ async function savedSheets(db: Db, editionId: string): Promise<Record<string, Sa
   return companySheets(data as EditionSettings | null);
 }
 
-/** Remembers one company's sheet, read fresh so two quick creations do not undo each other. */
-async function saveSheet(db: Db, editionId: string, companyId: string, sheet: Saved): Promise<void> {
-  const sheets = { ...(await savedSheets(db, editionId)), [companyId]: sheet };
+/** Remembers one pair's file, read fresh so two quick creations do not undo each other. */
+async function saveSheet(db: Db, editionId: string, key: string, sheet: Saved): Promise<void> {
+  const sheets = { ...(await savedSheets(db, editionId)), [key]: sheet };
   const { error } = await db.rpc('update_edition', {
     p_edition: editionId,
     p_patch: { settings: { company_sheets: sheets } },
@@ -138,16 +155,42 @@ function tabLabel(day: string): string {
   return `${Number(month)}/${Number(dayOfMonth)}`;
 }
 
-/** Every company's day tabs, built from one read of the edition's floor. */
-async function loadTabs(db: Db, edition: Edition, companies: Company[]): Promise<Map<string, DayTab[]>> {
-  const companyIds = new Set(companies.map((c) => c.id));
-  const [rooms, allSlots] = await Promise.all([
-    loadRooms(db, edition.id),
-    pages<SlotStatus>((from, to) =>
-      db.from('slot_status').select('*').eq('edition_id', edition.id).order('starts_at').order('id').range(from, to),
-    ),
+/**
+ * Every company-and-room pair with a session: live rooms and visible
+ * companies only, the way the floor sheet leaves out a deleted room.
+ */
+async function loadPairs(db: Db, editionId: string, companyIds?: Set<string>): Promise<Pair[]> {
+  const [companies, rooms, sessions] = await Promise.all([
+    loadCompanies(db, editionId),
+    loadRooms(db, editionId),
+    loadSessions(db, editionId),
   ]);
-  const slots = allSlots.filter((s) => companyIds.has(s.company_id));
+  const companyById = new Map(companies.map((c) => [c.id, c]));
+  const roomById = new Map(rooms.map((r) => [r.id, r]));
+  const seen = new Set<string>();
+  const pairs: Pair[] = [];
+  for (const s of sessions) {
+    const company = companyById.get(s.company_id);
+    const room = roomById.get(s.room_id);
+    if (!company || !room || company.is_hidden || !room.is_active) continue;
+    if (companyIds && !companyIds.has(company.id)) continue;
+    const key = sheetKey(company.id, room.id);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    pairs.push({ company, room });
+  }
+  return pairs.sort(
+    (a, b) => a.company.sort_order - b.company.sort_order || a.room.sort_order - b.room.sort_order || a.room.name.localeCompare(b.room.name),
+  );
+}
+
+/** Every pair's day tabs, built from one read of the edition's floor. */
+async function loadTabs(db: Db, edition: Edition, pairs: Pair[]): Promise<Map<string, DayTab[]>> {
+  const wanted = new Set(pairs.map((p) => sheetKey(p.company.id, p.room.id)));
+  const allSlots = await pages<SlotStatus>((from, to) =>
+    db.from('slot_status').select('*').eq('edition_id', edition.id).order('starts_at').order('id').range(from, to),
+  );
+  const slots = allSlots.filter((s) => wanted.has(sheetKey(s.company_id, s.room_id)));
 
   const applicationIds = [...new Set(slots.map((s) => s.application_id).filter((v): v is string => Boolean(v)))];
   const withCv = new Set<string>();
@@ -163,32 +206,29 @@ async function loadTabs(db: Db, edition: Edition, companies: Company[]): Promise
     }
   }
 
-  const roomName = new Map(rooms.map((r) => [r.id, r.name]));
   const zone = edition.time_zone;
   const banner = edition.name_ar || edition.name_en;
   const out = new Map<string, DayTab[]>();
 
-  for (const company of companies) {
+  for (const { company, room } of pairs) {
     const byDay = new Map<string, SlotStatus[]>();
     for (const slot of slots) {
-      if (slot.company_id !== company.id) continue;
+      if (slot.company_id !== company.id || slot.room_id !== room.id) continue;
       const day = dayOf(slot.starts_at, zone);
       byDay.set(day, [...(byDay.get(day) ?? []), slot]);
     }
 
     const tabs: DayTab[] = [...byDay.keys()].sort().map((day) => {
-      const daySlots = byDay.get(day)!;
-      const roomNames = [...new Set(daySlots.map((s) => roomName.get(s.room_id) ?? ''))].filter(Boolean).join(' · ');
       const pad = (cells: string[]) => [...cells, ...Array(VISIBLE_COLS + 1 - cells.length).fill('')];
       const rows: string[][] = [
         pad([banner]),
         pad([]),
         pad([]),
         pad(['COMPANY  /  الشركة', '', '', 'DATE  /  التاريخ', '', 'ROOM  /  الغرفة']),
-        pad([plain(company.name_en), '', '', longDate(day), '', plain(roomNames)]),
+        pad([plain(company.name_en), '', '', longDate(day), '', plain(room.name)]),
         pad(HEADERS),
       ];
-      for (const slot of daySlots) {
+      for (const slot of byDay.get(day)!) {
         const booking = slot.booking_id;
         const application = slot.application_id;
         const cv =
@@ -213,7 +253,7 @@ async function loadTabs(db: Db, edition: Edition, companies: Company[]): Promise
       }
       return { label: tabLabel(day), rows };
     });
-    out.set(company.id, tabs);
+    out.set(sheetKey(company.id, room.id), tabs);
   }
   return out;
 }
@@ -254,7 +294,7 @@ function tabFormatting(sheetId: number, slotCount: number): object[] {
   return requests;
 }
 
-/** Writes every day tab of one company's spreadsheet, keeping what was typed under Interviewer. */
+/** Writes every day tab of one file, keeping what was typed under Interviewer. */
 async function writeSheet(spreadsheetId: string, tabs: DayTab[]): Promise<void> {
   await revokeLinkSharing(spreadsheetId);
   const existing = await listTabs(spreadsheetId);
@@ -266,7 +306,7 @@ async function writeSheet(spreadsheetId: string, tabs: DayTab[]): Promise<void> 
     const label = 'No interviews yet';
     const sheetId = await ensureNamedTab(spreadsheetId, existing, claimed, label);
     keep.add(sheetId);
-    await writeTab(spreadsheetId, sheetId, label, [['No interviews are scheduled for this company yet.']]);
+    await writeTab(spreadsheetId, sheetId, label, [['No interviews are scheduled here yet.']]);
   }
 
   for (const tab of tabs) {
@@ -290,9 +330,20 @@ async function loadEdition(db: Db, editionId: string): Promise<Edition | null> {
   return data as Edition | null;
 }
 
+/** The pair's file, created and remembered the first time it is needed. */
+async function ensureSheet(db: Db, edition: Edition, pair: Pair, sheets: Record<string, Saved>): Promise<Saved> {
+  const key = sheetKey(pair.company.id, pair.room.id);
+  const saved = sheets[key];
+  if (saved) return saved;
+  const created = await createSpreadsheet(`${edition.name_en} — ${pair.company.name_en} — ${pair.room.name}`, 'Schedule');
+  await saveSheet(db, edition.id, key, created);
+  sheets[key] = created;
+  return created;
+}
+
 /**
- * The Rooms tab's "Create Google Sheet" and "Sync now": creates the
- * company's sheet if it has none, then writes it in full.
+ * The Rooms tab's "Create Google Sheets" and "Sync now": creates a file for
+ * each of the company's rooms that has none, then writes them all in full.
  */
 export async function syncCompanySheet(editionId: string, companyId: string): Promise<void> {
   if (!isGoogleConfigured()) throw new GoogleNotConnectedError();
@@ -300,23 +351,22 @@ export async function syncCompanySheet(editionId: string, companyId: string): Pr
   const db = createInterviewsClient();
   const edition = await loadEdition(db, editionId);
   if (!edition) return;
-  const company = (await loadCompanies(db, editionId)).find((c) => c.id === companyId);
-  if (!company) throw new Error('This company is not in the edition.');
+  const pairs = await loadPairs(db, editionId, new Set([companyId]));
+  if (pairs.length === 0) throw new Error('This company has no room with a session yet.');
 
-  let sheet = (await savedSheets(db, editionId))[companyId];
-  if (!sheet) {
-    sheet = await createSpreadsheet(`${edition.name_en} — ${company.name_en}`, 'Schedule');
-    await saveSheet(db, editionId, companyId, sheet);
+  const sheets = await savedSheets(db, editionId);
+  const tabsByPair = await loadTabs(db, edition, pairs);
+  for (const pair of pairs) {
+    const sheet = await ensureSheet(db, edition, pair, sheets);
+    await writeSheet(sheet.id, tabsByPair.get(sheetKey(pair.company.id, pair.room.id)) ?? []);
   }
-
-  const tabs = (await loadTabs(db, edition, [company])).get(companyId) ?? [];
-  await writeSheet(sheet.id, tabs);
 }
 
 /**
- * After a booking or stage change (sheetsSync.ts): rewrites each existing
- * company sheet whose rows changed. Never creates one, and leaves a deleted
- * company's sheet as it last was.
+ * After a booking or stage change (sheetsSync.ts): for every company that
+ * has opted in, creates the file of any room it was given since, and
+ * rewrites each file whose rows changed. A deleted company's or room's file
+ * is left as it last was.
  */
 export async function refreshCompanySheets(editionId: string): Promise<void> {
   if (!isGoogleConfigured()) return;
@@ -327,18 +377,18 @@ export async function refreshCompanySheets(editionId: string): Promise<void> {
   const edition = await loadEdition(db, editionId);
   if (!edition) return;
 
-  const companies = (await loadCompanies(db, editionId)).filter((c) => sheets[c.id] && !c.is_hidden);
-  const tabsByCompany = await loadTabs(db, edition, companies);
+  const pairs = (await loadPairs(db, editionId)).filter((p) => optedIn(sheets, p.company.id));
+  const tabsByPair = await loadTabs(db, edition, pairs);
 
-  for (const company of companies) {
-    const spreadsheetId = sheets[company.id].id;
-    const tabs = tabsByCompany.get(company.id) ?? [];
-    if (writtenAlready(`company:${spreadsheetId}`, tabs)) continue;
+  for (const pair of pairs) {
+    const tabs = tabsByPair.get(sheetKey(pair.company.id, pair.room.id)) ?? [];
     try {
-      await writeSheet(spreadsheetId, tabs);
+      const sheet = await ensureSheet(db, edition, pair, sheets);
+      if (writtenAlready(`company:${sheet.id}`, tabs)) continue;
+      await writeSheet(sheet.id, tabs);
     } catch (error) {
-      // One company's sheet (deleted in Drive, say) must not stop the others.
-      console.error(`[interviews/companySheets] ${company.name_en} failed`, error);
+      // One file (deleted in Drive, say) must not stop the others.
+      console.error(`[interviews/companySheets] ${pair.company.name_en} / ${pair.room.name} failed`, error);
     }
   }
 }
