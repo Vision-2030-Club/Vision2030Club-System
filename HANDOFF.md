@@ -997,7 +997,8 @@ short version:
   (`src/lib/interviews/email.ts`, plain HTTP, no SDK). Kicked after each
   action, swept by `/api/interviews/cron` every five minutes
   (`npm run interviews:cron` schedules it with pg_cron in the CLUB project,
-  same mechanism as push). Without `RESEND_API_KEY` rows wait and the
+  same mechanism as push; since 2026-10-05 it also schedules the
+  every-minute Google Sheets pull, `/api/interviews/sheets`). Without `RESEND_API_KEY` rows wait and the
   Messages page says so. Feedback is **email only** and held until a manager
   presses *Send feedback emails* (or sent at once, per edition setting).
 - **Exports.** `edition_snapshot` renders an edition as one JSON document;
@@ -1389,6 +1390,63 @@ and compared with both templates, and the behaviour confirmed: Pull applies
 only the changed Status, Notes and Interviewer survive a rewrite, and an
 unchanged company sheet costs no Google calls. What a fake cannot show is
 Google refusing a request; expect to fix something on the first real sync.
+
+### Status edits in the sheets come back into the app (2026-10-05)
+
+The club wants to work from either side: the app or the sheets. So the
+**Status** column of the floor sheet's day tabs and of every company sheet now
+goes both ways. Nothing else does. Students, times and phone numbers are the
+app's, and the booking rules in SQL decide them. Notes (floor) and
+Interviewer (company) are free text that lives only in the sheet.
+
+- **How an edit is recognised.** Every booked row carries a hidden *base*
+  column, `<booking id>|<stage>`: the Status the system last wrote. A Status
+  that differs from what the base shows is an edit; reading a sheet that
+  nobody touched therefore changes nothing.
+- **The safety rules** (`src/lib/interviews/sheetPull.ts`):
+  - Compare-and-set: an edit is applied only while the booking's stage in the
+    app is still the base. If the floor board moved the student in the
+    meantime, the app wins and the next rewrite shows its value.
+  - Only a word from the sheet's dropdown counts. A blank, a typo or anything
+    else is ignored and put back.
+  - A company file can only move bookings of its own company in its own room,
+    checked against the database, so editing the hidden columns does not
+    reach anyone else.
+  - Every change goes through `advance_stage` (manager rules, so a jump is
+    allowed) with an actor naming the sheet: `Floor Google Sheet`, or the
+    company with "(Google Sheet, Room 1)". Google does not say which person
+    typed it.
+- **When.** Three moments:
+  1. Just before any sync rewrites a sheet, which reads it first (one request
+     for all tabs, `readAllTabs`). An edit is therefore never overwritten
+     before it is read.
+  2. Every minute, from `/api/interviews/sheets` for **active** editions. One
+     Google Drive request says which files changed (`modifiedTimes`); only
+     those are read. A quiet minute costs that one Drive call and no Sheets
+     quota.
+  3. At once from *Pull from Sheet* in Settings, recorded as the member who
+     pressed it.
+
+  When an edit moved a booking, the sync runs another round (up to three) so
+  every other sheet shows it too.
+- **Scheduling needs a person.** `npm run interviews:cron` now installs two
+  pg_cron jobs in the club's Supabase project: the existing
+  `interviews-sweep` (every five minutes) and `interviews-sheets` (every
+  minute). It has to be re-run once after this merges; until then edits come
+  back only on a rewrite or on *Pull from Sheet*.
+- **The one window left.** Compare-and-set reads the stage and then calls
+  `advance_stage`, so a floor-board click landing in the same few
+  milliseconds can be overtaken. Closing that needs an "expected stage"
+  parameter on `advance_stage`, which is a migration; not done.
+
+Checked against the same fake Google as above with invented data:
+- a company edit reaches the app and the floor sheet;
+- a conflicting edit leaves the app's value, and the sheet is corrected;
+- a tampered hidden column cannot move another company's booking;
+- junk is ignored and replaced;
+- a floor edit waiting when a rewrite starts is applied first;
+- a quiet minute reads no sheet;
+- Interviewer names survive.
 
 ### Things easy to break
 
