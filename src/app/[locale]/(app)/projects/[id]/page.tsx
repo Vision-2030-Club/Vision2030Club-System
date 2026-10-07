@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { Link } from '@/i18n/navigation';
+import { Link, redirect } from '@/i18n/navigation';
 import { MemberLink } from '@/components/MemberLink';
 import { createClient } from '@/lib/supabase/server';
 import { getMyMember, scopeFor } from '@/lib/auth/session';
@@ -33,13 +33,37 @@ import {
   removeSplitPersonAction,
 } from '../actions';
 
+/**
+ * Which component a project opens in, when it carries one the viewer may
+ * open: Mock Interviews first, else Outreach. `?details=1` is the way to the
+ * project page itself (tasks, people, KPIs, components) — the "Project
+ * details" menu item and Outreach's back link use it.
+ */
+const OPENS_IN = ['mock_interviews', 'outreach'] as const;
+
 export default async function ProjectPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; id: string }>;
+  searchParams: Promise<{ details?: string }>;
 }) {
   const { locale, id } = await params;
+  const { details } = await searchParams;
   setRequestLocale(locale);
+
+  if (!details) {
+    const supabase = await createClient();
+    const [{ data: carried }, access] = await Promise.all([
+      supabase.from('project_components').select('component_key').eq('project_id', id),
+      getMyComponentAccess(),
+    ]);
+    const keys = new Set(((carried ?? []) as { component_key: string }[]).map((c) => c.component_key));
+    const opensIn = OPENS_IN.find(
+      (key) => keys.has(key) && access.some((row) => row.project_id === id && row.component_key === key),
+    );
+    if (opensIn) redirect({ href: componentHref(id, opensIn), locale });
+  }
 
   const t = await getTranslations('projects');
   const tTasks = await getTranslations('tasks');

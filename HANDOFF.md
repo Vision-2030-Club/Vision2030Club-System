@@ -1523,6 +1523,22 @@ empty clears it.
   lengths are refused, as are more than 14 days; and the fake-Google
   harness confirmed empty rooms, half-assigned rooms and Notes on empty rows.
 
+### A project opens in its component (2026-10-07)
+
+Opening a project (`/projects/<id>`), from the dashboard, the projects list,
+the KPI page or the sidebar, goes straight into its component when the viewer
+may open one. Mock Interviews comes first, else Outreach. A viewer without
+access to the component still gets the project page.
+
+- The project page itself is `/projects/<id>?details=1`. Managers reach it
+  from **Project details** at the bottom of the Mock Interviews menu, and
+  Outreach's back link uses it.
+- The Mock Interviews back button now goes to the dashboard for everyone. It
+  used to take managers to the project page, which would now loop straight
+  back into the component.
+- Any new link meant for the project page itself needs `?details=1`, or it
+  lands in the component.
+
 ### Things easy to break
 
 - **Every shareable link starts with `siteUrl()`** (`src/lib/interviews/email.ts`):

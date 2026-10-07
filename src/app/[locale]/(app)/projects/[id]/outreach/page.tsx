@@ -117,7 +117,7 @@ export default async function OutreachPage({
       <PageHeader
         title={localized(access.project, 'name', locale)}
         description={t('subtitle')}
-        back={{ href: `/projects/${id}`, label: t('backToProject') }}
+        back={{ href: `/projects/${id}?details=1`, label: t('backToProject') }}
         action={<Badge tone="brand">{t(`roles.${role}`)}</Badge>}
       />
 
