@@ -1443,10 +1443,10 @@ Interviewer (company) are free text that lives only in the sheet.
   the sheet is corrected. Every other caller passes no `p_expected` and
   behaves exactly as before. The old four-argument function is dropped,
   because keeping both would make calls ambiguous.
-  **Not applied yet**: apply it to the interviews project after 0010. Until
-  then the app gets PostgREST's `PGRST202` for the unknown parameter and
-  falls back to the old call, so nothing breaks; only the millisecond window
-  stays open. It was applied, with 0001–0010, to an empty embedded Postgres
+  **Applied to the interviews project** (reported 2026-10-07). On a database
+  without it, the app gets PostgREST's `PGRST202` for the unknown parameter
+  and falls back to the old call, so nothing breaks; only the millisecond
+  window stays open. It was applied, with 0001–0010, to an empty embedded Postgres
   (PGlite), twice, and these were confirmed: one function remains, granted to
   the service role only; the old calls work; a stale `p_expected` is refused
   and changes nothing (nor writes to the audit log); a click that lands first
