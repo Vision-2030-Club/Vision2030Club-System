@@ -1063,7 +1063,8 @@
       "logo_too_large": "The logo is larger than 1 MB.",
       "missing_company_name": "Enter the company’s name.",
       "missing_answer": "Answer this question: {question}.",
-      "no_match": "No application matches that phone number and email. Use the ones you applied with."
+      "no_match": "No application matches that phone number and email. Use the ones you applied with.",
+      "stage_changed": "The student’s status changed before this edit arrived, so the newer status was kept."
     },
     "student": {
       "hello": "Hello, {name}.",

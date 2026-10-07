@@ -16,7 +16,10 @@ import { createInterviewsClient } from '@/lib/supabase/interviews';
  *   - Compare-and-set. An edit is applied only while the booking's stage in
  *     the app is still the base: if the floor board moved the student since
  *     the sheet was last written, the app wins and the next rewrite shows its
- *     value in the sheet. A sheet never undoes a newer change.
+ *     value in the sheet. A sheet never undoes a newer change. The base goes
+ *     to advance_stage as p_expected (migration 0011), which compares it
+ *     with the booking row locked, so even a click a millisecond earlier
+ *     wins; without 0011 the comparison here is the only one.
  *   - Only a word from the sheet's own dropdown counts. A blank, a typo or
  *     anything else is ignored and put back by the next rewrite.
  *   - `mayChange` limits a file to its own bookings: a company's sheet can
@@ -128,13 +131,16 @@ export async function applySheetEdits(edits: SheetEdit[], rules: PullRules): Pro
     }
     if (booking.stage === to) continue;
 
-    const { error } = await db.rpc('advance_stage', {
-      p_booking: edit.bookingId,
-      p_to: to,
-      p_actor: rules.actor,
-      p_as_manager: true,
-    });
-    if (error) {
+    const args = { p_booking: edit.bookingId, p_to: to, p_actor: rules.actor, p_as_manager: true };
+    // p_expected (0011) makes the check above and the change one locked step
+    // in the database, so a floor-board click in between cannot be
+    // overwritten. Before 0011 is applied the parameter is unknown, and the
+    // check above is all there is.
+    let { error } = await db.rpc('advance_stage', { ...args, p_expected: edit.base });
+    if (error?.code === 'PGRST202') ({ error } = await db.rpc('advance_stage', args));
+    if (error?.hint === 'stage_changed') {
+      result.conflicts++;
+    } else if (error) {
       result.ignored++;
     } else {
       result.applied++;

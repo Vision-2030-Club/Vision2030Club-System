@@ -1434,10 +1434,23 @@ Interviewer (company) are free text that lives only in the sheet.
   `interviews-sweep` (every five minutes) and `interviews-sheets` (every
   minute). It has to be re-run once after this merges; until then edits come
   back only on a rewrite or on *Pull from Sheet*.
-- **The one window left.** Compare-and-set reads the stage and then calls
-  `advance_stage`, so a floor-board click landing in the same few
-  milliseconds can be overtaken. Closing that needs an "expected stage"
-  parameter on `advance_stage`, which is a migration; not done.
+- **The window between check and change, closed by 0011.** The app's
+  compare-and-set read the stage and then called `advance_stage`, so a
+  floor-board click landing in those milliseconds could be overtaken by the
+  sheet. `0011_advance_stage_expected.sql` gives `advance_stage` an optional
+  `p_expected`. It locks the booking row (`for update`), compares, and refuses
+  with the hint `stage_changed` when the stage moved, so the click wins and
+  the sheet is corrected. Every other caller passes no `p_expected` and
+  behaves exactly as before. The old four-argument function is dropped,
+  because keeping both would make calls ambiguous.
+  **Not applied yet**: apply it to the interviews project after 0010. Until
+  then the app gets PostgREST's `PGRST202` for the unknown parameter and
+  falls back to the old call, so nothing breaks; only the millisecond window
+  stays open. It was applied, with 0001–0010, to an empty embedded Postgres
+  (PGlite), twice, and these were confirmed: one function remains, granted to
+  the service role only; the old calls work; a stale `p_expected` is refused
+  and changes nothing (nor writes to the audit log); a click that lands first
+  wins.
 
 Checked against the same fake Google as above with invented data:
 - a company edit reaches the app and the floor sheet;
