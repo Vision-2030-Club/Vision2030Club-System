@@ -939,7 +939,11 @@
       "search": "Find a student",
       "empty": "Nothing to show.",
       "setStage": "Set stage…",
-      "refreshes": "Refreshes every 12 seconds."
+      "refreshes": "Refreshes every 12 seconds.",
+      "byCompany": "By company",
+      "byRoom": "By room",
+      "noRoomsThatDay": "No rooms on this day. Set the event days in Settings, or assign a company to a room.",
+      "unassigned": "No company yet"
     },
     "bookings": {
       "find": "Find a student",
@@ -1155,6 +1159,24 @@
     "companiesTab": {
       "noRoom": "No room yet — assign one on",
       "movedHint": "Companies are now managed on their own tab: add them, edit them, mark them full, and find their links and Google Sheets there."
+    },
+    "layout": {
+      "title": "Event days and hours",
+      "hint": "The floor tab and the floor Google Sheet lay out every room on these days, with a row every slot length between these hours, before any company is assigned. A company assigned to a room fills its own hours with its own time slots.",
+      "fromDay": "First day",
+      "toDay": "Last day",
+      "start": "From",
+      "end": "To",
+      "slotMinutes": "Row length (minutes)",
+      "clearHint": "Leave the first day empty and save to stop laying out empty rooms.",
+      "errors": {
+        "badDay": "Pick the first and last day.",
+        "daysBackwards": "The last day is before the first day.",
+        "tooManyDays": "That is more than {max} days. Check the dates.",
+        "badTime": "Pick the start and end times.",
+        "endBeforeStart": "The end time must be after the start time.",
+        "badSlot": "Pick a row length from the list."
+      }
     }
   },
   "outreach": {

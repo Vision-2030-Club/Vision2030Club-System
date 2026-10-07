@@ -26,6 +26,8 @@ export type EditionSettings = {
   floor_sheet_url?: string;
   /** Each room's public link token, by company id; read through roomLinks (roomLinks.ts). */
   room_links?: Record<string, string>;
+  /** The event's days and hours for the floor; read through floorLayout (floorLayout.ts). */
+  floor_layout?: { from_day: string; to_day: string; start: string; end: string; slot_minutes: number } | null;
   /** Each company's own Google Sheet, by company id; read through companySheets (companySheets.ts). */
   company_sheets?: Record<string, { id: string; url: string }>;
 };

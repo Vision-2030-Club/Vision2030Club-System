@@ -1495,6 +1495,31 @@ them together.
 - Rooms made by the old *Add room* keep working: they are ordinary rooms
   and companies with a session between them.
 
+### The floor before companies: event days and hours (2026-10-07)
+
+**Settings → Event days and hours** stores the event's first and last day,
+daily hours and a row length in the edition's settings as `floor_layout`
+(`src/lib/interviews/floorLayout.ts`). No migration. Leaving the first day
+empty clears it.
+
+- **What it changes.** On those days, the floor Google Sheet and the Floor
+  tab's new **By room** view lay out every active room with a row every row
+  length between those hours, before any company is assigned. A company
+  assigned to a room replaces the rows of its own hours with its real slots
+  (`roomDay`). A grid time is dropped when a slot is running at that moment,
+  so a company on 15-minute slots in a 20-minute grid shows its own times.
+  Days with sessions outside the layout still appear, as before.
+- **Empty rows hold no booking.** They carry a key (`grid:<room>:<time>`) so
+  a Note typed on one is kept, and no base, so their Status is never read
+  back. Room summaries count only real slots.
+- **Floor tab.** *By company* is the old board, with the stage buttons. *By
+  room* is read-only: every room of the day side by side, refreshed every 15
+  seconds (`AutoRefresh`).
+- **Checked:** grid times convert from the edition's clock (14:00 Riyadh is
+  11:00 UTC, and a summer-time zone converts too); bad dates, times and
+  lengths are refused, as are more than 14 days; and the fake-Google
+  harness confirmed empty rooms, half-assigned rooms and Notes on empty rows.
+
 ### Things easy to break
 
 - **Every shareable link starts with `siteUrl()`** (`src/lib/interviews/email.ts`):

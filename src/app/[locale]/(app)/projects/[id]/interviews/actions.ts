@@ -22,6 +22,7 @@ import { removeCv, uploadCv } from '@/lib/interviews/cv';
 import { kickRegistrationAppend, syncRegistrationSheet } from '@/lib/interviews/registrationSheet';
 import { APPLY_FIELDS, FIELD_LABELS, FIELD_MODES, resolveApplyFields, type FieldMode } from '@/lib/interviews/applyFields';
 import { applicationPayload } from '@/lib/interviews/applyPayload';
+import { layoutProblem, MAX_LAYOUT_DAYS, type FloorLayout } from '@/lib/interviews/floorLayout';
 import { choosesFullCompany, fullCompanyIds } from '@/lib/interviews/fullCompanies';
 import { normalisePhone } from '@/lib/interviews/phone';
 import { saveRoomLink } from '@/lib/interviews/roomLinks';
@@ -160,6 +161,46 @@ export async function syncFloorSheetAction(
     return fail(error instanceof Error ? error.message : 'Sync failed.');
   }
 
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
+/**
+ * Settings → Event days and hours (floorLayout.ts): what the floor lays out
+ * for every room before companies are assigned. An empty first day clears
+ * it, and the floor goes back to showing only rooms with a company.
+ */
+export async function updateFloorLayoutAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+  const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
+
+  const fromDay = text(formData, 'from_day');
+  let floor_layout: FloorLayout | null = null;
+  if (fromDay) {
+    floor_layout = {
+      from_day: fromDay,
+      to_day: text(formData, 'to_day') ?? fromDay,
+      start: text(formData, 'start') ?? '',
+      end: text(formData, 'end') ?? '',
+      slot_minutes: Number(text(formData, 'slot_minutes')),
+    };
+    const problem = layoutProblem(floor_layout);
+    if (problem) return fail(t(`layout.errors.${problem}`, { max: MAX_LAYOUT_DAYS }));
+  }
+
+  const db = createInterviewsClient();
+  const { error } = await db.rpc('update_edition', {
+    p_edition: g.access.edition.id,
+    p_patch: { settings: { floor_layout } },
+    p_actor: g.access.actor,
+  });
+  if (error) return fromPostgrest(error);
+
+  kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
 }

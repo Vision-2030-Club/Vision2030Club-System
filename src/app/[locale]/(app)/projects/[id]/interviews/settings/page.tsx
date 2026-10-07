@@ -6,6 +6,7 @@ import { Card, EmptyState, Input, Label, Select, Textarea } from '@/components/u
 import { formatDateTime, toDateTimeInput } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { siteUrl } from '@/lib/interviews/email';
+import { floorLayout, LAYOUT_SLOT_LENGTHS } from '@/lib/interviews/floorLayout';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { CopyField } from '../CopyField';
 import {
@@ -16,6 +17,7 @@ import {
   syncFloorSheetAction,
   syncRegistrationSheetAction,
   updateEditionAction,
+  updateFloorLayoutAction,
 } from '../actions';
 
 export default async function InterviewsSettingsPage({
@@ -57,6 +59,7 @@ export default async function InterviewsSettingsPage({
   const floorSheetUrl = edition.floor_sheet_url ?? settings.floor_sheet_url ?? null;
   const whenInput = (iso: string | null) => (iso ? toDateTimeInput(new Date(iso)) : '');
   const tvUrl = edition.tv_token ? `${siteUrl()}/${locale}/interviews/tv/${edition.tv_token}` : null;
+  const layout = floorLayout(settings);
   const labelRows = [...settings.rating_labels, ...Array(6).fill(null)].slice(0, 6);
 
   return (
@@ -164,6 +167,44 @@ export default async function InterviewsSettingsPage({
       </Card>
 
       <div className="space-y-4">
+        <Card>
+          <h2 className="mb-1 font-semibold">{t('layout.title')}</h2>
+          <p className="mb-3 text-xs text-ink-muted">{t('layout.hint')}</p>
+          <ActionForm action={updateFloorLayoutAction} submitLabel={tCommon('save')}>
+            <input type="hidden" name="locale" value={locale} />
+            <input type="hidden" name="project_id" value={id} />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label htmlFor="layout_from">{t('layout.fromDay')}</Label>
+                <Input id="layout_from" name="from_day" type="date" dir="ltr" defaultValue={layout?.from_day ?? ''} />
+              </div>
+              <div>
+                <Label htmlFor="layout_to">{t('layout.toDay')}</Label>
+                <Input id="layout_to" name="to_day" type="date" dir="ltr" defaultValue={layout?.to_day ?? ''} />
+              </div>
+              <div>
+                <Label htmlFor="layout_start">{t('layout.start')}</Label>
+                <Input id="layout_start" name="start" type="time" dir="ltr" step={300} defaultValue={layout?.start ?? '14:00'} />
+              </div>
+              <div>
+                <Label htmlFor="layout_end">{t('layout.end')}</Label>
+                <Input id="layout_end" name="end" type="time" dir="ltr" step={300} defaultValue={layout?.end ?? '20:00'} />
+              </div>
+              <div className="col-span-2">
+                <Label htmlFor="layout_slot">{t('layout.slotMinutes')}</Label>
+                <Select id="layout_slot" name="slot_minutes" defaultValue={String(layout?.slot_minutes ?? 20)}>
+                  {LAYOUT_SLOT_LENGTHS.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+            <p className="text-xs text-ink-muted">{t('layout.clearHint')}</p>
+          </ActionForm>
+        </Card>
+
         <Card>
           <h2 className="mb-1 font-semibold">{t('settings.tv')}</h2>
           <p className="mb-3 text-xs text-ink-muted">{t('settings.tvHint')}</p>
