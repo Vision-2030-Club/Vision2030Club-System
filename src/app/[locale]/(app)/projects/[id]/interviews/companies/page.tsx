@@ -1,13 +1,17 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { Link } from '@/i18n/navigation';
 import { ActionForm } from '@/components/ActionForm';
+import { Logo } from '@/components/CompanyPicker';
 import { ConfirmForm } from '@/components/ConfirmForm';
 import { Disclosure } from '@/components/Disclosure';
-import { Card, EmptyState, Input, Label, Select, Textarea } from '@/components/ui';
+import { LogoInput } from '@/components/LogoInput';
+import { Badge, Card, EmptyState, Input, Label, Textarea } from '@/components/ui';
 import { localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { companySheets, sheetKey } from '@/lib/interviews/companySheets';
 import { siteUrl } from '@/lib/interviews/email';
+import { fullCompanyIds } from '@/lib/interviews/fullCompanies';
 import { roomLinks } from '@/lib/interviews/roomLinks';
 import {
   loadAcceptedPhones,
@@ -19,31 +23,29 @@ import {
 } from '@/lib/interviews/queries';
 import type { Company, Room } from '@/lib/interviews/types';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
-import { toDateInput } from '@/lib/time';
 import { CopyField } from '../CopyField';
 import {
   acceptPhonesAction,
-  createRoomAction,
   createRoomLinkAction,
-  renameRoomAction,
   rotateCompanyTokenAction,
-  setRoomDeletedAction,
+  setCompanyFullAction,
+  setCompanyHiddenAction,
   syncCompanySheetAction,
   unacceptPhoneAction,
+  upsertCompanyAction,
 } from '../actions';
 
 /**
- * One room per card: a booth a candidate books into, with its own link.
- * "Room" here is a company + a physical room created together by
- * createRoomAction (0005) — but named separately: the room is its booth
- * label ("Room 1", shown as the card's heading), the company is whoever is
- * sitting in it that day ("KPMG", shown underneath and in the floor sheet's
- * own Company column). Each card also keeps the company's INTERVIEWER side
- * — the secret link and PIN the company's HR opens to select applicants and
- * follow their day — behind a disclosure, so the apply-form flow the club
- * decided on in September stays manageable next to the room flow. Which of
- * the two the club runs on the day is an open decision (HANDOFF.md); the
- * page supports both until it is taken.
+ * The companies, one card each, made on their own with nothing about rooms:
+ * the names and logo students see on the apply form, full or open, and
+ * everything that belongs to the company itself — its candidate link (the
+ * room flow), the phone numbers HR accepted for it, its interviewer link and
+ * PIN, and its Google Sheets. Which rooms it interviews in, and when, is
+ * decided later on the Rooms tab; the card lists what has been assigned.
+ *
+ * Removing a company is a soft hide (setCompanyHiddenAction): off the form
+ * and the floor, restorable from the section at the bottom, with its rooms
+ * and bookings untouched.
  */
 export default async function InterviewsCompaniesPage({
   params,
@@ -59,8 +61,11 @@ export default async function InterviewsCompaniesPage({
 
   const t = await getTranslations('interviews');
   const tCommon = await getTranslations('common');
-  const db = createInterviewsClient();
+  if (role === 'organizer') return <EmptyState>{tCommon('notPermitted')}</EmptyState>;
+  const manage = can.manage(role);
+  const decide = can.decide(role);
 
+  const db = createInterviewsClient();
   const [companies, counters, rooms, sessions] = await Promise.all([
     loadCompanies(db, edition.id),
     loadCounters(db, edition.id),
@@ -72,23 +77,12 @@ export default async function InterviewsCompaniesPage({
       companies.map(async (c): Promise<[string, AcceptedPhone[]]> => [c.id, await loadAcceptedPhones(db, c.id)]),
     ),
   );
-  // Deleted (setRoomDeletedAction) rooms drop off this list entirely rather
-  // than showing a "Deleted" badge in it — restoring one is a click away in
-  // the section below, but the everyday view stays just the live rooms.
-  const activeCompanies = companies.filter((c) => !c.is_hidden);
-  const deletedCompanies = companies.filter((c) => c.is_hidden);
 
-  // The room (booth label, e.g. "Room 1") and the company sitting in it
-  // (e.g. "KPMG") are separate names now — found through the session that
-  // links them, the same lookup renameRoomAction and setRoomDeletedAction use.
+  const visible = companies.filter((c) => !c.is_hidden);
+  const removed = companies.filter((c) => c.is_hidden);
+  const fullIds = fullCompanyIds(settings);
   const roomById = new Map(rooms.map((r) => [r.id, r]));
-  const roomIdByCompany = new Map(sessions.map((s) => [s.company_id, s.room_id]));
-  const roomFor = (company: Company): Room | undefined => {
-    const roomId = roomIdByCompany.get(company.id);
-    return roomId ? roomById.get(roomId) : undefined;
-  };
-  // A company can have more than one room (STC in Room 1 and Room 2); each
-  // gets its own Google Sheet (companySheets.ts).
+  // The rooms a company has been assigned to (Rooms tab); several are fine.
   const roomsFor = (company: Company): Room[] => [
     ...new Map(
       sessions
@@ -99,10 +93,8 @@ export default async function InterviewsCompaniesPage({
     ).values(),
   ];
 
-  const manage = can.manage(role);
-  const decide = can.decide(role);
-  // Each room's public link (roomLinks.ts, kept in the edition's settings);
-  // a candidate_token from 0005, where that migration ran, as a fallback.
+  // The company's public candidate link (roomLinks.ts, kept in the edition's
+  // settings); a candidate_token from 0005, where that migration ran, as a fallback.
   const links = roomLinks(settings);
   const sheets = companySheets(settings);
   const candidateLinkFor = (company: Company) => {
@@ -114,85 +106,42 @@ export default async function InterviewsCompaniesPage({
   return (
     <div className="space-y-4">
       {manage ? (
-        <Disclosure label={t('companies.addRoom')}>
-          <ActionForm action={createRoomAction} submitLabel={tCommon('create')}>
-            <input type="hidden" name="locale" value={locale} />
-            <input type="hidden" name="project_id" value={id} />
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div>
-                <Label htmlFor="new-room-name">{t('companies.roomName')}</Label>
-                <Input id="new-room-name" name="name" required />
-              </div>
-              <div>
-                <Label htmlFor="new-room-company-id">{t('companies.roomCompany')}</Label>
-                <Select id="new-room-company-id" name="company_id" defaultValue="">
-                  <option value="">{t('companies.roomCompanyNew')}</option>
-                  {activeCompanies.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {localized(c, 'name', locale)}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="new-room-company">{t('companies.companyName')}</Label>
-                <Input id="new-room-company" name="company_name" placeholder={t('companies.companyNameHint')} />
-              </div>
-              <div>
-                <Label htmlFor="new-room-company-ar">{t('companies.companyNameAr')}</Label>
-                <Input id="new-room-company-ar" name="company_name_ar" dir="rtl" />
-              </div>
-              <div>
-                <Label htmlFor="new-room-logo">{t('companies.logoUrl')}</Label>
-                <Input id="new-room-logo" name="logo_url" type="url" dir="ltr" />
-              </div>
-              <div>
-                <Label htmlFor="new-room-day">{t('companies.roomDay')}</Label>
-                <Input id="new-room-day" name="day" type="date" dir="ltr" defaultValue={toDateInput(new Date())} required />
-              </div>
-              <div>
-                <Label htmlFor="new-room-start">{t('companies.roomStart')}</Label>
-                <Input id="new-room-start" name="start_time" type="time" dir="ltr" step={300} defaultValue="14:00" required />
-              </div>
-              <div>
-                <Label htmlFor="new-room-end">{t('companies.roomEnd')}</Label>
-                <Input id="new-room-end" name="end_time" type="time" dir="ltr" step={300} defaultValue="20:00" required />
-              </div>
-            </div>
-            <p className="text-xs text-ink-muted">{t('companies.addRoomHint')}</p>
-          </ActionForm>
+        <Disclosure label={t('register.addCompany')}>
+          <CompanyForm locale={locale} projectId={id} t={t} submitLabel={tCommon('create')} />
         </Disclosure>
       ) : null}
 
-      {activeCompanies.length === 0 ? (
-        <EmptyState>{t('companies.empty')}</EmptyState>
+      {visible.length === 0 ? (
+        <EmptyState>{t('register.noCompanies')}</EmptyState>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
-          {activeCompanies.map((company) => {
+          {visible.map((company) => {
+            const name = localized(company, 'name', locale);
+            const full = fullIds.has(company.id);
             const c = counters.get(company.id);
-            const room = roomFor(company);
             const companyRooms = roomsFor(company);
             const roomSheets = companyRooms.map((r) => ({ room: r, sheet: sheets[sheetKey(company.id, r.id)] }));
             return (
               <Card key={company.id}>
                 <div className="flex flex-wrap items-start gap-3">
-                  {company.logo_url ? (
-                    // Logos are external URLs pasted in; next/image would
-                    // need every host allow-listed.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={company.logo_url}
-                      alt=""
-                      width={48}
-                      height={48}
-                      className="size-12 shrink-0 rounded-lg border border-line bg-white object-contain p-1"
-                    />
-                  ) : null}
+                  <Logo company={{ name, logo_url: company.logo_url }} />
                   <div className="min-w-0 flex-1">
-                    <span className="font-semibold">
-                      {companyRooms.length ? companyRooms.map((r) => r.name).join(' · ') : localized(company, 'name', locale)}
-                    </span>
-                    <p className="text-sm text-ink-muted">{localized(company, 'name', locale)}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">{name}</span>
+                      {full ? <Badge tone="warn">{t('register.full')}</Badge> : null}
+                    </div>
+                    <p className="text-sm text-ink-muted">
+                      {companyRooms.length ? (
+                        companyRooms.map((r) => r.name).join(' · ')
+                      ) : (
+                        <>
+                          {t('companiesTab.noRoom')}{' '}
+                          <Link href={`/projects/${id}/interviews/rooms`} className="text-brand-600 hover:underline">
+                            {t('tabs.rooms')}
+                          </Link>
+                        </>
+                      )}
+                    </p>
                     <p className="mt-1 text-xs text-ink-muted">
                       {t('decision.accepted')}: <span className="ltr-nums">{c?.accepted ?? 0}</span> ·{' '}
                       {t('overview.bookedOfSlots')}:{' '}
@@ -203,8 +152,37 @@ export default async function InterviewsCompaniesPage({
                   </div>
                 </div>
 
-                {/* Only the candidate link needs 0005 (candidate_token); everything
-                    else here runs on 0001's functions, so it shows on every room. */}
+                {manage ? (
+                  <div className="mt-3 flex flex-wrap items-start gap-2">
+                    <Disclosure label={tCommon('edit')} title={name}>
+                      <CompanyForm locale={locale} projectId={id} company={company} t={t} submitLabel={tCommon('save')} />
+                    </Disclosure>
+                    <ActionForm
+                      action={setCompanyFullAction}
+                      submitLabel={full ? t('register.markOpen') : t('register.markFull')}
+                      variant="secondary"
+                      className="space-y-2"
+                    >
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="project_id" value={id} />
+                      <input type="hidden" name="company_id" value={company.id} />
+                      <input type="hidden" name="full" value={full ? 'false' : 'true'} />
+                    </ActionForm>
+                    <ConfirmForm
+                      action={setCompanyHiddenAction}
+                      trigger={t('register.remove')}
+                      title={t('register.removeTitle')}
+                      body={t('register.removeBody')}
+                      confirmLabel={t('register.remove')}
+                    >
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="project_id" value={id} />
+                      <input type="hidden" name="company_id" value={company.id} />
+                      <input type="hidden" name="hidden" value="true" />
+                    </ConfirmForm>
+                  </div>
+                ) : null}
+
                 {decide ? (
                   <div className="mt-4 space-y-3 border-t border-line pt-3">
                     {candidateLinkFor(company) ? (
@@ -220,26 +198,6 @@ export default async function InterviewsCompaniesPage({
                         <input type="hidden" name="project_id" value={id} />
                         <input type="hidden" name="company_id" value={company.id} />
                       </ActionForm>
-                    ) : null}
-
-                    {manage ? (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Disclosure label={tCommon('edit')} title={room?.name ?? localized(company, 'name', locale)}>
-                          <RoomForm locale={locale} projectId={id} company={company} room={room} t={t} tCommon={tCommon} />
-                        </Disclosure>
-                        <ConfirmForm
-                          action={setRoomDeletedAction}
-                          trigger={t('companies.delete')}
-                          title={t('companies.deleteTitle')}
-                          body={t('companies.deleteBody')}
-                          confirmLabel={t('companies.delete')}
-                        >
-                          <input type="hidden" name="locale" value={locale} />
-                          <input type="hidden" name="project_id" value={id} />
-                          <input type="hidden" name="company_id" value={company.id} />
-                          <input type="hidden" name="deleted" value="true" />
-                        </ConfirmForm>
-                      </div>
                     ) : null}
 
                     <Disclosure label={t('companies.acceptedPhones')}>
@@ -306,16 +264,18 @@ export default async function InterviewsCompaniesPage({
                           ) : (
                             <p className="text-sm text-ink-muted">{t('companies.sheetNoRooms')}</p>
                           )}
-                          <ActionForm
-                            action={syncCompanySheetAction}
-                            submitLabel={roomSheets.length > 0 && roomSheets.every(({ sheet }) => sheet) ? t('companies.sheetSync') : t('companies.sheetCreate')}
-                            variant="secondary"
-                            className="space-y-2"
-                          >
-                            <input type="hidden" name="locale" value={locale} />
-                            <input type="hidden" name="project_id" value={id} />
-                            <input type="hidden" name="company_id" value={company.id} />
-                          </ActionForm>
+                          {roomSheets.length ? (
+                            <ActionForm
+                              action={syncCompanySheetAction}
+                              submitLabel={roomSheets.every(({ sheet }) => sheet) ? t('companies.sheetSync') : t('companies.sheetCreate')}
+                              variant="secondary"
+                              className="space-y-2"
+                            >
+                              <input type="hidden" name="locale" value={locale} />
+                              <input type="hidden" name="project_id" value={id} />
+                              <input type="hidden" name="company_id" value={company.id} />
+                            </ActionForm>
+                          ) : null}
                         </div>
                       </Disclosure>
                     ) : null}
@@ -327,22 +287,17 @@ export default async function InterviewsCompaniesPage({
         </div>
       )}
 
-      {manage && deletedCompanies.length > 0 ? (
-        <Disclosure label={t('companies.deletedSection', { count: deletedCompanies.length })}>
+      {manage && removed.length > 0 ? (
+        <Disclosure label={t('register.removedSection', { count: removed.length })}>
           <ul className="space-y-2">
-            {deletedCompanies.map((company) => (
+            {removed.map((company) => (
               <li key={company.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2">
                 <span className="text-sm text-ink-muted">{localized(company, 'name', locale)}</span>
-                <ActionForm
-                  action={setRoomDeletedAction}
-                  submitLabel={t('companies.restore')}
-                  variant="secondary"
-                  className="space-y-0"
-                >
+                <ActionForm action={setCompanyHiddenAction} submitLabel={t('register.restore')} variant="secondary" className="space-y-0">
                   <input type="hidden" name="locale" value={locale} />
                   <input type="hidden" name="project_id" value={id} />
                   <input type="hidden" name="company_id" value={company.id} />
-                  <input type="hidden" name="deleted" value="false" />
+                  <input type="hidden" name="hidden" value="false" />
                 </ActionForm>
               </li>
             ))}
@@ -356,66 +311,49 @@ export default async function InterviewsCompaniesPage({
 type T = Awaited<ReturnType<typeof getTranslations<'interviews'>>>;
 type TCommon = Awaited<ReturnType<typeof getTranslations<'common'>>>;
 
-/** Edits a room's booth label and the company sitting in it, separately. */
-function RoomForm({
+/** Add (no company) or edit one: both names and the logo. */
+function CompanyForm({
   locale,
   projectId,
   company,
-  room,
   t,
-  tCommon,
+  submitLabel,
 }: {
   locale: string;
   projectId: string;
-  company: Company;
-  room?: Room;
+  company?: Company;
   t: T;
-  tCommon: TCommon;
+  submitLabel: string;
 }) {
+  const key = company?.id ?? 'new';
   return (
-    <ActionForm action={renameRoomAction} submitLabel={tCommon('save')}>
+    <ActionForm action={upsertCompanyAction} submitLabel={submitLabel}>
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="project_id" value={projectId} />
-      <input type="hidden" name="company_id" value={company.id} />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <Label htmlFor={`${company.id}-name`}>{t('companies.roomName')}</Label>
-          <Input id={`${company.id}-name`} name="name" defaultValue={room?.name ?? company.name_en} required />
-        </div>
-        <div>
-          <Label htmlFor={`${company.id}-company_name`}>{t('companies.companyName')}</Label>
-          <Input id={`${company.id}-company_name`} name="company_name" defaultValue={company.name_en} />
-        </div>
-        <div>
-          <Label htmlFor={`${company.id}-company_name_ar`}>{t('companies.companyNameAr')}</Label>
-          <Input id={`${company.id}-company_name_ar`} name="company_name_ar" dir="rtl" defaultValue={company.name_ar} />
-        </div>
-        <div className="sm:col-span-2">
-          <Label htmlFor={`${company.id}-logo_url`}>{t('companies.logoUrl')}</Label>
-          {company.logo_url?.startsWith('data:') ? (
-            // Uploaded on the Applicants tab and stored as the image itself
-            // (LogoInput): carried through unchanged rather than shown as a
-            // page of base64 in a text box.
-            <>
-              <input type="hidden" name="logo_url" value={company.logo_url} />
-              <p id={`${company.id}-logo_url`} className="text-xs text-ink-muted">
-                {t('companies.logoUploaded')}
-              </p>
-            </>
-          ) : (
-            <Input
-              id={`${company.id}-logo_url`}
-              name="logo_url"
-              type="url"
-              dir="ltr"
-              defaultValue={company.logo_url ?? ''}
-            />
-          )}
-        </div>
+      {company ? <input type="hidden" name="company_id" value={company.id} /> : null}
+      <div>
+        <Label htmlFor={`${key}-name_en`}>{t('companies.nameEn')}</Label>
+        <Input id={`${key}-name_en`} name="name_en" dir="ltr" defaultValue={company?.name_en} required />
       </div>
+      <div>
+        <Label htmlFor={`${key}-name_ar`}>{t('companies.nameAr')}</Label>
+        <Input id={`${key}-name_ar`} name="name_ar" dir="rtl" defaultValue={company?.name_ar} />
+      </div>
+      <div>
+        <Label htmlFor={`${key}-logo`}>{t('register.logo')}</Label>
+        <LogoInput id={`${key}-logo`} />
+        <p className="mt-1 text-xs text-ink-muted">{t('register.logoHint')}</p>
+      </div>
+      {company?.logo_url ? (
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="remove_logo" className="accent-brand-600" />
+          {t('register.removeLogo')}
+        </label>
+      ) : null}
     </ActionForm>
   );
 }
+
 
 /**
  * Who HR accepted for this room's company, and a box to accept more by phone

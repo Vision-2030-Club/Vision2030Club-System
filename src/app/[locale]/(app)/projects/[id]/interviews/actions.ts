@@ -22,9 +22,10 @@ import { removeCv, uploadCv } from '@/lib/interviews/cv';
 import { kickRegistrationAppend, syncRegistrationSheet } from '@/lib/interviews/registrationSheet';
 import { APPLY_FIELDS, FIELD_LABELS, FIELD_MODES, resolveApplyFields, type FieldMode } from '@/lib/interviews/applyFields';
 import { applicationPayload } from '@/lib/interviews/applyPayload';
+import { layoutProblem, MAX_LAYOUT_DAYS, type FloorLayout } from '@/lib/interviews/floorLayout';
 import { choosesFullCompany, fullCompanyIds } from '@/lib/interviews/fullCompanies';
 import { normalisePhone } from '@/lib/interviews/phone';
-import { roomLinks, saveRoomLink } from '@/lib/interviews/roomLinks';
+import { saveRoomLink } from '@/lib/interviews/roomLinks';
 import type { EditionSettings, Stage } from '@/lib/interviews/types';
 import { fromClubWallClock } from '@/lib/time';
 
@@ -164,6 +165,46 @@ export async function syncFloorSheetAction(
   return ok();
 }
 
+/**
+ * Settings → Event days and hours (floorLayout.ts): what the floor lays out
+ * for every room before companies are assigned. An empty first day clears
+ * it, and the floor goes back to showing only rooms with a company.
+ */
+export async function updateFloorLayoutAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+  const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
+
+  const fromDay = text(formData, 'from_day');
+  let floor_layout: FloorLayout | null = null;
+  if (fromDay) {
+    floor_layout = {
+      from_day: fromDay,
+      to_day: text(formData, 'to_day') ?? fromDay,
+      start: text(formData, 'start') ?? '',
+      end: text(formData, 'end') ?? '',
+      slot_minutes: Number(text(formData, 'slot_minutes')),
+    };
+    const problem = layoutProblem(floor_layout);
+    if (problem) return fail(t(`layout.errors.${problem}`, { max: MAX_LAYOUT_DAYS }));
+  }
+
+  const db = createInterviewsClient();
+  const { error } = await db.rpc('update_edition', {
+    p_edition: g.access.edition.id,
+    p_patch: { settings: { floor_layout } },
+    p_actor: g.access.actor,
+  });
+  if (error) return fromPostgrest(error);
+
+  kickSheetsSync(g.access.edition.id);
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
 /** Settings → Sync now: the registrations sheet rewritten from the database (registrationSheet.ts). */
 export async function syncRegistrationSheetAction(
   _previous: ActionResult,
@@ -266,107 +307,40 @@ export async function exportNowAction(
 // -----------------------------------------------------------------------------
 
 /**
- * Edits a room created by createRoomAction: the room's own booth label
- * (`name`), and the company sitting in it — its display name and logo —
- * kept as two separate fields now rather than one shared value. The pair
- * is found through any session already scheduled for the company — the only
- * place the two are linked — rather than a new column, since createRoomAction
- * always creates both at once.
+ * Removes a company (a soft hide, restorable) or brings it back: off the
+ * apply form, the Companies tab's main list, the floor sheet and its own
+ * sheets. Only the company. Its rooms are the Rooms tab's to retire, and its
+ * sessions, slots and bookings stay exactly as they are, so its history
+ * survives and restoring it puts everything back.
  */
-export async function renameRoomAction(
+export async function setCompanyHiddenAction(
   _previous: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
   const g = await guard(formData, can.manage);
   if ('error' in g) return fail(g.error);
 
-  const companyId = requiredText(formData, 'company_id');
-  const name = requiredText(formData, 'name');
-  const companyName = text(formData, 'company_name') || name;
-  // The Arabic name falls back to the English one, never the other way: the
-  // candidate pages show whichever matches their language.
-  const companyNameAr = text(formData, 'company_name_ar') || companyName;
-  const logoUrl = text(formData, 'logo_url') ?? '';
-
   const db = createInterviewsClient();
-  const { error: companyError } = await db.rpc('upsert_company', {
+  const { error } = await db.rpc('upsert_company', {
     p_edition: g.access.edition.id,
-    p_company: companyId,
-    p_payload: { name_en: companyName, name_ar: companyNameAr, logo_url: logoUrl },
+    p_company: requiredText(formData, 'company_id'),
+    p_payload: { is_hidden: text(formData, 'hidden') !== 'false' },
     p_actor: g.access.actor,
   });
-  if (companyError) return fromPostgrest(companyError);
+  if (error) return fromPostgrest(error);
 
-  const { data: session } = await db
-    .from('sessions')
-    .select('room_id')
-    .eq('company_id', companyId)
-    .limit(1)
-    .maybeSingle();
-
-  if (session?.room_id) {
-    const { error: roomError } = await db.rpc('upsert_room', {
-      p_edition: g.access.edition.id,
-      p_room: session.room_id,
-      p_payload: { name },
-      p_actor: g.access.actor,
-    });
-    if (roomError) return fromPostgrest(roomError);
-  }
-
+  kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
 }
 
 /**
- * "Delete" a room — a soft delete, on purpose. It hides the company from
- * this grid and marks the room inactive (so its candidate link stops
- * working, per room/[token]/page.tsx), but touches nothing else: the
- * sessions, slots and bookings stay exactly as they are. The floor sheet
- * reads that same live data, so a deleted room's history keeps showing
- * there — nothing to resync or preserve specially, because nothing about
- * the underlying data changed. `deleted: 'false'` reverses it.
+ * Adds a room, or edits one: its name, its location (`note`: building,
+ * floor…), retired or not. A room needs no company: companies are assigned to
+ * it later, for a day and hours, as sessions (createSessionAction). Only the
+ * fields the form sends are changed, so the Retire button never wipes the
+ * location.
  */
-export async function setRoomDeletedAction(
-  _previous: ActionResult,
-  formData: FormData,
-): Promise<ActionResult> {
-  const g = await guard(formData, can.manage);
-  if ('error' in g) return fail(g.error);
-
-  const companyId = requiredText(formData, 'company_id');
-  const deleted = text(formData, 'deleted') !== 'false';
-
-  const db = createInterviewsClient();
-  const { error: companyError } = await db.rpc('upsert_company', {
-    p_edition: g.access.edition.id,
-    p_company: companyId,
-    p_payload: { is_hidden: deleted },
-    p_actor: g.access.actor,
-  });
-  if (companyError) return fromPostgrest(companyError);
-
-  const { data: session } = await db
-    .from('sessions')
-    .select('room_id')
-    .eq('company_id', companyId)
-    .limit(1)
-    .maybeSingle();
-
-  if (session?.room_id) {
-    const { error: roomError } = await db.rpc('upsert_room', {
-      p_edition: g.access.edition.id,
-      p_room: session.room_id,
-      p_payload: { is_active: !deleted },
-      p_actor: g.access.actor,
-    });
-    if (roomError) return fromPostgrest(roomError);
-  }
-
-  revalidate(g.locale, g.projectId);
-  return ok();
-}
-
 export async function upsertRoomAction(
   _previous: ActionResult,
   formData: FormData,
@@ -380,7 +354,7 @@ export async function upsertRoomAction(
     p_room: text(formData, 'room_id'),
     p_payload: {
       name: text(formData, 'name'),
-      note: text(formData, 'note') ?? '',
+      ...(formData.has('note') ? { note: text(formData, 'note') ?? '' } : {}),
       sort_order: text(formData, 'sort_order'),
       is_active: text(formData, 'is_active'),
     },
@@ -388,13 +362,15 @@ export async function upsertRoomAction(
   });
   if (error) return fromPostgrest(error);
 
+  // Room names head the floor sheet's blocks and the company sheets.
+  kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
 }
 
 /**
- * Adds or edits a company from the Applicants tab (a plain company, no room or
- * session: the apply-form flow). Only the fields the form sends are changed,
+ * Adds or edits a company from the Companies tab (a plain company, no room or
+ * session: rooms are assigned to it later, on the Rooms tab). Only the fields the form sends are changed,
  * so an edit never un-hides or re-orders a company by omission. A logo
  * arrives already shrunk by the browser (LogoInput) as a small `data:` image
  * and is stored in `logo_url` itself, so no file storage is involved.
@@ -453,6 +429,7 @@ export async function upsertCompanyAction(
   });
   if (error) return fromPostgrest(error);
 
+  kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok(companyId ? 'saved' : 'created');
 }
@@ -609,101 +586,6 @@ export async function registerAction(
 
   revalidate(g.locale, g.projectId);
   return ok('applied', { replaced: String(result.replaced) });
-}
-
-/**
- * The simplified "room" flow (0005): one button creates the room, the
- * company behind it (with its own candidate-facing link), and that one
- * day's 15-minute-slot session for the chosen hours, so nothing further
- * needs scheduling by hand. One room per day is the intended use (hence a
- * day picker rather than a fixed range): the candidate booking page shows
- * a room's slots flat, with no day tabs, on the assumption there is only
- * ever one day to show. Each step is its own transaction; if a later step
- * fails the earlier ones stand, same as every other admin form here that
- * is not meant to be re-run under load.
- */
-const ROOM_SLOT_MINUTES = 15;
-
-export async function createRoomAction(
-  _previous: ActionResult,
-  formData: FormData,
-): Promise<ActionResult> {
-  const g = await guard(formData, can.manage);
-  if ('error' in g) return fail(g.error);
-
-  const name = requiredText(formData, 'name');
-  const existingId = text(formData, 'company_id');
-  const companyName = text(formData, 'company_name') || name;
-  const companyNameAr = text(formData, 'company_name_ar') || companyName;
-  const logoUrl = text(formData, 'logo_url') ?? '';
-  const day = requiredText(formData, 'day');
-  const startTime = requiredText(formData, 'start_time');
-  const endTime = requiredText(formData, 'end_time');
-  const editionId = g.access.edition.id;
-  const db = createInterviewsClient();
-
-  // A room for a company students already choose on the form, so the room,
-  // their choices and the accepted list are the same company. Checked first,
-  // before anything is created.
-  if (existingId) {
-    const { data: existing } = await db
-      .from('companies')
-      .select('id')
-      .eq('id', existingId)
-      .eq('edition_id', editionId)
-      .eq('is_hidden', false)
-      .maybeSingle();
-    if (!existing) return fail('No such company.', 'not_found');
-  }
-
-  const { data: room, error: roomError } = await db.rpc('upsert_room', {
-    p_edition: editionId,
-    p_room: null,
-    p_payload: { name },
-    p_actor: g.access.actor,
-  });
-  if (roomError) return fromPostgrest(roomError);
-
-  let companyId = existingId;
-  if (!companyId) {
-    const { data: company, error: companyError } = await db.rpc('upsert_company', {
-      p_edition: editionId,
-      p_company: null,
-      p_payload: {
-        name_en: companyName,
-        name_ar: companyNameAr,
-        logo_url: logoUrl,
-        access_token: newToken(),
-        candidate_token: newToken(),
-      },
-      p_actor: g.access.actor,
-    });
-    if (companyError) return fromPostgrest(companyError);
-    companyId = company.id as string;
-  }
-
-  const { error: sessionError } = await db.rpc('create_session', {
-    p_edition: editionId,
-    p_payload: {
-      company_id: companyId,
-      room_id: room.id,
-      day,
-      start_time: startTime,
-      end_time: endTime,
-      slot_minutes: ROOM_SLOT_MINUTES,
-    },
-    p_actor: g.access.actor,
-  });
-  if (sessionError) return fromPostgrest(sessionError);
-
-  // The room's public link (roomLinks.ts), unless the company already has one.
-  if (!roomLinks(g.access.settings)[companyId]) {
-    const { error: linkError } = await saveRoomLink(db, editionId, companyId, newToken(), g.access.actor);
-    if (linkError) return fail(linkError);
-  }
-
-  revalidate(g.locale, g.projectId);
-  return ok('created');
 }
 
 /**
@@ -895,6 +777,7 @@ export async function createSessionAction(
   });
   if (error) return fromPostgrest(error);
 
+  kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok('created');
 }
@@ -914,6 +797,7 @@ export async function extendSessionAction(
   });
   if (error) return fromPostgrest(error);
 
+  kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
 }
@@ -932,6 +816,7 @@ export async function deleteSessionAction(
   });
   if (error) return fromPostgrest(error);
 
+  kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
 }
@@ -951,6 +836,7 @@ export async function setSlotClosedAction(
   });
   if (error) return fromPostgrest(error);
 
+  kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
 }

@@ -40,6 +40,7 @@ import {
   type SheetEdit,
 } from '@/lib/interviews/sheetPull';
 import type { Edition, EditionSettings, Room, SlotStatus, Stage } from '@/lib/interviews/types';
+import { floorLayout, gridTimes, layoutDays, roomDay } from '@/lib/interviews/floorLayout';
 import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/interviews/queries';
 
 /**
@@ -57,7 +58,7 @@ import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/inter
  * read off the sheet before each rewrite and put back on the same row.
  *
  * One TAB per day, named by its actual date ("9/19", "9/20", …). A day's
- * rooms come from its sessions (createRoomAction makes one per room per
+ * rooms come from its sessions (a company assigned to a room for a
  * day), so adding a room for a new day adds that day's tab. After the day
  * tabs, one "All bookings" tab lists every booking flat, for filtering and
  * counting (buildAllBookings).
@@ -162,22 +163,40 @@ function statusOf(slot: SlotStatus): string {
 
 type RoomBlock = { title: string; slots: SlotStatus[]; rows: string[][] };
 
-/** One row per slot of the room's session, booked or not, always BLOCK_COLS wide. */
-function buildRoomBlock(room: Room, companyNames: Map<string, string>, slots: SlotStatus[], notes: Map<string, string>, zone: string): RoomBlock {
+/**
+ * One row per slot of every session in the room that day, booked or not,
+ * plus — on an event day of the edition's floor layout (floorLayout.ts) — an
+ * empty row for every grid time no company covers yet. Always BLOCK_COLS wide.
+ */
+function buildRoomBlock(
+  room: Room,
+  companyNames: Map<string, string>,
+  slots: SlotStatus[],
+  grid: string[],
+  notes: Map<string, string>,
+  zone: string,
+): RoomBlock {
   return {
     title: room.name.toUpperCase(),
     slots,
-    rows: slots.map((slot) => [
-      timeOf(slot.starts_at, zone),
-      plain(companyNames.get(slot.company_id)),
-      plain(slot.student_name),
-      plain(slot.student_phone),
-      statusOf(slot),
-      notes.get(rowKey(slot)) ?? '',
-      '',
-      rowKey(slot),
-      slot.booking_id && slot.stage ? encodeBase(slot.booking_id, slot.stage) : '',
-    ]),
+    rows: roomDay(slots, grid).map((entry) => {
+      if (entry.kind === 'empty') {
+        const key = `grid:${room.id}:${entry.starts_at}`;
+        return [timeOf(entry.starts_at, zone), '', '', '', '', notes.get(key) ?? '', '', key, ''];
+      }
+      const slot = entry.slot;
+      return [
+        timeOf(slot.starts_at, zone),
+        plain(companyNames.get(slot.company_id)),
+        plain(slot.student_name),
+        plain(slot.student_phone),
+        statusOf(slot),
+        notes.get(rowKey(slot)) ?? '',
+        '',
+        rowKey(slot),
+        slot.booking_id && slot.stage ? encodeBase(slot.booking_id, slot.stage) : '',
+      ];
+    }),
   };
 }
 
@@ -239,6 +258,7 @@ async function syncDayTab(
   titleText: string,
   dayRooms: Room[],
   slotsByRoom: Map<string, SlotStatus[]>,
+  grid: string[],
   companyNames: Map<string, string>,
   notes: Map<string, string>,
   zone: string,
@@ -264,7 +284,7 @@ async function syncDayTab(
     const left = dayRooms[i];
     const right = dayRooms[i + 1] as Room | undefined;
     const blockOf = (room: Room) =>
-      buildRoomBlock(room, companyNames, slotsByRoom.get(room.id) ?? [], notes, zone);
+      buildRoomBlock(room, companyNames, slotsByRoom.get(room.id) ?? [], grid, notes, zone);
     const leftBlock = blockOf(left);
     const rightBlock = right ? blockOf(right) : undefined;
 
@@ -410,7 +430,12 @@ export async function syncFloorSheet(
   const companyNames = new Map(companies.map((c) => [c.id, c.name_en]));
 
   const zone = edition.time_zone;
-  const days = sessionDays(sessions); // sorted 'YYYY-MM-DD', one per calendar day with a session
+  // Every day with a session, and every event day of the floor layout (set
+  // in Settings), so rooms appear on the floor before companies do.
+  const layout = floorLayout(edition.settings);
+  const eventDays = new Set(layoutDays(layout));
+  const days = [...new Set([...sessionDays(sessions), ...eventDays])].sort();
+  const activeRooms = rooms.filter((r) => r.is_active);
 
   if (days.length === 0) {
     // Nothing scheduled at all (e.g. everything was just wiped for a fresh
@@ -445,7 +470,13 @@ export async function syncFloorSheet(
     const [, month, dayOfMonth] = day.split('-');
     const label = `${Number(month)}/${Number(dayOfMonth)}`;
 
-    const roomIds = [...new Set(sessions.filter((s) => s.day === day).map((s) => s.room_id))];
+    // On an event day every active room is laid out, assigned or not.
+    const roomIds = [
+      ...new Set([
+        ...sessions.filter((s) => s.day === day).map((s) => s.room_id),
+        ...(eventDays.has(day) ? activeRooms.map((r) => r.id) : []),
+      ]),
+    ];
     const dayRooms = roomIds
       .map((id) => roomById.get(id))
       .filter((r): r is Room => Boolean(r))
@@ -463,7 +494,7 @@ export async function syncFloorSheet(
 
     const sheetId = await ensureNamedTab(spreadsheetId, tabs, claimed, label);
     keepIds.add(sheetId);
-    await syncDayTab(spreadsheetId, sheetId, label, `DAY ${i + 1} · ${dayTitle(day)}`, dayRooms, slotsByRoom, companyNames, notes, zone);
+    await syncDayTab(spreadsheetId, sheetId, label, `DAY ${i + 1} · ${dayTitle(day)}`, dayRooms, slotsByRoom, layout && eventDays.has(day) ? gridTimes(layout, day, zone) : [], companyNames, notes, zone);
   }
 
   const allSheetId = allTab?.sheetId ?? (await addTab(spreadsheetId, ALL_TAB));

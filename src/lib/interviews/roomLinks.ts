@@ -3,8 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { EditionSettings } from './types';
 
 /**
- * Each room's public link, /interviews/room/<token>. A room here is a company
- * with its session (createRoomAction), so the link belongs to the company.
+ * A company's public candidate link, /interviews/room/<token> (the room
+ * flow): it belongs to the company, whichever rooms it is assigned to.
  * Kept in the edition's settings as `room_links` ({ company id: token }),
  * which update_edition already merges, so it needs none of 0005's columns or
  * functions. A new token for a company replaces the old one, and the old link

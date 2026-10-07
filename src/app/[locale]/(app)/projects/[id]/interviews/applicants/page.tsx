@@ -5,12 +5,10 @@ import { Badge, Button, Card, EmptyState, Input, Label, Select } from '@/compone
 import { formatDateTime, localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { resolveApplyFields } from '@/lib/interviews/applyFields';
-import { fullCompanyIds } from '@/lib/interviews/fullCompanies';
 import { loadApplicants, loadCompanies } from '@/lib/interviews/queries';
 import { DECISION_TONES } from '@/lib/interviews/ui';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { ApplicationFormCard } from '../ApplicationFormCard';
-import { CompanyManager } from '../CompanyManager';
 
 export default async function InterviewsApplicantsPage({
   params,
@@ -73,7 +71,13 @@ export default async function InterviewsApplicantsPage({
           tCommon={tCommon}
         />
         {manage ? (
-          <CompanyManager locale={locale} projectId={id} companies={companies} fullIds={fullCompanyIds(settings)} />
+          <Card>
+            <h2 className="mb-1 font-semibold">{t('register.manage')}</h2>
+            <p className="mb-3 text-xs text-ink-muted">{t('companiesTab.movedHint')}</p>
+            <Link href={`/projects/${id}/interviews/companies`} className="text-sm font-medium text-brand-600 hover:underline">
+              {t('tabs.companies')}
+            </Link>
+          </Card>
         ) : null}
       </div>
 
