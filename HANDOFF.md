@@ -1026,9 +1026,10 @@ mark (`public/brand/interviews-logo.png`, drawn by `InterviewsLogo`; the TV
 shows it white through a CSS filter), and sets `data-theme="interviews"` on
 `<html>`. That attribute switches the brand colour tokens to the component's
 palette (deep teal `#0e5a67`, mint `#a6eddd`, with lime `#c3f04a` and
-lavender `#c2b7ef` as `accent` / `accent-2`), paints the page itself mint
-(`--color-canvas`, what `body` and the public frame sit on) with lavender
-boxes (`--color-surface`) standing on it, and switches the typeface to DG Heaven
+mint as `accent` / `accent-2`), paints the page itself a near-white mint
+(`--color-canvas` `#f2fbf8`, what `body` and the public frame sit on) with
+mint boxes (`--color-surface` `#a6eddd`) standing on it (lavender was
+dropped on 2026-10-07; every text colour stays above 5.7:1 contrast), and switches the typeface to DG Heaven
 (`src/fonts/DG-Heaven-Light.ttf`, one Light cut; bolder weights are
 synthesised). The tokens are registered with `@property` in `globals.css`, so
 the colour change is animated (700 ms) rather than cut, and the page and
@@ -1036,7 +1037,7 @@ sidebar fade in over the typeface swap; the root layout's inline script sets
 the attribute before the first paint on a direct load, and `theme-animate` is
 only added afterwards, so nothing fades in from the club's teal. Both
 surfaces are light, so the dark ink serves everywhere; a rule on
-`.bg-surface` / `.bg-surface-muted` only tints the muted ink violet inside a
+`.bg-surface` / `.bg-surface-muted` only deepens the muted ink inside a
 box. Pages carry no theme-specific classes. The public `/interviews` pages
 carry the brand outright.
 

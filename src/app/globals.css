@@ -20,16 +20,16 @@
   --color-surface: #ffffff;
   --color-surface-muted: #f6f8f9;
   /* The page behind everything. The club's is the muted grey; the
-     interviews world paints it deep teal and floats mint cards on it. */
+     interviews world paints it a pale mint and floats mint cards on it. */
   --color-canvas: #f6f8f9;
   --color-ink: #0f172a;
   --color-ink-muted: #64748b;
   --color-line: #e2e8f0;
 
-  /* The Mock Interviews brand's two accents (lime, lavender); the club's
+  /* The Mock Interviews brand's two accents (lime, mint); the club's
      own world leaves them unused. */
   --color-accent: #c3f04a;
-  --color-accent-2: #c2b7ef;
+  --color-accent-2: #a6eddd;
 
   --color-ok: #15803d;
   --color-warn: #b45309;
@@ -136,12 +136,14 @@ html[data-theme="interviews"] {
   --color-brand-800: #093b44;
   --color-brand-900: #072d34;
   --color-brand-950: #041c21;
-  /* The page is the mint; the boxes on it are the lavender accent. Inset
-     areas inside a box (table heads, chips, hovers) go a shade deeper. */
-  --color-canvas: #a6eddd;
-  --color-surface: #c2b7ef;
-  --color-surface-muted: #b1a4e6;
-  --color-line: #9d8fdc;
+  /* The boxes are the mint; the page behind them is a mint so pale it is
+     nearly white, so they stand out. Inset areas inside a box (table heads,
+     chips, hovers) go a shade deeper. No lavender (the club's choice,
+     2026-10-07). */
+  --color-canvas: #f2fbf8;
+  --color-surface: #a6eddd;
+  --color-surface-muted: #8fe3d0;
+  --color-line: #6fcfba;
   --color-ink-muted: #3f5a63;
   /* The brand's typeface, for both scripts; digits and Latin fall back
      glyph by glyph where the cut lacks them. */
@@ -152,10 +154,10 @@ html[data-theme="interviews"][lang="en"] {
   font-family: var(--font-interviews), var(--font-latin), var(--font-arabic), system-ui, sans-serif;
 }
 
-/* Inside a lavender box the muted ink leans violet instead of teal-grey, so
-   secondary text reads as part of the box rather than of the page. */
+/* Inside a mint box the muted ink is a deeper teal-grey, so secondary text
+   keeps its contrast on the stronger background. */
 html[data-theme="interviews"] :is(.bg-surface, .bg-surface-muted) {
-  --color-ink-muted: #4a4370;
+  --color-ink-muted: #2d5257;
 }
 
 html.theme-animate {

@@ -26,7 +26,7 @@ export type ComponentShell = {
  * component's mark and only its pages, with a way back on top. Because the
  * nodes persist, the change can be animated: the logos cross-fade, the list
  * settles in, and `data-theme` on <html> lets the registered colour tokens in
- * globals.css glide from the club's teal to the component's violet.
+ * globals.css glide from the club's teal to the component's mint.
  *
  * Which world we are in is read from the URL, so a direct load of an
  * interviews page is already in the right one (the root layout's inline
