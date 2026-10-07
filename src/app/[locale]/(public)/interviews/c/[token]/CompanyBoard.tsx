@@ -54,6 +54,7 @@ export function CompanyBoard({
   profiles,
   feedback,
   ratingLabels,
+  initialOpen,
 }: {
   token: string;
   locale: string;
@@ -61,10 +62,12 @@ export function CompanyBoard({
   profiles: Record<string, Profile>;
   feedback: Record<string, FeedbackState>;
   ratingLabels: { key: string; label: string }[];
+  /** A booking to open on arrival: the Feedback link in the company's Google Sheet (companySheets.ts). */
+  initialOpen: string | null;
 }) {
   const t = useTranslations('interviews');
   const router = useRouter();
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(initialOpen);
 
   useEffect(() => {
     const tick = () => {
@@ -105,7 +108,7 @@ export function CompanyBoard({
             const profile = row.application_id ? profiles[row.application_id] : undefined;
             const fb = row.booking_id ? feedback[row.booking_id] : undefined;
             return (
-              <li key={row.slot_id}>
+              <li key={row.slot_id} id={row.booking_id ? `b-${row.booking_id}` : undefined}>
                 <div className="flex flex-wrap items-center gap-3 px-4 py-2.5">
                   <span className="ltr-nums w-24 shrink-0 text-sm font-semibold">{timeLabel(row.starts_at, locale)}</span>
                   <span className="w-20 shrink-0 text-xs text-ink-muted">{row.room_name}</span>

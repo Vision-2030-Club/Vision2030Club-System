@@ -1,383 +1,285 @@
 import 'server-only';
-import { after } from 'next/server';
-import { GoogleNotConnectedError, isGoogleConfigured } from '@/lib/google/auth';
-import { addTab, createFloorSheet, deleteOtherTabs, listTabs, readTab, renameTab, revokeLinkSharing, writeTab } from '@/lib/google/sheets';
+import { isGoogleConfigured } from '@/lib/google/auth';
+import {
+  addTab,
+  createFloorSheet,
+  deleteOtherTabs,
+  ensureNamedTab,
+  listTabs,
+  readTab,
+  renameTab,
+  revokeLinkSharing,
+  writeTab,
+} from '@/lib/google/sheets';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
-import { signCvLong } from '@/lib/interviews/cv';
+import {
+  dayOf,
+  dropdown,
+  grid,
+  hex,
+  hideColumn,
+  keptValues,
+  merge,
+  mergeRows,
+  pages,
+  paint,
+  plain,
+  stamp,
+  STAGE_NAMES,
+  timeOf,
+  widths,
+  type Box,
+} from '@/lib/interviews/sheetFormat';
 import type { Actor } from '@/lib/interviews/access';
 import type { Edition, EditionSettings, Room, SlotStatus, Stage } from '@/lib/interviews/types';
 import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/interviews/queries';
 
 /**
+ * The floor sheet, drawn after the club's "Rooms — 5th edition" template.
+ *
  * Mostly a mirror — this database → the sheet — with one door back the other
- * way: the Stage column. Everything else here is regenerated wholesale on
- * every sync, so a hand-edited name or time would just be overwritten; Stage
- * is the one column worth editing by hand (an organizer at the door ticking
- * people off) and the one place `advance_stage` already refuses anything
- * that isn't a real stage, so there is a guardrail to lean on. Nothing pulls
- * automatically, though — see pullFloorSheetStages and its caller
- * (syncFloorSheetAction/pullFloorSheetAction in the interviews actions),
- * which only ever run because someone clicked a button.
+ * way: the Status column. Everything the system knows is regenerated
+ * wholesale on every sync, so a hand-edited name or time would just be
+ * overwritten; Status is the one column worth editing by hand (an organizer
+ * at the door ticking people off) and the one place `advance_stage` already
+ * refuses anything that isn't a real stage, so there is a guardrail to lean
+ * on. Nothing pulls automatically, though — see pullFloorSheetStages and its
+ * caller (pullFloorSheetAction in the interviews actions), which only ever
+ * run because someone clicked a button. Notes are the organizers' own: read
+ * off the sheet before each rewrite and put back on the same row.
  *
- * One TAB per day, named by its actual date ("9/19", "9/20", …) rather than
- * a day column: rooms are now made one per day (0005's createRoomAction),
- * so a day is naturally a whole separate sheet of rooms, not a label
- * repeated down one column. The date is read straight off sessions.day —
- * add a room for today and its tab is named today's date automatically.
- * A plain centred date line ("April 19") sits above the grid itself.
+ * One TAB per day, named by its actual date ("9/19", "9/20", …). A day's
+ * rooms come from its sessions (createRoomAction makes one per room per
+ * day), so adding a room for a new day adds that day's tab. After the day
+ * tabs, one "All bookings" tab lists every booking flat, for filtering and
+ * counting (buildAllBookings).
  *
- * Within a tab, two rooms per row, each its own block: a merged, centred,
- * CORAL title bar naming the ROOM (its booth label, e.g. "Room 1") — not
- * the company — a NAVY Time/Company/Student Name/Student Phone
- * Number/CV/Status header row, then that room's bookings in time order.
- * Company is its own column, resolved from whichever company that room's
- * session belongs to, since a room's booth label and the company sitting
- * in it are named separately now.
+ * Within a day tab: a teal "DAY 1 · OCTOBER 12" banner, then rooms two side
+ * by side. Each room is a block: a teal title bar naming the ROOM (its booth
+ * label, uppercased) — not the company — a header row in the template's
+ * mint / lavender / lime, then one row per slot of every session in that
+ * room that day, booked or not, then a ROOM SUMMARY (total, booked,
+ * available). Two companies can share a room in one day (STC 2–5, PwC
+ * 5–8): their slots run on in time order and each row names its company.
  *
- * The seventh column of each block, hidden, carries the booking id —
- * nothing else in a row identifies which booking it is, and the id is what
- * pullFloorSheetStages matches an edited Status cell back to.
+ * Status shows the template's words, not the app's: Arrived, In-interview,
+ * Completed, Late (a no-show), and Gap for a slot closed for a break; a
+ * student who is booked but has not arrived shows blank. Pull from Sheet
+ * reads the first four back.
+ *
+ * The eighth column of each block, hidden, carries the booking id (or
+ * `slot:<id>` for a free slot) — nothing else in a row identifies it, and it
+ * is what Pull from Sheet and the Notes carried across a rewrite match on.
  */
 
-const STAGE_LABELS: Record<Stage, string> = {
-  scheduled: 'لم يصل',
-  arrived: 'وصل بالانتظار',
-  in_interview: 'في المقابلة',
-  done: 'تمت المقابلة',
-  no_show: 'متأخر',
+const STATUS_LABELS: Partial<Record<Stage, string>> = {
+  arrived: 'Arrived',
+  in_interview: 'In-interview',
+  done: 'Completed',
+  no_show: 'Late',
 };
-const LABEL_TO_STAGE = new Map(Object.entries(STAGE_LABELS).map(([stage, label]) => [label, stage as Stage]));
+const GAP = 'Gap';
+const STATUS_CHOICES = ['Arrived', 'Late', 'Completed', GAP, 'In-interview'];
+const LABEL_TO_STAGE = new Map(Object.entries(STATUS_LABELS).map(([stage, label]) => [label, stage as Stage]));
 
-/** Same tones as STAGE_TONES (lib/interviews/ui.ts) in the app itself, as literal RGB for the Sheets API. */
-const STAGE_COLORS: Record<string, { bg: { red: number; green: number; blue: number }; fg: { red: number; green: number; blue: number } }> = {
-  [STAGE_LABELS.scheduled]: { bg: { red: 0.9, green: 0.91, blue: 0.93 }, fg: { red: 0.29, green: 0.33, blue: 0.39 } },
-  [STAGE_LABELS.arrived]: { bg: { red: 0.86, green: 0.92, blue: 0.99 }, fg: { red: 0.12, green: 0.25, blue: 0.69 } },
-  [STAGE_LABELS.in_interview]: { bg: { red: 1, green: 0.95, blue: 0.78 }, fg: { red: 0.57, green: 0.25, blue: 0.05 } },
-  [STAGE_LABELS.done]: { bg: { red: 0.86, green: 0.99, blue: 0.91 }, fg: { red: 0.09, green: 0.4, blue: 0.2 } },
-  [STAGE_LABELS.no_show]: { bg: { red: 1, green: 0.89, blue: 0.89 }, fg: { red: 0.6, green: 0.11, blue: 0.11 } },
-};
+// One block: Time, Company, Student Name, Student Phone Number, Status,
+// Notes (two columns merged), and the hidden key.
+const HEADERS = ['Time', 'Company', 'Student Name', 'Student Phone Number', 'Status', 'Notes', ''];
+const STATUS_COL = 4;
+const NOTES_COL = 5;
+const VISIBLE_COLS = 7;
+const KEY_COL = 7;
+const BLOCK_COLS = 8;
+const RIGHT = BLOCK_COLS + 1; // one narrow gap column between the two rooms
+const PAIR_COLS = BLOCK_COLS * 2 + 1;
+const BLOCKS = [0, RIGHT];
 
-const COLUMNS = ['Time', 'Company', 'Student Name', 'Student Phone Number', 'CV', 'Status'];
-const STAGE_COL = COLUMNS.length - 1; // "Status" is always the last visible column
-const VISIBLE_COLS = COLUMNS.length;
-const ID_COL = VISIBLE_COLS; // the hidden 7th column, 0-based index within a block
-const BLOCK_COLS = VISIBLE_COLS + 1;
-const PAIR_COLS = BLOCK_COLS * 2 + 1; // two blocks + one gap column between them
+const TEAL = hex('0E5A67');
+const WHITE = hex('FFFFFF');
+const MINT = hex('A6EDDD');
+const LAVENDER = hex('C2B7EF');
+const LIME = hex('C3F04A');
+const NOTES_LINE = hex('D7D7D7');
+/** Header colour, then the paler tint of the same colour for the rows under it. */
+const COLUMN_TONES = [
+  { head: MINT, row: hex('EAF9F6') },
+  { head: LAVENDER, row: hex('F0ECFB') },
+  { head: LIME, row: hex('F3FBD7') },
+  { head: MINT, row: hex('EAF9F6') },
+  { head: LAVENDER, row: hex('F0ECFB') },
+  { head: MINT, row: hex('F8F6FC') },
+  { head: MINT, row: hex('F8F6FC') },
+];
 
-const CORAL = { red: 0.906, green: 0.42, blue: 0.353 };
-const NAVY = { red: 0.11, green: 0.23, blue: 0.39 };
-const WHITE = { red: 1, green: 1, blue: 1 };
-const EMPTY_ROW_GREY = { red: 0.93, green: 0.93, blue: 0.93 };
-const COMPANY_BLUE = { red: 0.06, green: 0.33, blue: 0.8 };
-const COMPANY_COL = COLUMNS.indexOf('Company');
+/** The flat tab after the day tabs (buildAllBookings). */
+const ALL_TAB = 'All bookings';
+const ALL_COLUMNS = [
+  'Day',
+  'Time',
+  'Room',
+  'Company',
+  'Student',
+  'Phone',
+  'Status',
+  'Arrived',
+  'Started',
+  'Finished',
+  'Booked at',
+  'Booked by',
+];
+
+/** "OCTOBER 12" — the date in the banner of each day tab. */
+function dayTitle(day: string): string {
+  return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric' })
+    .format(new Date(`${day}T12:00:00Z`))
+    .toUpperCase();
+}
 
 function blankRow(): string[] {
   return Array(BLOCK_COLS).fill('');
 }
 
-/** "2:00 PM" — one point in time, not a range: the next row's start is the end. */
-function fmtTime(iso: string, zone: string): string {
-  return new Intl.DateTimeFormat('en-US', { timeZone: zone, hour: 'numeric', minute: '2-digit', hour12: true }).format(
-    new Date(iso),
-  );
+function rowKey(slot: SlotStatus): string {
+  return slot.booking_id ?? `slot:${slot.id}`;
 }
 
-/** `2026-10-12`, on the edition's own clock — matches how sessions.day is stored. */
-function dateKey(iso: string, zone: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(
-    new Date(iso),
-  );
+function statusOf(slot: SlotStatus): string {
+  if (slot.booking_id) return slot.stage ? (STATUS_LABELS[slot.stage] ?? '') : '';
+  return slot.is_closed ? GAP : '';
 }
 
-/** "April 19" — the plain date line drawn above each day's grid. */
-function dayTitle(day: string): string {
-  return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric' }).format(
-    new Date(`${day}T12:00:00Z`),
-  );
-}
+type RoomBlock = { title: string; slots: SlotStatus[]; rows: string[][] };
 
-/** Title row, header row, then one row per booking — always BLOCK_COLS wide. */
-async function buildRoomBlock(
-  db: ReturnType<typeof createInterviewsClient>,
-  room: Room,
-  companyName: string,
-  slots: SlotStatus[],
-  cvPathByApplication: Map<string, string | null>,
-  zone: string,
-): Promise<string[][]> {
-  const rows: string[][] = [
-    [room.name, ...Array(VISIBLE_COLS - 1).fill(''), ''],
-    [...COLUMNS, ''],
-  ];
-
-  // Every slot the room's session generated gets a row, booked or not — a
-  // fixed 2pm-8pm-shaped grid instead of one that only grows with bookings.
-  // Nothing but Time and Company (both known up front, independent of who
-  // books) is filled in for an empty slot; the rest stays blank until
-  // someone actually books it.
-  for (const slot of slots) {
-    if (!slot.booking_id) {
-      rows.push([fmtTime(slot.starts_at, zone), companyName, '', '', '', '', '']);
-      continue;
-    }
-    const cvPath = slot.application_id ? cvPathByApplication.get(slot.application_id) : null;
-    const cvUrl = cvPath ? await signCvLong(db, cvPath) : null;
-    rows.push([
-      fmtTime(slot.starts_at, zone),
-      companyName,
-      slot.student_name ?? '',
-      slot.student_phone ?? '',
-      cvUrl ? `=HYPERLINK("${cvUrl}", "View CV")` : '',
-      slot.stage ? STAGE_LABELS[slot.stage] : '',
-      slot.booking_id,
-    ]);
-  }
-
-  return rows;
+/** One row per slot of the room's session, booked or not, always BLOCK_COLS wide. */
+function buildRoomBlock(room: Room, companyNames: Map<string, string>, slots: SlotStatus[], notes: Map<string, string>, zone: string): RoomBlock {
+  return {
+    title: room.name.toUpperCase(),
+    slots,
+    rows: slots.map((slot) => [
+      timeOf(slot.starts_at, zone),
+      plain(companyNames.get(slot.company_id)),
+      plain(slot.student_name),
+      plain(slot.student_phone),
+      statusOf(slot),
+      notes.get(rowKey(slot)) ?? '',
+      '',
+      rowKey(slot),
+    ]),
+  };
 }
 
 /**
- * The coral title bar (merged + centred) and the navy column-header row,
- * a dropdown + colour rule on Status, grey fill on every still-empty slot
- * row (so an open slot reads as open at a glance) and the Company column
- * in blue, matching the reference sheet.
+ * One room's block at (row, col): title bar, header row, its slot rows, and
+ * below them (at `summaryRow`, shared by the two rooms of a pair so they line
+ * up) the room summary.
  */
-function blockFormatting(
-  sheetId: number,
-  startRow: number,
-  startCol: number,
-  blockLen: number,
-  bookedFlags: boolean[] = [],
-): object[] {
-  if (blockLen === 0) return [];
+function blockFormatting(sheetId: number, row: number, col: number, block: RoomBlock, summaryRow: number): object[] {
+  const box = (r0: number, r1: number, c0: number, c1: number): Box => ({ sheetId, r0, r1, c0: col + c0, c1: col + c1 });
+  const first = row + 2;
+  const last = first + block.rows.length;
+
   const requests: object[] = [
-    {
-      repeatCell: {
-        range: { sheetId, startRowIndex: startRow, endRowIndex: startRow + 1, startColumnIndex: startCol, endColumnIndex: startCol + BLOCK_COLS },
-        cell: {
-          userEnteredFormat: {
-            backgroundColor: CORAL,
-            textFormat: { bold: true, foregroundColor: WHITE },
-            horizontalAlignment: 'CENTER',
-          },
-        },
-        fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
-      },
-    },
-    {
-      repeatCell: {
-        range: { sheetId, startRowIndex: startRow + 1, endRowIndex: startRow + 2, startColumnIndex: startCol, endColumnIndex: startCol + BLOCK_COLS },
-        cell: {
-          userEnteredFormat: {
-            backgroundColor: NAVY,
-            textFormat: { bold: true, foregroundColor: WHITE },
-            horizontalAlignment: 'CENTER',
-          },
-        },
-        fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
-      },
-    },
-    {
-      mergeCells: {
-        range: { sheetId, startRowIndex: startRow, endRowIndex: startRow + 1, startColumnIndex: startCol, endColumnIndex: startCol + BLOCK_COLS },
-        mergeType: 'MERGE_ALL',
-      },
-    },
+    paint(box(row, row + 1, 0, VISIBLE_COLS), { bg: TEAL, fg: WHITE, bold: true, size: 14, align: 'CENTER' }),
+    merge(box(row, row + 1, 0, VISIBLE_COLS)),
+    ...COLUMN_TONES.map((tone, c) =>
+      paint(box(row + 1, row + 2, c, c + 1), { bg: tone.head, fg: TEAL, bold: true, align: 'CENTER' }),
+    ),
+    merge(box(row + 1, row + 2, NOTES_COL, NOTES_COL + 2)),
+    // The summary: a teal label, then Total / Booked / Available.
+    paint(box(summaryRow, summaryRow + 1, 0, 2), { bg: TEAL, fg: WHITE, bold: true, align: 'CENTER' }),
+    merge(box(summaryRow, summaryRow + 1, 0, 2)),
+    paint(box(summaryRow, summaryRow + 1, 2, VISIBLE_COLS), { bg: MINT, fg: TEAL, bold: true, align: 'CENTER' }),
+    merge(box(summaryRow, summaryRow + 1, 4, VISIBLE_COLS)),
+    paint(box(summaryRow + 1, summaryRow + 2, 2, VISIBLE_COLS), { bg: WHITE, fg: TEAL, bold: true, align: 'CENTER' }),
+    merge(box(summaryRow + 1, summaryRow + 2, 4, VISIBLE_COLS)),
   ];
 
-  const dataRows = blockLen - 2;
-  if (dataRows > 0) {
-    requests.push({
-      setDataValidation: {
-        range: {
-          sheetId,
-          startRowIndex: startRow + 2,
-          endRowIndex: startRow + 2 + dataRows,
-          startColumnIndex: startCol + STAGE_COL,
-          endColumnIndex: startCol + STAGE_COL + 1,
-        },
-        rule: {
-          condition: {
-            type: 'ONE_OF_LIST',
-            values: Object.values(STAGE_LABELS).map((label) => ({ userEnteredValue: label })),
-          },
-          showCustomUi: true,
-          strict: true,
-        },
-      },
-    });
-
-    // One rule per stage, colouring the cell by its text — same tones as
-    // the Badge on the floor board (STAGE_TONES). Recalculates the moment
-    // someone picks a new value from the dropdown, unlike a plain fill.
-    for (const [label, { bg, fg }] of Object.entries(STAGE_COLORS)) {
-      requests.push({
-        addConditionalFormatRule: {
-          index: 0,
-          rule: {
-            ranges: [
-              {
-                sheetId,
-                startRowIndex: startRow + 2,
-                endRowIndex: startRow + 2 + dataRows,
-                startColumnIndex: startCol + STAGE_COL,
-                endColumnIndex: startCol + STAGE_COL + 1,
-              },
-            ],
-            booleanRule: {
-              condition: { type: 'TEXT_EQ', values: [{ userEnteredValue: label }] },
-              format: { backgroundColor: bg, textFormat: { foregroundColor: fg, bold: true } },
-            },
-          },
-        },
-      });
-    }
-
-    requests.push({
-      repeatCell: {
-        range: {
-          sheetId,
-          startRowIndex: startRow + 2,
-          endRowIndex: startRow + 2 + dataRows,
-          startColumnIndex: startCol + COMPANY_COL,
-          endColumnIndex: startCol + COMPANY_COL + 1,
-        },
-        cell: { userEnteredFormat: { textFormat: { foregroundColor: COMPANY_BLUE, underline: true } } },
-        fields: 'userEnteredFormat.textFormat(foregroundColor,underline)',
-      },
-    });
-
-    // Grey out every slot nobody has booked yet, in contiguous runs — a
-    // free slot should read as free at a glance, same as the reference.
-    let row = 0;
-    while (row < dataRows) {
-      if (bookedFlags[row]) {
-        row++;
-        continue;
-      }
-      let end = row;
-      while (end < dataRows && !bookedFlags[end]) end++;
-      requests.push({
-        repeatCell: {
-          range: {
-            sheetId,
-            startRowIndex: startRow + 2 + row,
-            endRowIndex: startRow + 2 + end,
-            startColumnIndex: startCol,
-            endColumnIndex: startCol + BLOCK_COLS,
-          },
-          cell: { userEnteredFormat: { backgroundColor: EMPTY_ROW_GREY } },
-          fields: 'userEnteredFormat.backgroundColor',
-        },
-      });
-      row = end;
-    }
+  if (block.rows.length > 0) {
+    requests.push(
+      ...COLUMN_TONES.map((tone, c) =>
+        paint(box(first, last, c, c + 1), c === 0 ? { bg: tone.row, fg: TEAL, bold: true, align: 'CENTER' } : { bg: tone.row }),
+      ),
+      mergeRows(box(first, last, NOTES_COL, NOTES_COL + 2)),
+      grid(box(row + 1, last, NOTES_COL, NOTES_COL + 2), NOTES_LINE),
+      dropdown(box(first, last, STATUS_COL, STATUS_COL + 1), STATUS_CHOICES),
+    );
   }
-
   return requests;
 }
 
-/** Column widths and the hidden booking-id column, set once per tab. */
-function columnLayoutRequests(sheetId: number): object[] {
-  // Time, Company, Student Name, Student Phone Number, CV, Status
-  const widths = [90, 110, 180, 160, 100, 140];
-  const requests: object[] = [];
-  for (const startCol of [0, BLOCK_COLS + 1]) {
-    widths.forEach((pixelSize, i) => {
-      requests.push({
-        updateDimensionProperties: {
-          range: { sheetId, dimension: 'COLUMNS', startIndex: startCol + i, endIndex: startCol + i + 1 },
-          properties: { pixelSize },
-          fields: 'pixelSize',
-        },
-      });
-    });
-    requests.push({
-      updateDimensionProperties: {
-        range: { sheetId, dimension: 'COLUMNS', startIndex: startCol + ID_COL, endIndex: startCol + ID_COL + 1 },
-        properties: { hiddenByUser: true },
-        fields: 'hiddenByUser',
-      },
-    });
-  }
-  requests.push({
-    updateDimensionProperties: {
-      range: { sheetId, dimension: 'COLUMNS', startIndex: BLOCK_COLS, endIndex: BLOCK_COLS + 1 },
-      properties: { pixelSize: 24 },
-      fields: 'pixelSize',
-    },
-  });
-  return requests;
+/** The two-row summary under a room: labels, then the counts. */
+function summaryRows(block: RoomBlock | undefined): [string[], string[]] {
+  if (!block) return [blankRow(), blankRow()];
+  const total = block.slots.filter((s) => s.booking_id || !s.is_closed).length;
+  const booked = block.slots.filter((s) => s.booking_id).length;
+  return [
+    ['ROOM SUMMARY', '', 'Total Slots', 'Booked', 'Available', '', '', ''],
+    ['', '', String(total), String(booked), String(total - booked), '', '', ''],
+  ];
 }
 
 /** Builds one day's full grid (every room scheduled that day, two per row) and writes it to its tab. */
 async function syncDayTab(
-  db: ReturnType<typeof createInterviewsClient>,
   spreadsheetId: string,
   sheetId: number,
   sheetTitle: string,
   titleText: string,
   dayRooms: Room[],
   slotsByRoom: Map<string, SlotStatus[]>,
-  companyNameByRoom: Map<string, string>,
-  cvPathByApplication: Map<string, string | null>,
+  companyNames: Map<string, string>,
   zone: string,
 ): Promise<void> {
-  const values: string[][] = [[titleText, ...Array(PAIR_COLS - 1).fill('')], Array(PAIR_COLS).fill('')];
-  const formatRequests: object[] = [
-    ...columnLayoutRequests(sheetId),
-    {
-      repeatCell: {
-        range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: PAIR_COLS },
-        cell: { userEnteredFormat: { textFormat: { bold: true, fontSize: 12 }, horizontalAlignment: 'CENTER' } },
-        fields: 'userEnteredFormat(textFormat,horizontalAlignment)',
-      },
-    },
-    {
-      mergeCells: {
-        range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: PAIR_COLS },
-        mergeType: 'MERGE_ALL',
-      },
-    },
+  // Notes are the organizers' own; carry them across the rewrite.
+  const notes = keptValues(await readTab(spreadsheetId, sheetTitle), BLOCKS, KEY_COL, NOTES_COL);
+
+  const values: string[][] = [
+    [titleText, ...Array(PAIR_COLS - 1).fill('')],
+    Array(PAIR_COLS).fill(''),
+    Array(PAIR_COLS).fill(''),
+    Array(PAIR_COLS).fill(''),
   ];
-  let cursorRow = 2;
+  const banner: Box = { sheetId, r0: 0, r1: 3, c0: 0, c1: PAIR_COLS };
+  const formatRequests: object[] = [
+    ...widths(sheetId, 0, [86, 120, 170, 150, 110, 90, 130]),
+    ...widths(sheetId, RIGHT, [86, 120, 170, 150, 110, 90, 130]),
+    ...widths(sheetId, BLOCK_COLS, [30]),
+    hideColumn(sheetId, KEY_COL),
+    hideColumn(sheetId, RIGHT + KEY_COL),
+    paint(banner, { bg: TEAL, fg: WHITE, bold: true, size: 20, align: 'CENTER' }),
+    merge(banner),
+  ];
+  let cursorRow = values.length;
 
   for (let i = 0; i < dayRooms.length; i += 2) {
     const left = dayRooms[i];
     const right = dayRooms[i + 1] as Room | undefined;
+    const blockOf = (room: Room) =>
+      buildRoomBlock(room, companyNames, slotsByRoom.get(room.id) ?? [], notes, zone);
+    const leftBlock = blockOf(left);
+    const rightBlock = right ? blockOf(right) : undefined;
 
-    const leftRows = await buildRoomBlock(
-      db,
-      left,
-      companyNameByRoom.get(left.id) ?? '',
-      slotsByRoom.get(left.id) ?? [],
-      cvPathByApplication,
-      zone,
-    );
-    const rightRows = right
-      ? await buildRoomBlock(
-          db,
-          right,
-          companyNameByRoom.get(right.id) ?? '',
-          slotsByRoom.get(right.id) ?? [],
-          cvPathByApplication,
-          zone,
-        )
-      : [];
+    const titleRow = (block?: RoomBlock) => (block ? [block.title, ...Array(BLOCK_COLS - 1).fill('')] : blankRow());
+    const headerRow = (block?: RoomBlock) => (block ? [...HEADERS, ''] : blankRow());
+    values.push([...titleRow(leftBlock), '', ...titleRow(rightBlock)]);
+    values.push([...headerRow(leftBlock), '', ...headerRow(rightBlock)]);
 
-    const height = Math.max(leftRows.length, rightRows.length);
+    const height = Math.max(leftBlock.rows.length, rightBlock?.rows.length ?? 0);
     for (let r = 0; r < height; r++) {
-      values.push([...(leftRows[r] ?? blankRow()), '', ...(rightRows[r] ?? blankRow())]);
+      values.push([...(leftBlock.rows[r] ?? blankRow()), '', ...(rightBlock?.rows[r] ?? blankRow())]);
     }
-
-    const leftBooked = (slotsByRoom.get(left.id) ?? []).map((s) => Boolean(s.booking_id));
-    const rightBooked = right ? (slotsByRoom.get(right.id) ?? []).map((s) => Boolean(s.booking_id)) : [];
-    formatRequests.push(...blockFormatting(sheetId, cursorRow, 0, leftRows.length, leftBooked));
-    formatRequests.push(...blockFormatting(sheetId, cursorRow, BLOCK_COLS + 1, rightRows.length, rightBooked));
-
-    cursorRow += height;
     values.push(Array(PAIR_COLS).fill(''));
-    cursorRow += 1;
+
+    const summaryRow = cursorRow + 2 + height + 1;
+    const [leftLabels, leftCounts] = summaryRows(leftBlock);
+    const [rightLabels, rightCounts] = summaryRows(rightBlock);
+    values.push([...leftLabels, '', ...rightLabels]);
+    values.push([...leftCounts, '', ...rightCounts]);
+
+    formatRequests.push(...blockFormatting(sheetId, cursorRow, 0, leftBlock, summaryRow));
+    if (rightBlock) formatRequests.push(...blockFormatting(sheetId, cursorRow, RIGHT, rightBlock, summaryRow));
+
+    values.push(Array(PAIR_COLS).fill(''), Array(PAIR_COLS).fill(''));
+    cursorRow = values.length;
   }
 
   await writeTab(spreadsheetId, sheetId, sheetTitle, values, formatRequests);
@@ -418,50 +320,19 @@ async function ensureFloorSheet(
   return created.id;
 }
 
-/**
- * The tab for one day, named by its date (e.g. "9/19"): reuses one already
- * named that, otherwise claims the spreadsheet's leftover default tab (its
- * very first sync), otherwise adds a fresh one. `claimed` tracks which
- * existing tabs this run has already spoken for, so two days never fight
- * over the same unclaimed default.
- */
-async function ensureDayTab(
-  spreadsheetId: string,
-  tabs: { sheetId: number; title: string }[],
-  claimed: Set<number>,
-  label: string,
-): Promise<number> {
-  const exact = tabs.find((t) => t.title === label);
-  if (exact) {
-    claimed.add(exact.sheetId);
-    return exact.sheetId;
-  }
-
-  const spare = tabs.find((t) => !claimed.has(t.sheetId));
-  if (spare) {
-    await renameTab(spreadsheetId, spare.sheetId, label);
-    spare.title = label;
-    claimed.add(spare.sheetId);
-    return spare.sheetId;
-  }
-
-  const sheetId = await addTab(spreadsheetId, label);
-  tabs.push({ sheetId, title: label });
-  claimed.add(sheetId);
-  return sheetId;
-}
-
 /** Everything a full rebuild needs about the edition's current floor. */
 async function loadFloorData(db: ReturnType<typeof createInterviewsClient>, editionId: string) {
-  const [rooms, sessions, { data: slotRows }] = await Promise.all([
+  const [rooms, sessions, slots] = await Promise.all([
     loadRooms(db, editionId),
     loadSessions(db, editionId),
-    db.from('slot_status').select('*').eq('edition_id', editionId).order('starts_at'),
+    pages<SlotStatus>((from, to) =>
+      db.from('slot_status').select('*').eq('edition_id', editionId).order('starts_at').order('id').range(from, to),
+    ),
   ]);
-  return { rooms, sessions, slots: (slotRows ?? []) as SlotStatus[] };
+  return { rooms, sessions, slots };
 }
 
-/** Rebuilds one edition's floor sheet from scratch. Call via kickFloorSheetSync. */
+/** Rebuilds one edition's floor sheet from scratch. Call via kickSheetsSync (sheetsSync.ts). */
 export async function syncFloorSheet(editionId: string): Promise<void> {
   if (!isGoogleConfigured()) return;
 
@@ -488,20 +359,9 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
     (s) => roomById.get(s.room_id)?.is_active && !companyById.get(s.company_id)?.is_hidden,
   );
 
-  const companyNameByRoom = new Map<string, string>();
-  for (const session of sessions) {
-    if (companyNameByRoom.has(session.room_id)) continue;
-    const company = companyById.get(session.company_id);
-    if (company) companyNameByRoom.set(session.room_id, company.name_en);
-  }
-
-  const applicationIds = [...new Set(slots.map((s) => s.application_id).filter((v): v is string => Boolean(v)))];
-  const { data: applicationRows } = applicationIds.length
-    ? await db.from('applications').select('id, cv_path').in('id', applicationIds)
-    : { data: [] };
-  const cvPathByApplication = new Map(
-    ((applicationRows ?? []) as { id: string; cv_path: string | null }[]).map((a) => [a.id, a.cv_path]),
-  );
+  // A room can hold two companies in one day (STC 2–5, PwC 5–8), so every
+  // row names the company of its own slot, not one company per room.
+  const companyNames = new Map(companies.map((c) => [c.id, c.name_en]));
 
   const zone = edition.time_zone;
   const days = sessionDays(sessions); // sorted 'YYYY-MM-DD', one per calendar day with a session
@@ -528,7 +388,14 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
 
   const claimed = new Set<number>();
   const keepIds = new Set<number>();
+  // Spoken for before the days are, so a new day never renames it.
+  const allTab = tabs.find((t) => t.title === ALL_TAB);
+  if (allTab) {
+    claimed.add(allTab.sheetId);
+    keepIds.add(allTab.sheetId);
+  }
 
+  const liveSessions = new Set(sessions.map((s) => s.id));
   for (let i = 0; i < days.length; i++) {
     const day = days[i];
     // day is already 'YYYY-MM-DD' on the edition's own clock (sessions.day) —
@@ -547,31 +414,107 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
       slotsByRoom.set(
         room.id,
         slots
-          .filter((s) => s.room_id === room.id && dateKey(s.starts_at, zone) === day)
+          .filter((s) => s.room_id === room.id && liveSessions.has(s.session_id) && dayOf(s.starts_at, zone) === day)
           .sort((a, b) => a.starts_at.localeCompare(b.starts_at)),
       );
     }
 
-    const sheetId = await ensureDayTab(spreadsheetId, tabs, claimed, label);
+    const sheetId = await ensureNamedTab(spreadsheetId, tabs, claimed, label);
     keepIds.add(sheetId);
-    const titleText = `Day ${i + 1} ${dayTitle(day)}`;
-    await syncDayTab(db, spreadsheetId, sheetId, label, titleText, dayRooms, slotsByRoom, companyNameByRoom, cvPathByApplication, zone);
+    await syncDayTab(spreadsheetId, sheetId, label, `DAY ${i + 1} · ${dayTitle(day)}`, dayRooms, slotsByRoom, companyNames, zone);
   }
+
+  const allSheetId = allTab?.sheetId ?? (await addTab(spreadsheetId, ALL_TAB));
+  keepIds.add(allSheetId);
+  const allRows = await buildAllBookings(db, editionId, liveSessions, slots, roomById, companyNames, zone);
+  const header: Box = { sheetId: allSheetId, r0: 0, r1: 1, c0: 0, c1: ALL_COLUMNS.length };
+  await writeTab(spreadsheetId, allSheetId, ALL_TAB, allRows, [
+    paint(header, { bg: TEAL, fg: WHITE, bold: true }),
+    {
+      updateSheetProperties: {
+        properties: { sheetId: allSheetId, gridProperties: { frozenRowCount: 1 } },
+        fields: 'gridProperties.frozenRowCount',
+      },
+    },
+  ]);
 
   await deleteOtherTabs(spreadsheetId, keepIds);
 }
 
 /**
- * Reads every day tab's Stage column back and applies whatever it finds to
+ * The "All bookings" tab: every live booking of the edition on one flat,
+ * filterable list, with the times the floor recorded for it — what the day
+ * tabs, laid out room by room for the people at the door, cannot be sorted
+ * or counted by. Same rooms as the day tabs: a deleted room or company is
+ * left out. Its Status column is NOT read back by Pull from Sheet; that is
+ * the day tabs' job.
+ */
+async function buildAllBookings(
+  db: ReturnType<typeof createInterviewsClient>,
+  editionId: string,
+  liveSessions: Set<string>,
+  slots: SlotStatus[],
+  roomById: Map<string, Room>,
+  companyNames: Map<string, string>,
+  zone: string,
+): Promise<string[][]> {
+  const slotById = new Map(slots.filter((s) => liveSessions.has(s.session_id)).map((s) => [s.id, s]));
+
+  const bookings = await pages<{
+    id: string;
+    slot_id: string;
+    starts_at: string;
+    stage: Stage;
+    arrived_at: string | null;
+    started_at: string | null;
+    finished_at: string | null;
+    booked_at: string;
+    booked_by_kind: string;
+  }>((from, to) =>
+    db
+      .from('bookings')
+      .select('id, slot_id, starts_at, stage, arrived_at, started_at, finished_at, booked_at, booked_by_kind')
+      .eq('edition_id', editionId)
+      .is('cancelled_at', null)
+      .order('starts_at')
+      .order('id')
+      .range(from, to),
+  );
+
+  const rows: string[][] = [ALL_COLUMNS];
+  for (const booking of bookings) {
+    const slot = slotById.get(booking.slot_id);
+    if (!slot) continue;
+    rows.push([
+      dayOf(booking.starts_at, zone),
+      timeOf(booking.starts_at, zone),
+      plain(roomById.get(slot.room_id)?.name),
+      plain(companyNames.get(slot.company_id)),
+      plain(slot.student_name),
+      plain(slot.student_phone),
+      STAGE_NAMES[booking.stage] ?? booking.stage,
+      timeOf(booking.arrived_at, zone),
+      timeOf(booking.started_at, zone),
+      timeOf(booking.finished_at, zone),
+      stamp(booking.booked_at, zone),
+      booking.booked_by_kind === 'staff' ? 'Staff' : 'Student',
+    ]);
+  }
+  return rows;
+}
+
+/**
+ * Reads every day tab's Status column back and applies whatever changed to
  * the matching booking — the one door back the other way (see the file
  * note). `advance_stage` is the same function the floor board's own buttons
- * call, `p_as_manager: true` so a jump straight from "Not Arrived" to
- * "Finished" is accepted the way a manager's own override already is. A row
- * whose Stage cell is blank, unrecognised, or already matches is simply not
- * counted — this never errors on a row, only reports what it did.
+ * call, `p_as_manager: true` so a jump straight from not-arrived to
+ * Completed is accepted the way a manager's own override already is. A row
+ * whose Status is blank, Gap, unrecognised, or already what the system
+ * holds is left alone — this never errors on a row, only reports what it
+ * did.
  *
  * Never called automatically: only from pullFloorSheetAction, when someone
- * presses the button. Nothing else in this file reads a cell.
+ * presses the button.
  */
 export async function pullFloorSheetStages(
   editionId: string,
@@ -583,23 +526,33 @@ export async function pullFloorSheetStages(
   const sheetId = edition ? await savedFloorSheet(db, edition) : null;
   if (!sheetId) return { updated: 0, skipped: 0 };
 
+  const current = new Map(
+    (
+      await pages<{ id: string; stage: Stage }>((from, to) =>
+        db.from('bookings').select('id, stage').eq('edition_id', editionId).is('cancelled_at', null).order('id').range(from, to),
+      )
+    ).map((b) => [b.id, b.stage]),
+  );
+
   const tabs = await listTabs(sheetId);
   let updated = 0;
   let skipped = 0;
 
   for (const tab of tabs) {
+    if (tab.title === ALL_TAB) continue;
     const rows = await readTab(sheetId, tab.title);
     for (const row of rows) {
-      for (const startCol of [0, BLOCK_COLS + 1]) {
-        const bookingId = row[startCol + ID_COL];
-        const stageLabel = row[startCol + STAGE_COL];
-        if (!bookingId || !stageLabel) continue;
+      for (const startCol of BLOCKS) {
+        const bookingId = row[startCol + KEY_COL];
+        const label = row[startCol + STATUS_COL];
+        if (!bookingId || !label || !current.has(bookingId) || label === GAP) continue;
 
-        const stage = LABEL_TO_STAGE.get(stageLabel);
+        const stage = LABEL_TO_STAGE.get(label);
         if (!stage) {
           skipped++;
           continue;
         }
+        if (current.get(bookingId) === stage) continue;
 
         const { error } = await db.rpc('advance_stage', {
           p_booking: bookingId,
@@ -614,50 +567,4 @@ export async function pullFloorSheetStages(
   }
 
   return { updated, skipped };
-}
-
-/**
- * Syncs in flight, per edition, on this server instance. A rebuild is a
- * dozen Google calls; two bookings seconds apart used to start two rebuilds
- * that raced each other over the same tabs (both claiming the spare tab,
- * one deleting what the other had just written). Now a second request that
- * arrives while one is running only leaves a note, and the running one goes
- * round once more when it finishes — so the sheet ends up reflecting the
- * latest state, with at most two rebuilds for any burst.
- */
-const inFlight = new Map<string, { again: boolean }>();
-
-async function syncCoalesced(editionId: string): Promise<void> {
-  const running = inFlight.get(editionId);
-  if (running) {
-    running.again = true;
-    return;
-  }
-  const state = { again: false };
-  inFlight.set(editionId, state);
-  try {
-    do {
-      state.again = false;
-      await syncFloorSheet(editionId);
-    } while (state.again);
-  } finally {
-    inFlight.delete(editionId);
-  }
-}
-
-/**
- * Fire-and-forget, after the response has gone out — same pattern as
- * kickEmailDelivery. A Google hiccup (not connected yet, a revoked token,
- * a rate limit) must never fail the booking action that triggered it; it is
- * logged and the next change tries again.
- */
-export function kickFloorSheetSync(editionId: string): void {
-  after(async () => {
-    try {
-      await syncCoalesced(editionId);
-    } catch (error) {
-      if (error instanceof GoogleNotConnectedError) return;
-      console.error('[interviews/floorSheet] sync failed', error);
-    }
-  });
 }

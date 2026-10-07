@@ -1,4 +1,5 @@
 import 'server-only';
+import { createHash } from 'node:crypto';
 import { getAccessToken } from './auth';
 
 /**
@@ -119,6 +120,39 @@ export async function addTab(spreadsheetId: string, title: string): Promise<numb
   return data.replies[0].addSheet.properties.sheetId as number;
 }
 
+/**
+ * The tab named `label` (a day, "9/19"): reuses one already named that,
+ * otherwise claims the spreadsheet's leftover default tab (its very first
+ * sync), otherwise adds a fresh one. `claimed` tracks which existing tabs
+ * this run has already spoken for, so two days never fight over the same
+ * unclaimed default.
+ */
+export async function ensureNamedTab(
+  spreadsheetId: string,
+  tabs: SheetTab[],
+  claimed: Set<number>,
+  label: string,
+): Promise<number> {
+  const exact = tabs.find((t) => t.title === label);
+  if (exact) {
+    claimed.add(exact.sheetId);
+    return exact.sheetId;
+  }
+
+  const spare = tabs.find((t) => !claimed.has(t.sheetId));
+  if (spare) {
+    await renameTab(spreadsheetId, spare.sheetId, label);
+    spare.title = label;
+    claimed.add(spare.sheetId);
+    return spare.sheetId;
+  }
+
+  const sheetId = await addTab(spreadsheetId, label);
+  tabs.push({ sheetId, title: label });
+  claimed.add(sheetId);
+  return sheetId;
+}
+
 /** Removes any tab not in `keepIds` — a day whose sessions were deleted entirely. */
 export async function deleteOtherTabs(spreadsheetId: string, keepIds: Set<number>): Promise<void> {
   const tabs = await listTabs(spreadsheetId);
@@ -203,6 +237,16 @@ export async function writeTab(
             fields: 'userEnteredFormat',
           },
         },
+        // A dropdown with no rule clears it; a column hidden by an older
+        // layout would otherwise hide whatever the new layout puts there.
+        { setDataValidation: { range: { sheetId, startRowIndex: 0, endRowIndex: 1000, startColumnIndex: 0, endColumnIndex: 26 } } },
+        {
+          updateDimensionProperties: {
+            range: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 26 },
+            properties: { hiddenByUser: false },
+            fields: 'hiddenByUser',
+          },
+        },
       ],
     }),
   });
@@ -218,6 +262,38 @@ export async function writeTab(
     method: 'POST',
     body: JSON.stringify({ requests: formatRequests }),
   });
+}
+
+/**
+ * What this server instance last wrote to each sheet, as a hash, so an
+ * automatic sync can skip a sheet whose content has not changed. Every
+ * booking change re-syncs every sheet of the edition, and the one Google
+ * account they all share has a write quota of about sixty requests a
+ * minute; most of those syncs change one company's sheet and leave the rest
+ * as they were.
+ *
+ * Per instance and forgotten after ten minutes, so a sheet written by
+ * another instance, or edited by hand, is at most ten minutes from being
+ * rewritten. "Sync now" never consults it.
+ */
+const lastWritten = new Map<string, { hash: string; at: number }>();
+const REMEMBER_MS = 10 * 60 * 1000;
+
+function hashOf(content: unknown): string {
+  return createHash('sha1').update(JSON.stringify(content)).digest('hex');
+}
+
+export function writtenAlready(key: string, content: unknown): boolean {
+  const seen = lastWritten.get(key);
+  return Boolean(seen && Date.now() - seen.at < REMEMBER_MS && seen.hash === hashOf(content));
+}
+
+export function rememberWritten(key: string, content: unknown): void {
+  lastWritten.set(key, { hash: hashOf(content), at: Date.now() });
+}
+
+export function forgetWritten(key: string): void {
+  lastWritten.delete(key);
 }
 
 /**

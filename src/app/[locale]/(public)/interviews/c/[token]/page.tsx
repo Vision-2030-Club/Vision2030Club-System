@@ -23,10 +23,10 @@ export default async function CompanyPage({
   searchParams,
 }: {
   params: Promise<{ locale: string; token: string }>;
-  searchParams: Promise<{ day?: string }>;
+  searchParams: Promise<{ day?: string; open?: string }>;
 }) {
   const { locale, token } = await params;
-  const { day } = await searchParams;
+  const { day, open } = await searchParams;
   setRequestLocale(locale);
   if (!isToken(token) || !isInterviewsConfigured()) notFound();
 
@@ -142,6 +142,7 @@ export default async function CompanyPage({
         rows={rows}
         profiles={profiles}
         feedback={feedbackState}
+        initialOpen={open && rows.some((r) => r.booking_id === open) ? open : null}
         ratingLabels={(settings?.rating_labels ?? []).map((l) => ({ key: l.key, label: locale === 'ar' ? l.ar : l.en }))}
       />
     </div>

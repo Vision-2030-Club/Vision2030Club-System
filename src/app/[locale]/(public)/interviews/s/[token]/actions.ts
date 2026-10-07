@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { fail, fromPostgrest, ok, requiredText, text, type ActionResult } from '@/lib/actions';
 import { kickEmailDelivery } from '@/lib/interviews/email';
-import { kickFloorSheetSync } from '@/lib/interviews/floorSheet';
+import { kickSheetsSync } from '@/lib/interviews/sheetsSync';
 import { isToken } from '@/lib/interviews/tokens';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 
@@ -37,7 +37,7 @@ export async function bookAction(_previous: ActionResult, formData: FormData): P
 
   kickEmailDelivery();
   const editionId = await editionIdFor(db, token);
-  if (editionId) kickFloorSheetSync(editionId);
+  if (editionId) kickSheetsSync(editionId);
   revalidatePath(page(locale, token));
   return ok('created');
 }
@@ -57,7 +57,7 @@ export async function moveAction(_previous: ActionResult, formData: FormData): P
 
   kickEmailDelivery();
   const editionId = await editionIdFor(db, token);
-  if (editionId) kickFloorSheetSync(editionId);
+  if (editionId) kickSheetsSync(editionId);
   revalidatePath(page(locale, token));
   return ok();
 }
@@ -77,7 +77,7 @@ export async function cancelAction(_previous: ActionResult, formData: FormData):
 
   kickEmailDelivery();
   const editionId = await editionIdFor(db, token);
-  if (editionId) kickFloorSheetSync(editionId);
+  if (editionId) kickSheetsSync(editionId);
   revalidatePath(page(locale, token));
   return ok();
 }

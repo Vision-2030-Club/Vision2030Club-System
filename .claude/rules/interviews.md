@@ -29,7 +29,8 @@ short:
   cancelled with a flag, and every change is logged with who made it.
 - Anything written to the floor Google Sheet or a public page carries
   personal data. The sheet is shared by name only; never grant "anyone with
-  the link". Signed CV URLs are short-lived except in the sheet.
+  the link". Signed CV URLs are short-lived; the sheets link CVs through
+  `/api/interviews/cv`, which checks who is asking each time.
 - Fire-and-forget work (emails, sheet sync) goes through `after()` and must
   never fail the action that triggered it.
 - Booking rules (one slot per person, no double booking, the edition's

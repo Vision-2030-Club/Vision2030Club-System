@@ -6,6 +6,7 @@ import { Disclosure } from '@/components/Disclosure';
 import { Card, EmptyState, Input, Label, Select, Textarea } from '@/components/ui';
 import { localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
+import { companySheets, sheetKey } from '@/lib/interviews/companySheets';
 import { siteUrl } from '@/lib/interviews/email';
 import { roomLinks } from '@/lib/interviews/roomLinks';
 import {
@@ -27,6 +28,7 @@ import {
   renameRoomAction,
   rotateCompanyTokenAction,
   setRoomDeletedAction,
+  syncCompanySheetAction,
   unacceptPhoneAction,
 } from '../actions';
 
@@ -85,12 +87,24 @@ export default async function InterviewsCompaniesPage({
     const roomId = roomIdByCompany.get(company.id);
     return roomId ? roomById.get(roomId) : undefined;
   };
+  // A company can have more than one room (STC in Room 1 and Room 2); each
+  // gets its own Google Sheet (companySheets.ts).
+  const roomsFor = (company: Company): Room[] => [
+    ...new Map(
+      sessions
+        .filter((s) => s.company_id === company.id)
+        .map((s) => roomById.get(s.room_id))
+        .filter((r): r is Room => Boolean(r?.is_active))
+        .map((r) => [r.id, r]),
+    ).values(),
+  ];
 
   const manage = can.manage(role);
   const decide = can.decide(role);
   // Each room's public link (roomLinks.ts, kept in the edition's settings);
   // a candidate_token from 0005, where that migration ran, as a fallback.
   const links = roomLinks(settings);
+  const sheets = companySheets(settings);
   const candidateLinkFor = (company: Company) => {
     const token = links[company.id] ?? company.candidate_token;
     return token ? `${siteUrl()}/${locale}/interviews/room/${token}` : null;
@@ -157,6 +171,8 @@ export default async function InterviewsCompaniesPage({
           {activeCompanies.map((company) => {
             const c = counters.get(company.id);
             const room = roomFor(company);
+            const companyRooms = roomsFor(company);
+            const roomSheets = companyRooms.map((r) => ({ room: r, sheet: sheets[sheetKey(company.id, r.id)] }));
             return (
               <Card key={company.id}>
                 <div className="flex flex-wrap items-start gap-3">
@@ -173,7 +189,9 @@ export default async function InterviewsCompaniesPage({
                     />
                   ) : null}
                   <div className="min-w-0 flex-1">
-                    <span className="font-semibold">{room?.name ?? localized(company, 'name', locale)}</span>
+                    <span className="font-semibold">
+                      {companyRooms.length ? companyRooms.map((r) => r.name).join(' · ') : localized(company, 'name', locale)}
+                    </span>
                     <p className="text-sm text-ink-muted">{localized(company, 'name', locale)}</p>
                     <p className="mt-1 text-xs text-ink-muted">
                       {t('decision.accepted')}: <span className="ltr-nums">{c?.accepted ?? 0}</span> ·{' '}
@@ -256,6 +274,48 @@ export default async function InterviewsCompaniesPage({
                             <input type="hidden" name="project_id" value={id} />
                             <input type="hidden" name="company_id" value={company.id} />
                           </ConfirmForm>
+                        </div>
+                      </Disclosure>
+                    ) : null}
+
+                    {manage ? (
+                      <Disclosure label={t('companies.sheet')}>
+                        <div className="space-y-3">
+                          <p className="text-xs text-ink-muted">{t('companies.sheetHint')}</p>
+                          {roomSheets.length ? (
+                            <ul className="space-y-1">
+                              {roomSheets.map(({ room: r, sheet }) => (
+                                <li key={r.id} className="text-sm">
+                                  <span className="font-medium">{r.name}</span>
+                                  {' · '}
+                                  {sheet ? (
+                                    <a
+                                      href={sheet.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-medium text-brand-600 hover:underline"
+                                    >
+                                      {t('companies.sheetOpen')}
+                                    </a>
+                                  ) : (
+                                    <span className="text-ink-muted">{t('companies.sheetNone')}</span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-sm text-ink-muted">{t('companies.sheetNoRooms')}</p>
+                          )}
+                          <ActionForm
+                            action={syncCompanySheetAction}
+                            submitLabel={roomSheets.length > 0 && roomSheets.every(({ sheet }) => sheet) ? t('companies.sheetSync') : t('companies.sheetCreate')}
+                            variant="secondary"
+                            className="space-y-2"
+                          >
+                            <input type="hidden" name="locale" value={locale} />
+                            <input type="hidden" name="project_id" value={id} />
+                            <input type="hidden" name="company_id" value={company.id} />
+                          </ActionForm>
                         </div>
                       </Disclosure>
                     ) : null}

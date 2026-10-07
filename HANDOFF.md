@@ -1103,7 +1103,7 @@ apply form → HR selection → personal link flow decided on 2026-09-16:
   room's whole day, taken times greyed. `rooms(edition_id, name)` is no
   longer unique (0007).
 - **The floor sheet (0006).** One Google Sheet per edition, rebuilt after
-  every booking/stage change (`kickFloorSheetSync`, fire-and-forget) and on
+  every booking/stage change (`kickSheetsSync` since 2026-10-05, fire-and-forget) and on
   *Sync now* in Settings; one tab per day, two rooms per row, a hidden
   booking-id column. Its Status column is the one thing read BACK, and only
   when someone presses *Pull from Sheet*. Needs the club's Google account
@@ -1297,6 +1297,98 @@ under Admin → Google (any account; the sheets belong to it) and need the
 Google Sheets API and Google Drive API enabled in that Google Cloud project
 as well as the Calendar API. Both have a **Sync now** button, which shows
 Google's error if one comes back; the automatic syncs only log it.
+
+### More in the Google Sheets: company sheets, full answers, All bookings (2026-10-05)
+
+No migration; everything new is kept in the edition's settings.
+
+- **Both layouts follow the club's 5th-edition templates** ("Rooms" and
+  "Company Template", the .xlsx files the organizers made). The colours,
+  merges, dropdowns and widths are Sheets API requests built in
+  `floorSheet.ts` / `companySheets.ts` from the helpers at the bottom of
+  `src/lib/interviews/sheetFormat.ts`. If the template changes, change those;
+  there is no template file read at run time.
+- **Floor sheet, per the Rooms template.** One tab per day; a teal
+  `DAY 1 · OCTOBER 12` banner; rooms two side by side, each with a teal
+  title bar, the mint / lavender / lime header (Time, Company, Student Name,
+  Student Phone Number, Status, Notes), one row per slot of the room's
+  session, and a ROOM SUMMARY (total, booked, available) under it. **The CV
+  column is gone**, because the template has none, and with it the 30-day
+  signed CV URLs (`signCvLong` is deleted). Status uses the template's words:
+  Arrived, In-interview, Completed, Late (= no-show), Gap (a slot closed for
+  a break), blank for booked-but-not-arrived. *Pull from Sheet* reads the
+  first four back, and only calls `advance_stage` for rows that differ from
+  the database. **Notes are the organizers'**: each rewrite reads the tab
+  first and puts every note back on its row, matched by the hidden eighth
+  column (booking id, or `slot:<id>` for a free slot). A note typed in the
+  second or two between that read and the write is lost. **A room can hold
+  two companies in one day** (STC 2–5, PwC 5–8: two sessions in one room,
+  made on the Schedule tab; the Rooms tab's *Add room* always makes a new
+  room). Their slots run on in time order and each row names the company of
+  its own slot.
+- **Company sheets** (`src/lib/interviews/companySheets.ts`), per the Company
+  template. **One spreadsheet per company AND room**: STC in Room 1 and Room
+  2 has two files. Each file has one tab per day and shows only that
+  company's own hours in that room, so when PwC takes Room 1 after STC, each
+  sees only its own students. Created when a manager presses *Create Google
+  Sheets* in the company's card on the Rooms tab (one file per room the
+  company has a session in); from then on the company is opted in, and a
+  room it is given later gets its file on the next sync — HR still has to
+  share that new file. The edition's Arabic name on the banner, the
+  COMPANY / DATE / ROOM band, then a row per slot: Time, Interviewer, Student
+  Name, **Phone Number** (the club decided on 2026-10-05 that companies get
+  it, as the template shows), Student CV, Feedback Link, Status. Status is the
+  system's (Interview Done / No Show / In-progress, from the floor) and is
+  never read back; Interviewer is the company's and is carried across
+  rewrites like the floor's Notes (keyed by slot). Nothing is shared
+  automatically; HR opens it from the club's Google account and shares it by
+  name, and link sharing is revoked on every rebuild. The CV link is the
+  interviewer page's own (`/api/interviews/cv?token=<company token>&booking=…`)
+  and the Feedback link opens `/interviews/c/<token>?day=…&open=<booking>`,
+  which the company page now honours by opening that student's feedback form.
+  Both behave like the interviewer link: open to whoever sees the sheet when
+  the company has no PIN, only after the PIN when it has one. A new
+  interviewer link changes both, and the sync that follows rewrites them. Kept
+  in settings as `company_sheets` (`{ "<company id>:<room id>": { id, url } }`).
+- **Registrations sheet, wider.** Every question the form can ask now has a
+  column (college, GPA, English, club member, why first choice), plus
+  **Accepted**, **Rejected** and **Booked**. The column of a question the
+  edition does not ask is hidden unless somebody answered it. Because those
+  three columns change after the row was appended, the sheet is now also
+  rewritten after HR decisions (Accept/Reject, the accepted-phones list) and
+  after bookings, which also folds "Updated" duplicates away.
+- **Floor sheet, "All bookings" tab.** After the day tabs: every live booking
+  on one flat list with arrived, started and finished times, booked at and
+  by whom. Same rooms as the day tabs. *Pull from Sheet* skips this tab; only
+  the day tabs' Status column is read back.
+- **One background sync for all of them** (`src/lib/interviews/sheetsSync.ts`,
+  `kickSheetsSync`). It replaces `kickFloorSheetSync` at every call site and
+  keeps its coalescing (at most two rebuilds per burst, per instance). It
+  runs floor, then company sheets, then registrations, each on its own so one
+  broken sheet does not stop the others.
+
+**Quota is the thing to watch.** Everything shares one Google account, and
+Sheets allows roughly sixty write requests a minute per account. A booking
+already cost the floor sheet about four writes and one read (the Notes) per
+day tab; it now adds about
+four for the All bookings tab, four for the affected company's sheet, and four
+for the registrations sheet when its Booked column changes. To keep that down,
+the company and registrations sheets hash what they would write and skip
+Google entirely when it matches what this instance last wrote
+(`writtenAlready` / `rememberWritten` in `src/lib/google/sheets.ts`). The memory
+is per instance and lasts ten minutes, so a hand edit or another instance's
+write can survive up to ten minutes; *Sync now* never skips. If the logs show
+`429` / "Quota exceeded" during a booking rush, the first fix is to stop
+rebuilding the registrations sheet on bookings (drop it from `syncAll`) and
+rely on *Sync now*.
+
+**Not exercised against Google yet**, like the rest of the Google code. What
+was checked: the real sync code was run against a fake Google and a fake
+interviews database (invented data), its requests replayed into a picture
+and compared with both templates, and the behaviour confirmed: Pull applies
+only the changed Status, Notes and Interviewer survive a rewrite, and an
+unchanged company sheet costs no Google calls. What a fake cannot show is
+Google refusing a request; expect to fix something on the first real sync.
 
 ### Things easy to break
 

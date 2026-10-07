@@ -14,7 +14,9 @@ import {
 } from '@/lib/interviews/access';
 import { newPin, newToken } from '@/lib/interviews/tokens';
 import { deliverPendingEmails, kickEmailDelivery } from '@/lib/interviews/email';
-import { kickFloorSheetSync, pullFloorSheetStages, syncFloorSheet } from '@/lib/interviews/floorSheet';
+import { pullFloorSheetStages, syncFloorSheet } from '@/lib/interviews/floorSheet';
+import { kickSheetsSync } from '@/lib/interviews/sheetsSync';
+import { syncCompanySheet } from '@/lib/interviews/companySheets';
 import { takeExport } from '@/lib/interviews/export';
 import { removeCv, uploadCv } from '@/lib/interviews/cv';
 import { kickRegistrationAppend, syncRegistrationSheet } from '@/lib/interviews/registrationSheet';
@@ -172,6 +174,24 @@ export async function syncRegistrationSheetAction(
 
   try {
     await syncRegistrationSheet(g.access.edition.id);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Sync failed.');
+  }
+
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
+/** Rooms tab → "Create Google Sheet" / "Sync now": one company's own sheet (companySheets.ts). */
+export async function syncCompanySheetAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  try {
+    await syncCompanySheet(g.access.edition.id, requiredText(formData, 'company_id'));
   } catch (error) {
     return fail(error instanceof Error ? error.message : 'Sync failed.');
   }
@@ -507,6 +527,8 @@ export async function updateApplyFieldsAction(
   });
   if (error) return fromPostgrest(error);
 
+  // The registrations sheet hides the column of a question no longer asked.
+  kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
 }
@@ -789,6 +811,7 @@ export async function acceptPhonesAction(
     else if (error) return fromPostgrest(error);
   }
 
+  kickSheetsSync(editionId);
   revalidate(g.locale, g.projectId);
   if (notFound.length || notChosen.length) {
     const parts = [t('companies.phonesAccepted', { count: typed.length - notFound.length - notChosen.length })];
@@ -819,6 +842,7 @@ export async function unacceptPhoneAction(formData: FormData): Promise<void> {
     p_actor: g.access.actor,
   });
 
+  kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
 }
 
@@ -837,6 +861,8 @@ export async function rotateCompanyTokenAction(
   });
   if (error) return fromPostgrest(error);
 
+  // The company's sheet links its CVs through the interviewer token.
+  kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
 }
@@ -1003,6 +1029,7 @@ export async function decideAction(
   // The first acceptance queued the student's link; send it now, not at the
   // next sweep.
   kickEmailDelivery();
+  kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
 }
@@ -1033,7 +1060,7 @@ export async function stageAction(input: {
   });
   if (error) return fromPostgrest(error);
 
-  if (access.edition) kickFloorSheetSync(access.edition.id);
+  if (access.edition) kickSheetsSync(access.edition.id);
   revalidate(input.locale, input.projectId);
   return ok();
 }
@@ -1058,7 +1085,7 @@ export async function staffBookAction(
   if (error) return fromPostgrest(error);
 
   kickEmailDelivery();
-  kickFloorSheetSync(g.access.edition.id);
+  kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok('created');
 }
@@ -1079,7 +1106,7 @@ export async function staffMoveAction(
   if (error) return fromPostgrest(error);
 
   kickEmailDelivery();
-  kickFloorSheetSync(g.access.edition.id);
+  kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
 }
@@ -1100,7 +1127,7 @@ export async function staffCancelAction(
   if (error) return fromPostgrest(error);
 
   kickEmailDelivery();
-  kickFloorSheetSync(g.access.edition.id);
+  kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
 }
