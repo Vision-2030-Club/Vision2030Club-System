@@ -12,6 +12,14 @@ export type PickableSlot = {
   taken: boolean;
 };
 
+/** One day in one room: the picker's heading over its times. */
+export type SlotGroup = {
+  key: string;
+  day: string;
+  room: string;
+  slots: PickableSlot[];
+};
+
 function useRefusal() {
   const t = useTranslations('interviews');
   return (state: ActionResult) =>
@@ -25,23 +33,23 @@ function useRefusal() {
 /**
  * One company's schedule, every slot its own rectangle — open ones
  * pick-able, taken ones shown but greyed and inert, so the day's shape is
- * visible instead of just its gaps. No day tabs: a room is one day's worth
- * of slots (a separate room is made per day), so there is only ever one
- * day here to show.
+ * visible instead of just its gaps. Each day-and-room gets its own heading,
+ * so a company with rooms on several days never shows two identical-looking
+ * times side by side.
  */
 export function SlotPicker({
   token,
   locale,
   companyId,
   bookingId,
-  slots,
+  groups,
   mode,
 }: {
   token: string;
   locale: string;
   companyId: string;
   bookingId?: string;
-  slots: PickableSlot[];
+  groups: SlotGroup[];
   mode: 'book' | 'move';
 }) {
   const t = useTranslations('interviews');
@@ -73,30 +81,37 @@ export function SlotPicker({
 
       <p className="text-sm font-medium">{mode === 'book' ? t('student.chooseTime') : t('student.chooseNewTime')}</p>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {slots.map((slot) => {
-          const selected = selectedSlotId === slot.id;
-          return (
-            <button
-              key={slot.id}
-              type="button"
-              disabled={slot.taken}
-              onClick={() => setSelectedSlotId(slot.id)}
-              aria-pressed={selected}
-              className={cx(
-                'ltr-nums rounded-lg border px-3 py-2.5 text-center text-sm font-medium transition-colors',
-                slot.taken
-                  ? 'cursor-not-allowed border-line/60 bg-surface-muted text-ink-muted/40 line-through'
-                  : selected
-                    ? 'border-brand-600 bg-brand-600 text-white'
-                    : 'border-line text-ink hover:border-brand-400 hover:bg-brand-50',
-              )}
-            >
-              {slot.timeLabel}
-            </button>
-          );
-        })}
-      </div>
+      {groups.map((group) => (
+        <div key={group.key} className="space-y-2">
+          <p className="text-xs font-semibold text-ink-muted">
+            <span className="ltr-nums">{group.day}</span> · {group.room}
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {group.slots.map((slot) => {
+              const selected = selectedSlotId === slot.id;
+              return (
+                <button
+                  key={slot.id}
+                  type="button"
+                  disabled={slot.taken}
+                  onClick={() => setSelectedSlotId(slot.id)}
+                  aria-pressed={selected}
+                  className={cx(
+                    'ltr-nums rounded-lg border px-3 py-2.5 text-center text-sm font-medium transition-colors',
+                    slot.taken
+                      ? 'cursor-not-allowed border-line/60 bg-surface-muted text-ink-muted/40 line-through'
+                      : selected
+                        ? 'border-brand-600 bg-brand-600 text-white'
+                        : 'border-line text-ink hover:border-brand-400 hover:bg-brand-50',
+                  )}
+                >
+                  {slot.timeLabel}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 

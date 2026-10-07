@@ -34,5 +34,7 @@ short:
 - Fire-and-forget work (emails, sheet sync) goes through `after()` and must
   never fail the action that triggered it.
 - Booking rules (one slot per person, no double booking, the edition's
-  window, the cutoff, the past-time rule for active editions) live in SQL,
-  not in the page. Do not re-implement or bypass them in TypeScript.
+  window, the cutoff) and slot rules (20-minute slots, prayer breaks) live
+  in SQL, not in the page. Do not re-implement or bypass them in
+  TypeScript; `slotRules.ts` only mirrors the slot rules for display. A
+  past time can be booked on purpose (0012).

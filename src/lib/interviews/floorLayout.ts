@@ -10,6 +10,8 @@
  * Settings form and the floor read the same rules.
  */
 
+import { nextSlotStart } from './slotRules';
+
 export type FloorLayout = {
   /** First and last event day, `YYYY-MM-DD`, inclusive. */
   from_day: string;
@@ -99,10 +101,15 @@ function wallClock(day: string, minute: number, zone: string): string {
   return new Date(naive.getTime() - zoneOffsetMs(naive, zone)).toISOString();
 }
 
-/** The start of every grid row on `day`: `start`, then every `slot_minutes`, before `end`. */
+/**
+ * The start of every grid row on `day`: `start`, then every `slot_minutes`,
+ * before `end`, picking up after each prayer break the way the database
+ * makes slots (slotRules.ts), so empty rows line up with assigned ones.
+ */
 export function gridTimes(layout: FloorLayout, day: string, zone: string): string[] {
   const out: string[] = [];
-  for (let m = minutes(layout.start); m + layout.slot_minutes <= minutes(layout.end); m += layout.slot_minutes) {
+  const len = layout.slot_minutes;
+  for (let m = nextSlotStart(minutes(layout.start), len); m + len <= minutes(layout.end); m = nextSlotStart(m + len, len)) {
     out.push(wallClock(day, m, zone));
   }
   return out;

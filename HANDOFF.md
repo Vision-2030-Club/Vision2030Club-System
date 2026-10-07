@@ -1128,6 +1128,7 @@ apply form → HR selection → personal link flow decided on 2026-09-16:
 - The past-time rule is back for **active** editions (`app.refuse_past_slot`);
   a **draft** edition ignores the clock so rooms can still be tried out
   against today's date. Set the edition *Active* for the event.
+  **Dropped again by 0012** (2026-10-07): any time can be booked.
 - The sheet is no longer shared "anyone with the link" (it holds names,
   phones and 30-day CV links). `revokeLinkSharing` runs on every sync and
   also closes sheets created before this; share it by name from the club's
@@ -1487,7 +1488,7 @@ them together.
 - **Rooms tab** (`interviews/rooms/page.tsx`, new): one card per room, with
   its name and **location** (`rooms.note`: building, floor…). *Assign a
   company* on a room's card creates a session (`createSessionAction`) for a
-  company, a day, hours and a slot length. One room can host several
+  company, a day and hours (20-minute slots since 0012). One room can host several
   companies on one day at different hours. The card lists who is assigned
   when, with *Remove* (`deleteSessionAction`, refused while students are
   booked). Rooms are retired, never deleted.
@@ -1534,6 +1535,50 @@ empty clears it.
   11:00 UTC, and a summer-time zone converts too); bad dates, times and
   lengths are refused, as are more than 14 days; and the fake-Google
   harness confirmed empty rooms, half-assigned rooms and Notes on empty rows.
+
+### 20-minute slots, prayer breaks, past times bookable (2026-10-07)
+
+`supabase/interviews/migrations/0012_fixed_slots_prayer_breaks.sql`,
+**not yet applied**: the project lead pastes it into the interviews
+project's SQL editor (or runs `npm run db:push -- --target interviews`)
+before the event. It can be run twice.
+
+- **Every slot is 20 minutes.** The slot-length picker is gone from the
+  Rooms and Schedule tabs, and `create_session` makes 20-minute slots
+  (`app.slot_minutes()`) whatever it is sent. Mixing a 20- and a 30-minute
+  assignment for one company filled the student's picker with overlapping
+  times. Sessions made before keep their own length; `extend_session` grows
+  them at it.
+- **Prayer breaks: 15:00–15:30 and 17:30–18:00** on the edition's clock
+  (`app.prayer_breaks`). No slot is made across one; slots run up to the
+  break and pick up when it ends (14:00 … 14:40, 15:30 … 17:10, 18:00 …).
+  Because of that ten-minute shift an assignment's end no longer has to be
+  a whole number of slots: slots are made while one fits and the session is
+  trimmed to its last slot. Hours with no room for any slot are refused
+  (`no_slot_fits`). The same times are in `src/lib/interviews/slotRules.ts`,
+  which the floor grid (`gridTimes`) uses so its empty rows line up;
+  **change both together**, with a new migration for the SQL side.
+- **Existing slots inside a break are closed** (`is_closed`) by the
+  migration, unless a student holds one; those stay for HR to move. Nothing
+  is deleted. A company already assigned on 30-minute slots keeps them:
+  *Remove* that assignment on the Rooms tab and assign it again.
+- **A past time can be booked** in every edition: `book_slot` and
+  `move_booking` no longer call `app.refuse_past_slot` (dropped). The team
+  books on students' behalf and the refusal only got in the way. The
+  change-cutoff (`within_cutoff`) still applies to moving a booking.
+- **The student's picker groups times under a date and room heading**, so a
+  company with rooms on several days no longer shows two identical-looking
+  times side by side.
+- **Before the migration is applied** nothing breaks: the app sends 20
+  minutes, which the old `create_session` accepts whenever the hours are a
+  whole number of 20-minute slots; breaks are not skipped and past times are
+  still refused until it runs.
+- **Checked** on an empty local Postgres 16 with 0001–0012 applied and
+  invented data: 14:00–17:00 makes seven slots ending 16:50; extending to
+  20:00 adds 16:50, 17:10, then 18:00–19:40; 15:00–15:30 alone is refused
+  and leaves no session behind; a slot whose time has passed books; a
+  30-minute slot at 17:30 is closed while a booked one at 15:00 is left;
+  re-running the file changes nothing more.
 
 ### A project opens in its component (2026-10-07)
 

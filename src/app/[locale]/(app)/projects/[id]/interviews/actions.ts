@@ -23,6 +23,7 @@ import { kickRegistrationAppend, syncRegistrationSheet } from '@/lib/interviews/
 import { APPLY_FIELDS, FIELD_LABELS, FIELD_MODES, resolveApplyFields, type FieldMode } from '@/lib/interviews/applyFields';
 import { applicationPayload } from '@/lib/interviews/applyPayload';
 import { layoutProblem, MAX_LAYOUT_DAYS, type FloorLayout } from '@/lib/interviews/floorLayout';
+import { SLOT_MINUTES } from '@/lib/interviews/slotRules';
 import { choosesFullCompany, fullCompanyIds } from '@/lib/interviews/fullCompanies';
 import { normalisePhone } from '@/lib/interviews/phone';
 import { saveRoomLink } from '@/lib/interviews/roomLinks';
@@ -771,7 +772,8 @@ export async function createSessionAction(
       day: requiredText(formData, 'day'),
       start_time: requiredText(formData, 'start_time'),
       end_time: requiredText(formData, 'end_time'),
-      slot_minutes: Number(requiredText(formData, 'slot_minutes')),
+      // The database makes 20-minute slots whatever it is sent (0012).
+      slot_minutes: SLOT_MINUTES,
     },
     p_actor: g.access.actor,
   });
