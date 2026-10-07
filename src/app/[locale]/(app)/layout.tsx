@@ -137,6 +137,7 @@ export default async function AppLayout({
         { href: `${base}/applicants`, label: tInterviews('tabs.applicants'), icon: 'members', show: can.decide(role) },
         { href: `${base}/register`, label: tInterviews('tabs.register'), icon: 'register', show: can.decide(role) },
         { href: `${base}/companies`, label: tInterviews('tabs.companies'), icon: 'company', show: role !== 'organizer' },
+        { href: `${base}/rooms`, label: tInterviews('tabs.rooms'), icon: 'rooms', show: role !== 'organizer' },
         { href: `${base}/schedule`, label: tInterviews('tabs.schedule'), icon: 'calendar', show: true },
         { href: `${base}/floor`, label: tInterviews('tabs.floor'), icon: 'stage', show: true },
         { href: `${base}/bookings`, label: tInterviews('tabs.bookings'), icon: 'tasks', show: can.manage(role) },

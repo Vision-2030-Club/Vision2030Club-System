@@ -36,8 +36,8 @@ export default async function RoomPage({
   const company = data as Company | null;
   const joined = (session as { rooms: { name: string } | { name: string }[] | null } | null)?.rooms;
   const roomName = (Array.isArray(joined) ? joined[0] : joined)?.name ?? null;
-  // is_hidden doubles as "deleted" for a room (setRoomDeletedAction) — a
-  // deleted room's link stops working, even though its data is untouched.
+  // is_hidden is a removed company (setCompanyHiddenAction): its link
+  // stops working, even though its data is untouched.
   if (!company || company.is_hidden) notFound();
 
   return (

@@ -57,7 +57,7 @@ import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/inter
  * read off the sheet before each rewrite and put back on the same row.
  *
  * One TAB per day, named by its actual date ("9/19", "9/20", …). A day's
- * rooms come from its sessions (createRoomAction makes one per room per
+ * rooms come from its sessions (a company assigned to a room for a
  * day), so adding a room for a new day adds that day's tab. After the day
  * tabs, one "All bookings" tab lists every booking flat, for filtering and
  * counting (buildAllBookings).

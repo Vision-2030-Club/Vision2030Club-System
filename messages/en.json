@@ -635,14 +635,15 @@
       "overview": "Overview",
       "applicants": "Applicants",
       "register": "Register",
-      "companies": "Rooms",
+      "companies": "Companies",
       "schedule": "Schedule",
       "floor": "Floor",
       "bookings": "Bookings",
       "people": "People",
       "settings": "Settings",
       "log": "Log",
-      "messages": "Messages"
+      "messages": "Messages",
+      "rooms": "Rooms"
     },
     "status": {
       "draft": "Draft",
@@ -991,7 +992,7 @@
       "another": "Register another student",
       "publicLink": "Apply link",
       "manage": "Companies on the form",
-      "manageHint": "Students choose from these. A full company stays visible, blurred, but can no longer be chosen. Removing one hides it from the form and closes its room if it has one; nothing is erased and it can be restored.",
+      "manageHint": "Students choose from these. A full company stays visible, blurred, but can no longer be chosen. Removing one hides it from the form; nothing is erased and it can be restored.",
       "addCompany": "Add company",
       "logo": "Logo",
       "logoHint": "Any image. It is shrunk to a small square and saved with the company.",
@@ -1000,7 +1001,7 @@
       "markOpen": "Mark as open",
       "remove": "Remove",
       "removeTitle": "Remove this company?",
-      "removeBody": "It disappears from the form, and its room closes if it has one, but nothing is erased: the students who chose it, its bookings and its history stay as they are. You can restore it any time.",
+      "removeBody": "It disappears from the form and from the floor, but nothing is erased: its rooms, bookings and history stay, and it can be restored at the bottom of this page.",
       "restore": "Restore",
       "removedSection": "Removed companies ({count})",
       "manageOnApplicants": "The questions, the companies and the public link are on the Applicants tab."
@@ -1130,6 +1131,30 @@
       "notAccepted": "You have not been accepted for this company yet. Check back later, or contact the club.",
       "email": "Email",
       "emailHint": "The email you applied with."
+    },
+    "roomsTab": {
+      "add": "Add room",
+      "name": "Room name",
+      "location": "Location",
+      "locationHint": "Building, floor…",
+      "noLocation": "No location yet",
+      "empty": "No rooms yet. Add the rooms of the venue; companies are assigned to them later.",
+      "assignments": "Companies in this room",
+      "noAssignments": "No company assigned yet.",
+      "assign": "Assign a company",
+      "assignHint": "The company interviews here on this day between these hours; its time slots are made from them. Another company can have the same room at other hours.",
+      "needCompany": "Add companies first, on the",
+      "booked": "{booked}/{total} booked",
+      "unassign": "Remove",
+      "unassignTitle": "Remove this company from the room?",
+      "unassignBody": "Its time slots in this room on this day are removed. This is refused while students are booked in them: move or cancel them first.",
+      "retire": "Retire",
+      "bringBack": "Bring back",
+      "retiredSection": "Retired rooms ({count})"
+    },
+    "companiesTab": {
+      "noRoom": "No room yet — assign one on",
+      "movedHint": "Companies are now managed on their own tab: add them, edit them, mark them full, and find their links and Google Sheets there."
     }
   },
   "outreach": {

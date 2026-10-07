@@ -1324,8 +1324,8 @@ No migration; everything new is kept in the edition's settings.
   column (booking id, or `slot:<id>` for a free slot). A note typed in the
   second or two between that read and the write is lost. **A room can hold
   two companies in one day** (STC 2–5, PwC 5–8: two sessions in one room,
-  made on the Schedule tab; the Rooms tab's *Add room* always makes a new
-  room). Their slots run on in time order and each row names the company of
+  made on the Schedule tab, or since 2026-10-07 with *Assign a company* on
+  the room's card on the Rooms tab). Their slots run on in time order and each row names the company of
   its own slot.
 - **Company sheets** (`src/lib/interviews/companySheets.ts`), per the Company
   template. **One spreadsheet per company AND room**: STC in Room 1 and Room
@@ -1460,6 +1460,40 @@ Checked against the same fake Google as above with invented data:
 - a floor edit waiting when a rewrite starts is applied first;
 - a quiet minute reads no sheet;
 - Interviewer names survive.
+
+### Rooms and companies are separate (2026-10-07)
+
+The club lays out the venue before it knows which company goes where, so a
+room and a company are now made apart and joined later. The database
+always allowed it (`rooms` and `companies` have no link; a **session** is
+what puts a company in a room for a day and hours). Only the screens tied
+them together.
+
+- **Rooms tab** (`interviews/rooms/page.tsx`, new): one card per room, with
+  its name and **location** (`rooms.note`: building, floor…). *Assign a
+  company* on a room's card creates a session (`createSessionAction`) for a
+  company, a day, hours and a slot length. One room can host several
+  companies on one day at different hours. The card lists who is assigned
+  when, with *Remove* (`deleteSessionAction`, refused while students are
+  booked). Rooms are retired, never deleted.
+- **Companies tab** (`interviews/companies/page.tsx`, the URL the old Rooms
+  tab had): one card per company. It holds the company's add/edit form with
+  logo (moved here from the Applicants tab, which now links to it), Mark as
+  full, Remove, the candidate link, accepted phones, interviewer link and
+  PIN, and its Google Sheets. The card lists the rooms it was assigned to.
+- **Gone:** `createRoomAction` (room + company + session in one go, fixed
+  15-minute slots), `renameRoomAction` and `setRoomDeletedAction`. Those
+  two found "the company's room" through its first session, so with two
+  rooms they changed an arbitrary one, and removing a company also retired
+  a room. **Removing a company now hides only the company**
+  (`setCompanyHiddenAction`).
+- **Fixed:** *Retire* / *Bring back* on a room used to send an empty
+  location, and `upsert_room` erased the room's note. `upsertRoomAction`
+  now sends only the fields the form has.
+- Every room, company and assignment change, and closing a slot, now
+  re-syncs the Google Sheets (`kickSheetsSync`).
+- Rooms made by the old *Add room* keep working: they are ordinary rooms
+  and companies with a session between them.
 
 ### Things easy to break
 
