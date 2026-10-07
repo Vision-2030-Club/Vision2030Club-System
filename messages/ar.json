@@ -643,7 +643,8 @@
       "settings": "الإعدادات",
       "log": "السجل",
       "messages": "الرسائل",
-      "rooms": "الغرف"
+      "rooms": "الغرف",
+      "projectDetails": "تفاصيل المشروع"
     },
     "status": {
       "draft": "مسودة",

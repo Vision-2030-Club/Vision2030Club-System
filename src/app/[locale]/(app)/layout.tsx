@@ -145,6 +145,13 @@ export default async function AppLayout({
         { href: `${base}/settings`, label: tInterviews('tabs.settings'), icon: 'admin', show: can.manage(role) },
         { href: `${base}/log`, label: tInterviews('tabs.log'), icon: 'requests', show: can.manage(role) },
         { href: `${base}/messages`, label: tInterviews('tabs.messages'), icon: 'mail', show: can.manage(role) },
+        // A project opens straight into this component; managers still need its own page.
+        {
+          href: `/projects/${component.project_id}?details=1`,
+          label: tInterviews('tabs.projectDetails'),
+          icon: 'projects',
+          show: can.manage(role),
+        },
       ] satisfies NavItem[]
     ).filter((item) => item.show);
 
@@ -152,7 +159,8 @@ export default async function AppLayout({
       projectId: component.project_id,
       label,
       items,
-      backHref: can.manage(role) ? `/projects/${component.project_id}` : '/dashboard',
+      // Not the project page: opening it would land straight back here.
+      backHref: '/dashboard',
       logo: <InterviewsLogo name={label} />,
     };
   });

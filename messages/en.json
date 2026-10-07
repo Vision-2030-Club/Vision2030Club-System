@@ -643,7 +643,8 @@
       "settings": "Settings",
       "log": "Log",
       "messages": "Messages",
-      "rooms": "Rooms"
+      "rooms": "Rooms",
+      "projectDetails": "Project details"
     },
     "status": {
       "draft": "Draft",
