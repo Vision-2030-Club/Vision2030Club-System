@@ -56,7 +56,7 @@ export default async function LocaleLayout({
           (and the public interviews pages) wear the interviews palette; the
           shell keeps this attribute in step afterwards. Setting it here,
           before anything renders, is what stops a direct load of such a page
-          from painting teal and then fading to violet.
+          from painting teal and then fading to mint.
         */}
         <script
           dangerouslySetInnerHTML={{
