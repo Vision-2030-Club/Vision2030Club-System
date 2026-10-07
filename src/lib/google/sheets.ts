@@ -12,23 +12,39 @@ import { getAccessToken } from './auth';
 const SHEETS_API = 'https://sheets.googleapis.com/v4';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 
-async function googleFetch(base: string, path: string, init: RequestInit = {}) {
-  const token = await getAccessToken();
-  const response = await fetch(`${base}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      ...(init.headers ?? {}),
-    },
-  });
+/**
+ * How long to wait before each retry when Google says "too many requests"
+ * (429: the club account's per-minute quota, about sixty writes and sixty
+ * reads a minute). Sheets refills the quota every minute, so the waits add up
+ * to just over one. Only a sync waits: the Sync now buttons do too, and say
+ * Google's error if the minute still is not enough.
+ */
+const RETRY_WAITS_MS = [5_000, 20_000, 40_000];
 
-  const body = response.status === 204 ? null : await response.json().catch(() => null);
-  if (!response.ok) {
-    const message = body?.error?.message ?? `Google returned ${response.status}`;
-    throw new Error(message);
+async function googleFetch(base: string, path: string, init: RequestInit = {}) {
+  for (let attempt = 0; ; attempt++) {
+    const token = await getAccessToken();
+    const response = await fetch(`${base}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...(init.headers ?? {}),
+      },
+    });
+
+    const body = response.status === 204 ? null : await response.json().catch(() => null);
+    if (response.status === 429 && attempt < RETRY_WAITS_MS.length) {
+      const after = Number(response.headers.get('retry-after'));
+      await new Promise((resolve) => setTimeout(resolve, after > 0 ? after * 1000 : RETRY_WAITS_MS[attempt]));
+      continue;
+    }
+    if (!response.ok) {
+      const message = body?.error?.message ?? `Google returned ${response.status}`;
+      throw new Error(message);
+    }
+    return body;
   }
-  return body;
 }
 
 /** A range's sheet name, quoted the way the Sheets API needs it (spaces, etc). */
@@ -241,22 +257,17 @@ async function conditionalFormatCount(spreadsheetId: string, sheetId: number): P
  * Replaces one tab's whole content with `rows`, then applies `formatRequests`
  * — raw Sheets API batchUpdate requests (repeatCell, mergeCells,
  * addConditionalFormatRule, …) the caller already built, addressed to
- * `sheetId`. A full rewrite rather than a patch: a day's row count and
- * layout change constantly (a cancelled booking, a room added), and
- * computing a minimal diff would cost more than just resending everything —
- * this is at most a few hundred cells.
+ * `sheetId` — all in one write request. A full rewrite rather than a patch:
+ * a day's row count and layout change constantly (a cancelled booking, a
+ * room added), and computing a minimal diff would cost more than resending
+ * everything — this is at most a few hundred cells.
  *
- * Old merges, background/text formatting and conditional-format rules are
- * all cleared first: `values.clear` touches none of them, so a row that
- * carried a coral or navy fill in a previous sync (a room block that has
- * since shrunk, a layout that gained a title row and shifted everything
- * down) would otherwise keep that colour forever, bleeding into whatever
- * the new sync puts there. Re-adding a Stage colour rule on every sync
- * without clearing the last sync's copy would likewise just keep piling up
+ * Old values, merges, formatting, dropdowns, hidden columns and
+ * conditional-format rules are all cleared first, inside the same request:
+ * a row that carried a colour in a previous sync (a room block that has
+ * since shrunk) would otherwise keep it forever, and re-adding a Status
+ * colour rule on every sync without clearing the last one would pile up
  * duplicates.
- *
- * `USER_ENTERED` rather than `RAW` so a `=HYPERLINK(...)` cell (the CV
- * column) actually evaluates instead of showing as literal formula text.
  */
 export async function writeTab(
   spreadsheetId: string,
@@ -265,13 +276,9 @@ export async function writeTab(
   rows: string[][],
   formatRequests: object[] = [],
 ): Promise<void> {
-  const range = `${quoted(sheetTitle)}!A1:Z10000`;
-  await googleFetch(SHEETS_API, `/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}:clear`, {
-    method: 'POST',
-    body: JSON.stringify({}),
-  });
-
   const oldFormatCount = await conditionalFormatCount(spreadsheetId, sheetId);
+  // ONE write request for the whole tab: Google counts each request against
+  // the account's ~60 writes a minute, and this used to take four.
   await googleFetch(SHEETS_API, `/spreadsheets/${spreadsheetId}:batchUpdate`, {
     method: 'POST',
     body: JSON.stringify({
@@ -281,8 +288,8 @@ export async function writeTab(
         {
           repeatCell: {
             range: { sheetId, startRowIndex: 0, endRowIndex: 1000, startColumnIndex: 0, endColumnIndex: 26 },
-            cell: { userEnteredFormat: {} },
-            fields: 'userEnteredFormat',
+            cell: {},
+            fields: 'userEnteredValue,userEnteredFormat',
           },
         },
         // A dropdown with no rule clears it; a column hidden by an older
@@ -295,21 +302,30 @@ export async function writeTab(
             fields: 'hiddenByUser',
           },
         },
+        {
+          updateCells: {
+            start: { sheetId, rowIndex: 0, columnIndex: 0 },
+            rows: rows.map((row) => ({ values: row.map(cellValue) })),
+            fields: 'userEnteredValue',
+          },
+        },
+        ...formatRequests,
       ],
     }),
   });
+}
 
-  await googleFetch(
-    SHEETS_API,
-    `/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(`${quoted(sheetTitle)}!A1`)}?valueInputOption=USER_ENTERED`,
-    { method: 'PUT', body: JSON.stringify({ values: rows }) },
-  );
-
-  if (formatRequests.length === 0) return;
-  await googleFetch(SHEETS_API, `/spreadsheets/${spreadsheetId}:batchUpdate`, {
-    method: 'POST',
-    body: JSON.stringify({ requests: formatRequests }),
-  });
+/**
+ * One cell as the Sheets API stores it. A `=FORMULA(...)` (the CV and
+ * feedback links) stays a formula; everything else is text exactly as given
+ * — a leading apostrophe, which callers use to keep "05…" or "=name" as typed,
+ * is the marker for that and is dropped. Text is never re-read as a number or
+ * a date, so a time like "2:00 PM" stays the words the sheet was given.
+ */
+function cellValue(value: string): { userEnteredValue?: object } {
+  if (!value) return {};
+  if (value.startsWith('=')) return { userEnteredValue: { formulaValue: value } };
+  return { userEnteredValue: { stringValue: value.startsWith("'") ? value.slice(1) : value } };
 }
 
 /**

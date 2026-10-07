@@ -1386,6 +1386,18 @@ write can survive up to ten minutes; *Sync now* never skips. If the logs show
 rebuilding the registrations sheet on bookings (drop it from `syncAll`) and
 rely on *Sync now*.
 
+**Hit for real in the 2026-10-07 rehearsal, and fixed.** Creating the sheets
+of a 7-room, 6-company day (floor, registrations and five company files)
+in one go ran into Google's "Write requests per minute per user" limit, and
+the sync stopped. Two changes followed:
+- `writeTab` now rewrites a tab in **one** batchUpdate instead of four (clear,
+  reset formats, values, formats). Values go in as `updateCells`: a
+  `=FORMULA` stays a formula, and everything else is plain text, so a
+  leading apostrophe marks text and is dropped. A full floor rewrite went
+  from about 12 write requests to 3.
+- `googleFetch` waits and retries on 429, honouring `Retry-After` and
+  otherwise waiting 5 s, then 20 s, then 40 s, before giving up.
+
 **Not exercised against Google yet**, like the rest of the Google code. What
 was checked: the real sync code was run against a fake Google and a fake
 interviews database (invented data), its requests replayed into a picture
