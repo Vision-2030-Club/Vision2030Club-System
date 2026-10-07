@@ -166,7 +166,55 @@ export async function deleteOtherTabs(spreadsheetId: string, keepIds: Set<number
   });
 }
 
-/** Reads back one tab's cells — for pulling Stage edits (floorSheet.ts). */
+/**
+ * Every tab's cells as shown, in ONE read request — what a sync reads
+ * before it rewrites a file (the Status edits waiting there, and the Notes
+ * and Interviewer names it must put back), and what the every-minute pull
+ * reads. One request per file rather than one per tab, because reads share
+ * the account's per-minute quota with everything else.
+ */
+export async function readAllTabs(spreadsheetId: string): Promise<Map<string, string[][]>> {
+  const data = await googleFetch(
+    SHEETS_API,
+    `/spreadsheets/${spreadsheetId}?includeGridData=true&fields=${encodeURIComponent(
+      'sheets(properties(title),data(rowData(values(formattedValue))))',
+    )}`,
+  );
+  const out = new Map<string, string[][]>();
+  for (const sheet of (data.sheets ?? []) as {
+    properties: { title: string };
+    data?: { rowData?: { values?: { formattedValue?: string }[] }[] }[];
+  }[]) {
+    const rows = (sheet.data?.[0]?.rowData ?? []).map((row) => (row.values ?? []).map((cell) => cell.formattedValue ?? ''));
+    out.set(sheet.properties.title, rows);
+  }
+  return out;
+}
+
+/**
+ * When each spreadsheet this app made was last changed, by anyone — from
+ * Drive, whose quota is separate and far larger than Sheets'. The pull
+ * (sheetPull.ts) reads only the files whose time moved. `drive.file` lists
+ * exactly the files this app created.
+ */
+export async function modifiedTimes(): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  let pageToken = '';
+  do {
+    const params = new URLSearchParams({
+      q: "mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false",
+      fields: 'nextPageToken, files(id, modifiedTime)',
+      pageSize: '1000',
+      ...(pageToken ? { pageToken } : {}),
+    });
+    const data = await googleFetch(DRIVE_API, `/files?${params.toString()}`);
+    for (const f of (data.files ?? []) as { id: string; modifiedTime: string }[]) out.set(f.id, f.modifiedTime);
+    pageToken = data.nextPageToken ?? '';
+  } while (pageToken);
+  return out;
+}
+
+/** Reads back one tab's cells. */
 export async function readTab(spreadsheetId: string, sheetTitle: string): Promise<string[][]> {
   const range = `${quoted(sheetTitle)}!A1:Z10000`;
   const data = await googleFetch(SHEETS_API, `/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`);

@@ -6,7 +6,7 @@ import {
   deleteOtherTabs,
   ensureNamedTab,
   listTabs,
-  readTab,
+  readAllTabs,
   renameTab,
   revokeLinkSharing,
   writeTab,
@@ -30,7 +30,15 @@ import {
   widths,
   type Box,
 } from '@/lib/interviews/sheetFormat';
-import type { Actor } from '@/lib/interviews/access';
+import {
+  applySheetEdits,
+  editsIn,
+  emptyResult,
+  encodeBase,
+  type PullResult,
+  type PullRules,
+  type SheetEdit,
+} from '@/lib/interviews/sheetPull';
 import type { Edition, EditionSettings, Room, SlotStatus, Stage } from '@/lib/interviews/types';
 import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/interviews/queries';
 
@@ -41,12 +49,12 @@ import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/inter
  * way: the Status column. Everything the system knows is regenerated
  * wholesale on every sync, so a hand-edited name or time would just be
  * overwritten; Status is the one column worth editing by hand (an organizer
- * at the door ticking people off) and the one place `advance_stage` already
- * refuses anything that isn't a real stage, so there is a guardrail to lean
- * on. Nothing pulls automatically, though — see pullFloorSheetStages and its
- * caller (pullFloorSheetAction in the interviews actions), which only ever
- * run because someone clicked a button. Notes are the organizers' own: read
- * off the sheet before each rewrite and put back on the same row.
+ * at the door ticking people off), and an edit there becomes the booking's
+ * stage — when a sync is about to rewrite the sheet, every minute from the
+ * pull (sheetsSync.ts), or at once from Pull from Sheet — under the rules in
+ * sheetPull.ts: compare-and-set against the hidden base column, so the app
+ * wins whenever it moved the student since. Notes are the organizers' own:
+ * read off the sheet before each rewrite and put back on the same row.
  *
  * One TAB per day, named by its actual date ("9/19", "9/20", …). A day's
  * rooms come from its sessions (createRoomAction makes one per room per
@@ -67,9 +75,10 @@ import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/inter
  * student who is booked but has not arrived shows blank. Pull from Sheet
  * reads the first four back.
  *
- * The eighth column of each block, hidden, carries the booking id (or
- * `slot:<id>` for a free slot) — nothing else in a row identifies it, and it
- * is what Pull from Sheet and the Notes carried across a rewrite match on.
+ * Two hidden columns end each block: the row's key, the booking id (or
+ * `slot:<id>` for a free slot), which the Notes are carried by; and its
+ * base, `<booking id>|<stage>`, the Status the system last wrote, which is
+ * how an edit is told apart from the system's own value (sheetPull.ts).
  */
 
 const STATUS_LABELS: Partial<Record<Stage, string>> = {
@@ -83,13 +92,16 @@ const STATUS_CHOICES = ['Arrived', 'Late', 'Completed', GAP, 'In-interview'];
 const LABEL_TO_STAGE = new Map(Object.entries(STATUS_LABELS).map(([stage, label]) => [label, stage as Stage]));
 
 // One block: Time, Company, Student Name, Student Phone Number, Status,
-// Notes (two columns merged), and the hidden key.
+// Notes (two columns merged), and two hidden columns: the row's key (what
+// Notes are carried by) and its base (what Status the system last wrote,
+// sheetPull.ts).
 const HEADERS = ['Time', 'Company', 'Student Name', 'Student Phone Number', 'Status', 'Notes', ''];
 const STATUS_COL = 4;
 const NOTES_COL = 5;
 const VISIBLE_COLS = 7;
 const KEY_COL = 7;
-const BLOCK_COLS = 8;
+const BASE_COL = 8;
+const BLOCK_COLS = 9;
 const RIGHT = BLOCK_COLS + 1; // one narrow gap column between the two rooms
 const PAIR_COLS = BLOCK_COLS * 2 + 1;
 const BLOCKS = [0, RIGHT];
@@ -164,6 +176,7 @@ function buildRoomBlock(room: Room, companyNames: Map<string, string>, slots: Sl
       notes.get(rowKey(slot)) ?? '',
       '',
       rowKey(slot),
+      slot.booking_id && slot.stage ? encodeBase(slot.booking_id, slot.stage) : '',
     ]),
   };
 }
@@ -213,8 +226,8 @@ function summaryRows(block: RoomBlock | undefined): [string[], string[]] {
   const total = block.slots.filter((s) => s.booking_id || !s.is_closed).length;
   const booked = block.slots.filter((s) => s.booking_id).length;
   return [
-    ['ROOM SUMMARY', '', 'Total Slots', 'Booked', 'Available', '', '', ''],
-    ['', '', String(total), String(booked), String(total - booked), '', '', ''],
+    ['ROOM SUMMARY', '', 'Total Slots', 'Booked', 'Available', '', '', '', ''],
+    ['', '', String(total), String(booked), String(total - booked), '', '', '', ''],
   ];
 }
 
@@ -227,11 +240,9 @@ async function syncDayTab(
   dayRooms: Room[],
   slotsByRoom: Map<string, SlotStatus[]>,
   companyNames: Map<string, string>,
+  notes: Map<string, string>,
   zone: string,
 ): Promise<void> {
-  // Notes are the organizers' own; carry them across the rewrite.
-  const notes = keptValues(await readTab(spreadsheetId, sheetTitle), BLOCKS, KEY_COL, NOTES_COL);
-
   const values: string[][] = [
     [titleText, ...Array(PAIR_COLS - 1).fill('')],
     Array(PAIR_COLS).fill(''),
@@ -243,8 +254,7 @@ async function syncDayTab(
     ...widths(sheetId, 0, [86, 120, 170, 150, 110, 90, 130]),
     ...widths(sheetId, RIGHT, [86, 120, 170, 150, 110, 90, 130]),
     ...widths(sheetId, BLOCK_COLS, [30]),
-    hideColumn(sheetId, KEY_COL),
-    hideColumn(sheetId, RIGHT + KEY_COL),
+    ...[KEY_COL, BASE_COL, RIGHT + KEY_COL, RIGHT + BASE_COL].map((col) => hideColumn(sheetId, col)),
     paint(banner, { bg: TEAL, fg: WHITE, bold: true, size: 20, align: 'CENTER' }),
     merge(banner),
   ];
@@ -259,7 +269,7 @@ async function syncDayTab(
     const rightBlock = right ? blockOf(right) : undefined;
 
     const titleRow = (block?: RoomBlock) => (block ? [block.title, ...Array(BLOCK_COLS - 1).fill('')] : blankRow());
-    const headerRow = (block?: RoomBlock) => (block ? [...HEADERS, ''] : blankRow());
+    const headerRow = (block?: RoomBlock) => (block ? [...HEADERS, '', ''] : blankRow());
     values.push([...titleRow(leftBlock), '', ...titleRow(rightBlock)]);
     values.push([...headerRow(leftBlock), '', ...headerRow(rightBlock)]);
 
@@ -332,14 +342,50 @@ async function loadFloorData(db: ReturnType<typeof createInterviewsClient>, edit
   return { rooms, sessions, slots };
 }
 
-/** Rebuilds one edition's floor sheet from scratch. Call via kickSheetsSync (sheetsSync.ts). */
-export async function syncFloorSheet(editionId: string): Promise<void> {
-  if (!isGoogleConfigured()) return;
+/** How the floor sheet's Status words map to stages, for the way back (sheetPull.ts). */
+function floorRules(actor: Record<string, unknown>): PullRules {
+  return {
+    labelOf: (stage) => STATUS_LABELS[stage] ?? '',
+    stageOf: (label) => LABEL_TO_STAGE.get(label),
+    actor,
+  };
+}
+
+/** Who a Status edit in the floor sheet is recorded as, when nobody pressed a button. */
+const FLOOR_SHEET_ACTOR = { kind: 'system', name: 'Floor Google Sheet' };
+
+/** The Status edits waiting in the day tabs of an already-read floor sheet. */
+function floorEdits(tabs: Map<string, string[][]>, rules: PullRules): SheetEdit[] {
+  return [...tabs].filter(([title]) => title !== ALL_TAB).flatMap(([, rows]) => editsIn(rows, BLOCKS, BASE_COL, STATUS_COL, rules));
+}
+
+/**
+ * Rebuilds one edition's floor sheet from scratch. Call via kickSheetsSync
+ * (sheetsSync.ts). Reads the sheet first, in one request: Status edits
+ * waiting there are applied before anything is overwritten (sheetPull.ts),
+ * and the Notes are carried across. Returns what the edits did.
+ */
+export async function syncFloorSheet(
+  editionId: string,
+  actor: Record<string, unknown> = FLOOR_SHEET_ACTOR,
+): Promise<PullResult> {
+  if (!isGoogleConfigured()) return emptyResult();
 
   const db = createInterviewsClient();
   const { data: editionRow } = await db.from('editions').select('*').eq('id', editionId).maybeSingle();
   const edition = editionRow as Edition | null;
-  if (!edition) return;
+  if (!edition) return emptyResult();
+
+  const spreadsheetId = await ensureFloorSheet(db, edition);
+  await revokeLinkSharing(spreadsheetId);
+  const tabs = await listTabs(spreadsheetId);
+  const written = await readAllTabs(spreadsheetId);
+  const pulled = await applySheetEdits(floorEdits(written, floorRules(actor)), floorRules(actor));
+  // Notes are the organizers' own; carry them across the rewrite.
+  const notes = new Map<string, string>();
+  for (const [title, rows] of written) {
+    if (title !== ALL_TAB) for (const [key, note] of keptValues(rows, BLOCKS, KEY_COL, NOTES_COL)) notes.set(key, note);
+  }
 
   const { rooms, sessions: allSessions, slots } = await loadFloorData(db, editionId);
   const roomById = new Map(rooms.map((r) => [r.id, r]));
@@ -366,10 +412,6 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
   const zone = edition.time_zone;
   const days = sessionDays(sessions); // sorted 'YYYY-MM-DD', one per calendar day with a session
 
-  const spreadsheetId = await ensureFloorSheet(db, edition);
-  await revokeLinkSharing(spreadsheetId);
-  const tabs = await listTabs(spreadsheetId);
-
   if (days.length === 0) {
     // Nothing scheduled at all (e.g. everything was just wiped for a fresh
     // test run). deleteOtherTabs never empties a spreadsheet completely —
@@ -383,7 +425,7 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
       await writeTab(spreadsheetId, keep.sheetId, placeholder, [['No rooms are scheduled yet.']]);
       await deleteOtherTabs(spreadsheetId, new Set([keep.sheetId]));
     }
-    return;
+    return pulled;
   }
 
   const claimed = new Set<number>();
@@ -421,7 +463,7 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
 
     const sheetId = await ensureNamedTab(spreadsheetId, tabs, claimed, label);
     keepIds.add(sheetId);
-    await syncDayTab(spreadsheetId, sheetId, label, `DAY ${i + 1} · ${dayTitle(day)}`, dayRooms, slotsByRoom, companyNames, zone);
+    await syncDayTab(spreadsheetId, sheetId, label, `DAY ${i + 1} · ${dayTitle(day)}`, dayRooms, slotsByRoom, companyNames, notes, zone);
   }
 
   const allSheetId = allTab?.sheetId ?? (await addTab(spreadsheetId, ALL_TAB));
@@ -439,6 +481,7 @@ export async function syncFloorSheet(editionId: string): Promise<void> {
   ]);
 
   await deleteOtherTabs(spreadsheetId, keepIds);
+  return pulled;
 }
 
 /**
@@ -504,67 +547,23 @@ async function buildAllBookings(
 }
 
 /**
- * Reads every day tab's Status column back and applies whatever changed to
- * the matching booking — the one door back the other way (see the file
- * note). `advance_stage` is the same function the floor board's own buttons
- * call, `p_as_manager: true` so a jump straight from not-arrived to
- * Completed is accepted the way a manager's own override already is. A row
- * whose Status is blank, Gap, unrecognised, or already what the system
- * holds is left alone — this never errors on a row, only reports what it
- * did.
- *
- * Never called automatically: only from pullFloorSheetAction, when someone
- * presses the button.
+ * Applies the Status edits waiting in the floor sheet without rewriting it:
+ * the every-minute pull (sheetsSync.ts), when the sheet changed since it was
+ * last read. A sync rewrite does the same as its first step.
  */
-export async function pullFloorSheetStages(
+export async function pullFloorSheet(
   editionId: string,
-  actor: Actor,
-): Promise<{ updated: number; skipped: number }> {
+  actor: Record<string, unknown> = FLOOR_SHEET_ACTOR,
+): Promise<PullResult> {
+  const sheetId = await floorSheetId(editionId);
+  if (!sheetId) return emptyResult();
+  return applySheetEdits(floorEdits(await readAllTabs(sheetId), floorRules(actor)), floorRules(actor));
+}
+
+/** The edition's floor sheet, if it has one. */
+export async function floorSheetId(editionId: string): Promise<string | null> {
   const db = createInterviewsClient();
   const { data: editionRow } = await db.from('editions').select('*').eq('id', editionId).maybeSingle();
   const edition = editionRow as Edition | null;
-  const sheetId = edition ? await savedFloorSheet(db, edition) : null;
-  if (!sheetId) return { updated: 0, skipped: 0 };
-
-  const current = new Map(
-    (
-      await pages<{ id: string; stage: Stage }>((from, to) =>
-        db.from('bookings').select('id, stage').eq('edition_id', editionId).is('cancelled_at', null).order('id').range(from, to),
-      )
-    ).map((b) => [b.id, b.stage]),
-  );
-
-  const tabs = await listTabs(sheetId);
-  let updated = 0;
-  let skipped = 0;
-
-  for (const tab of tabs) {
-    if (tab.title === ALL_TAB) continue;
-    const rows = await readTab(sheetId, tab.title);
-    for (const row of rows) {
-      for (const startCol of BLOCKS) {
-        const bookingId = row[startCol + KEY_COL];
-        const label = row[startCol + STATUS_COL];
-        if (!bookingId || !label || !current.has(bookingId) || label === GAP) continue;
-
-        const stage = LABEL_TO_STAGE.get(label);
-        if (!stage) {
-          skipped++;
-          continue;
-        }
-        if (current.get(bookingId) === stage) continue;
-
-        const { error } = await db.rpc('advance_stage', {
-          p_booking: bookingId,
-          p_to: stage,
-          p_actor: actor,
-          p_as_manager: true,
-        });
-        if (error) skipped++;
-        else updated++;
-      }
-    }
-  }
-
-  return { updated, skipped };
+  return edition ? savedFloorSheet(db, edition) : null;
 }

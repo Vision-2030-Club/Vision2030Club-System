@@ -14,7 +14,7 @@ import {
 } from '@/lib/interviews/access';
 import { newPin, newToken } from '@/lib/interviews/tokens';
 import { deliverPendingEmails, kickEmailDelivery } from '@/lib/interviews/email';
-import { pullFloorSheetStages, syncFloorSheet } from '@/lib/interviews/floorSheet';
+import { syncFloorSheet } from '@/lib/interviews/floorSheet';
 import { kickSheetsSync } from '@/lib/interviews/sheetsSync';
 import { syncCompanySheet } from '@/lib/interviews/companySheets';
 import { takeExport } from '@/lib/interviews/export';
@@ -215,10 +215,12 @@ export async function pullFloorSheetAction(
   if ('error' in g) return fail(g.error);
 
   try {
-    const { updated, skipped } = await pullFloorSheetStages(g.access.edition.id, g.access.actor);
-    await syncFloorSheet(g.access.edition.id);
+    // The rewrite applies the sheet's Status edits first (sheetPull.ts), as
+    // this member; then every other sheet catches up in the background.
+    const { applied, conflicts, ignored } = await syncFloorSheet(g.access.edition.id, g.access.actor);
+    if (applied) kickSheetsSync(g.access.edition.id);
     revalidate(g.locale, g.projectId);
-    return ok('saved', { updated: String(updated), skipped: String(skipped) });
+    return ok('saved', { updated: String(applied), skipped: String(conflicts + ignored) });
   } catch (error) {
     return fail(error instanceof Error ? error.message : 'Pull failed.');
   }

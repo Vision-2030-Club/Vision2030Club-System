@@ -4,8 +4,9 @@ import {
   createSpreadsheet,
   deleteOtherTabs,
   ensureNamedTab,
+  forgetWritten,
   listTabs,
-  readTab,
+  readAllTabs,
   rememberWritten,
   revokeLinkSharing,
   writeTab,
@@ -31,6 +32,16 @@ import {
 } from '@/lib/interviews/sheetFormat';
 import type { Company, Edition, EditionSettings, Room, SlotStatus, Stage } from '@/lib/interviews/types';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
+import {
+  addResults,
+  applySheetEdits,
+  editsIn,
+  emptyResult,
+  encodeBase,
+  type PullResult,
+  type PullRules,
+  type SheetEdit,
+} from '@/lib/interviews/sheetPull';
 
 /**
  * A Google Sheet per company AND room, drawn after the club's "Company
@@ -55,8 +66,12 @@ import { createInterviewsClient } from '@/lib/supabase/interviews';
  * club's decision of 2026-10-05, as the template does.
  *
  * Who writes what:
- *   - Status is the system's: the floor's stage as the template's words
- *     (Interview Done, No Show, In-progress), blank before that.
+ *   - Status goes both ways: the floor's stage as the template's words
+ *     (Interview Done, No Show, In-progress), blank before that; and a word
+ *     the company picks there becomes the booking's stage (sheetPull.ts:
+ *     compare-and-set against the hidden base column, ninth, so the app wins
+ *     whenever it moved the student since, and a file can only move its own
+ *     company's bookings in its own room).
  *   - Interviewer is the company's: the system has no such data, so it
  *     reads the column before each rewrite and puts each name back on its
  *     time slot (keyed by the hidden eighth column, the slot id).
@@ -78,6 +93,8 @@ const INTERVIEWER_COL = 1;
 const STATUS_COL = 6;
 const VISIBLE_COLS = 7;
 const KEY_COL = 7;
+/** Hidden: `<booking id>|<stage>`, the Status the system last wrote (sheetPull.ts). */
+const BASE_COL = 8;
 const FIRST_SLOT_ROW = 6;
 
 const STATUS_LABELS: Partial<Record<Stage, string>> = {
@@ -86,6 +103,7 @@ const STATUS_LABELS: Partial<Record<Stage, string>> = {
   in_interview: 'In-progress',
 };
 const STATUS_CHOICES = ['Interview Done', 'No Show', 'In-progress'];
+const LABEL_TO_STAGE = new Map(Object.entries(STATUS_LABELS).map(([stage, label]) => [label, stage as Stage]));
 
 const BANNER = hex('326F75');
 const INK = hex('163E43');
@@ -219,7 +237,7 @@ async function loadTabs(db: Db, edition: Edition, pairs: Pair[]): Promise<Map<st
     }
 
     const tabs: DayTab[] = [...byDay.keys()].sort().map((day) => {
-      const pad = (cells: string[]) => [...cells, ...Array(VISIBLE_COLS + 1 - cells.length).fill('')];
+      const pad = (cells: string[]) => [...cells, ...Array(BASE_COL + 1 - cells.length).fill('')];
       const rows: string[][] = [
         pad([banner]),
         pad([]),
@@ -249,6 +267,7 @@ async function loadTabs(db: Db, edition: Edition, pairs: Pair[]): Promise<Map<st
           feedback,
           booking && slot.stage ? (STATUS_LABELS[slot.stage] ?? '') : '',
           `slot:${slot.id}`,
+          booking && slot.stage ? encodeBase(booking, slot.stage) : '',
         ]);
       }
       return { label: tabLabel(day), rows };
@@ -266,6 +285,7 @@ function tabFormatting(sheetId: number, slotCount: number): object[] {
   const requests: object[] = [
     ...widths(sheetId, 0, [80, 115, 160, 115, 150, 100, 120]),
     hideColumn(sheetId, KEY_COL),
+    hideColumn(sheetId, BASE_COL),
     paint(box(0, 2, 0, VISIBLE_COLS), { bg: BANNER, fg: WHITE, bold: true, size: 18, align: 'CENTER' }),
     merge(box(0, 2, 0, VISIBLE_COLS)),
     paint(box(2, 3, 0, VISIBLE_COLS), { bg: LIME }),
@@ -294,9 +314,45 @@ function tabFormatting(sheetId: number, slotCount: number): object[] {
   return requests;
 }
 
-/** Writes every day tab of one file, keeping what was typed under Interviewer. */
-async function writeSheet(spreadsheetId: string, tabs: DayTab[]): Promise<void> {
+/** How a company's Status words map to stages, and the one company and room its file may move. */
+function companyRules(pair: Pair): PullRules {
+  return {
+    labelOf: (stage) => STATUS_LABELS[stage] ?? '',
+    stageOf: (label) => LABEL_TO_STAGE.get(label),
+    actor: { kind: 'company', id: pair.company.id, name: `${pair.company.name_en} (Google Sheet, ${pair.room.name})` },
+    mayChange: (b) => b.company_id === pair.company.id && b.room_id === pair.room.id,
+  };
+}
+
+function companyEdits(tabs: Map<string, string[][]>, rules: PullRules): SheetEdit[] {
+  return [...tabs.values()].flatMap((rows) => editsIn(rows.slice(FIRST_SLOT_ROW), [0], BASE_COL, STATUS_COL, rules));
+}
+
+/** Applies the Status edits waiting in one pair's file, read in one request. */
+async function pullPair(pair: Pair, spreadsheetId: string, tabs?: Map<string, string[][]>): Promise<PullResult> {
+  const rules = companyRules(pair);
+  return applySheetEdits(companyEdits(tabs ?? (await readAllTabs(spreadsheetId)), rules), rules);
+}
+
+/**
+ * Writes every day tab of one pair's file. Reads it first, in one request:
+ * Status edits waiting there are applied before anything is overwritten
+ * (and the rows rebuilt if one moved a booking), and the names typed under
+ * Interviewer are carried across.
+ */
+async function writeSheet(db: Db, edition: Edition, pair: Pair, spreadsheetId: string, built: DayTab[]): Promise<PullResult> {
   await revokeLinkSharing(spreadsheetId);
+  const written = await readAllTabs(spreadsheetId);
+  const pulled = await pullPair(pair, spreadsheetId, written);
+  const tabs = pulled.applied
+    ? ((await loadTabs(db, edition, [pair])).get(sheetKey(pair.company.id, pair.room.id)) ?? [])
+    : built;
+
+  const interviewers = new Map<string, string>();
+  for (const rows of written.values()) {
+    for (const [key, name] of keptValues(rows.slice(FIRST_SLOT_ROW), [0], KEY_COL, INTERVIEWER_COL)) interviewers.set(key, name);
+  }
+
   const existing = await listTabs(spreadsheetId);
   const claimed = new Set<number>();
   const keep = new Set<number>();
@@ -312,7 +368,6 @@ async function writeSheet(spreadsheetId: string, tabs: DayTab[]): Promise<void> 
   for (const tab of tabs) {
     const sheetId = await ensureNamedTab(spreadsheetId, existing, claimed, tab.label);
     keep.add(sheetId);
-    const interviewers = keptValues(await readTab(spreadsheetId, tab.label), [0], KEY_COL, INTERVIEWER_COL);
     const rows = tab.rows.map((row, i) =>
       i >= FIRST_SLOT_ROW && interviewers.has(row[KEY_COL])
         ? row.map((cell, c) => (c === INTERVIEWER_COL ? interviewers.get(row[KEY_COL])! : cell))
@@ -323,6 +378,7 @@ async function writeSheet(spreadsheetId: string, tabs: DayTab[]): Promise<void> 
 
   await deleteOtherTabs(spreadsheetId, keep);
   rememberWritten(`company:${spreadsheetId}`, tabs);
+  return pulled;
 }
 
 async function loadEdition(db: Db, editionId: string): Promise<Edition | null> {
@@ -358,7 +414,7 @@ export async function syncCompanySheet(editionId: string, companyId: string): Pr
   const tabsByPair = await loadTabs(db, edition, pairs);
   for (const pair of pairs) {
     const sheet = await ensureSheet(db, edition, pair, sheets);
-    await writeSheet(sheet.id, tabsByPair.get(sheetKey(pair.company.id, pair.room.id)) ?? []);
+    await writeSheet(db, edition, pair, sheet.id, tabsByPair.get(sheetKey(pair.company.id, pair.room.id)) ?? []);
   }
 }
 
@@ -368,14 +424,15 @@ export async function syncCompanySheet(editionId: string, companyId: string): Pr
  * rewrites each file whose rows changed. A deleted company's or room's file
  * is left as it last was.
  */
-export async function refreshCompanySheets(editionId: string): Promise<void> {
-  if (!isGoogleConfigured()) return;
+export async function refreshCompanySheets(editionId: string): Promise<PullResult> {
+  let result = emptyResult();
+  if (!isGoogleConfigured()) return result;
 
   const db = createInterviewsClient();
   const sheets = await savedSheets(db, editionId);
-  if (Object.keys(sheets).length === 0) return;
+  if (Object.keys(sheets).length === 0) return result;
   const edition = await loadEdition(db, editionId);
-  if (!edition) return;
+  if (!edition) return result;
 
   const pairs = (await loadPairs(db, editionId)).filter((p) => optedIn(sheets, p.company.id));
   const tabsByPair = await loadTabs(db, edition, pairs);
@@ -385,10 +442,54 @@ export async function refreshCompanySheets(editionId: string): Promise<void> {
     try {
       const sheet = await ensureSheet(db, edition, pair, sheets);
       if (writtenAlready(`company:${sheet.id}`, tabs)) continue;
-      await writeSheet(sheet.id, tabs);
+      result = addResults(result, await writeSheet(db, edition, pair, sheet.id, tabs));
     } catch (error) {
       // One file (deleted in Drive, say) must not stop the others.
       console.error(`[interviews/companySheets] ${pair.company.name_en} / ${pair.room.name} failed`, error);
     }
   }
+  return result;
 }
+
+/**
+ * The every-minute pull (sheetsSync.ts): applies the Status edits waiting in
+ * each company file that `changed` says moved since it was last read, and
+ * marks it `read` once applied. A file
+ * where something differed from the app but could not be applied is
+ * forgotten by the unchanged-sheet memory, so the next sync rewrites it and
+ * the sheet shows the app's value again.
+ */
+export async function pullCompanySheets(
+  editionId: string,
+  changed: (spreadsheetId: string) => boolean,
+  read: (spreadsheetId: string) => void,
+): Promise<PullResult> {
+  let result = emptyResult();
+  if (!isGoogleConfigured()) return result;
+
+  const db = createInterviewsClient();
+  const sheets = await savedSheets(db, editionId);
+  if (Object.keys(sheets).length === 0) return result;
+  const pairs = await loadPairs(db, editionId);
+
+  for (const pair of pairs) {
+    const sheet = sheets[sheetKey(pair.company.id, pair.room.id)];
+    if (!sheet || !changed(sheet.id)) continue;
+    try {
+      const pulled = await pullPair(pair, sheet.id);
+      if (pulled.conflicts || pulled.ignored) forgetWritten(`company:${sheet.id}`);
+      result = addResults(result, pulled);
+      read(sheet.id);
+    } catch (error) {
+      console.error(`[interviews/companySheets] pull ${pair.company.name_en} / ${pair.room.name} failed`, error);
+    }
+  }
+  return result;
+}
+
+/** Every company file the edition has, for the pull's changed-since check. */
+export async function companySheetIds(editionId: string): Promise<string[]> {
+  const db = createInterviewsClient();
+  return Object.values(await savedSheets(db, editionId)).map((s) => s.id);
+}
+
