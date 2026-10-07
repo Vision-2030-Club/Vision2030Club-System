@@ -3,6 +3,7 @@ import { isGoogleConfigured } from '@/lib/google/auth';
 import {
   addTab,
   createFloorSheet,
+  spreadsheetUsable,
   deleteOtherTabs,
   ensureNamedTab,
   listTabs,
@@ -319,17 +320,19 @@ async function syncDayTab(
  * 0006 never reached the real project, and `set_floor_sheet` failing there
  * was ignored, so every sync made a new spreadsheet and none was ever
  * remembered. Now the id and link live in the edition's settings
- * (`floor_sheet_id`, `floor_sheet_url`), like the registrations sheet; the
- * column still counts where 0006 did run.
+ * (`floor_sheet_id`, `floor_sheet_url`), like the registrations sheet. The
+ * settings come first, because a file that replaces a deleted one is saved
+ * there; nothing writes the column any more, so it only counts where 0006
+ * ran and the settings have none.
  */
 async function savedFloorSheet(
   db: ReturnType<typeof createInterviewsClient>,
   edition: Edition,
 ): Promise<string | null> {
-  if (edition.floor_sheet_id) return edition.floor_sheet_id;
   const { data } = await db.rpc('edition_settings', { p_edition: edition.id });
   const id = (data as EditionSettings | null)?.floor_sheet_id;
-  return typeof id === 'string' && id ? id : null;
+  if (typeof id === 'string' && id) return id;
+  return edition.floor_sheet_id || null;
 }
 
 async function ensureFloorSheet(
@@ -337,7 +340,8 @@ async function ensureFloorSheet(
   edition: Edition,
 ): Promise<string> {
   const saved = await savedFloorSheet(db, edition);
-  if (saved) return saved;
+  // A file deleted in Drive is replaced; one in the trash is restored.
+  if (saved && (await spreadsheetUsable(saved))) return saved;
 
   const created = await createFloorSheet(`${edition.name_en} — Floor`);
   const { error } = await db.rpc('update_edition', {

@@ -1535,6 +1535,44 @@ empty clears it.
   lengths are refused, as are more than 14 days; and the fake-Google
   harness confirmed empty rooms, half-assigned rooms and Notes on empty rows.
 
+### A sheet deleted in Drive is restored or replaced (2026-10-07)
+
+Each Google Sheet (floor, registrations, one per company and room) is made
+once and its id saved in the edition's settings; every sync rewrites that
+same file. If someone signed in to the club's Google account deleted it in
+Drive, the app kept writing to the missing file: every sync failed, no new
+file was made, and the saved link opened Google's "the file you have
+requested has been deleted" page.
+
+- **Before writing, the app checks the saved file** (`spreadsheetUsable` in
+  `src/lib/google/sheets.ts`, one Drive read). A file **in the trash is
+  taken back out**, so the link, its sharing and the Notes survive. A file
+  **deleted for good** (Drive answers 404, also when the connected Google
+  account cannot see it) is **replaced**: a new file is made, saved in the
+  settings, and filled from the database, so every booking is in it. Any
+  other error (Google down, 403 rate limit) fails the sync as before and
+  never replaces a file.
+- **What a replacement loses:** its link is new (the Settings page and the
+  Companies tab show it), it is shared with nobody until someone shares it by
+  name from the club's account, and what lived only in the old file is gone
+  (Notes, Interviewer names typed over the company's, a Status edit made in
+  the last minute before the pull read it).
+- **When it happens:** the floor sheet on its next sync (every booking or
+  stage change); the registrations and company sheets on their next change
+  or *Sync now*. An unchanged sheet still costs no Google call, so a
+  deleted one is noticed only when something is written to it.
+- **To retire a sheet for good**, deleting it in Drive is no longer enough
+  while the app still syncs it: the trash is undone and a deleted file is
+  made again.
+- The floor sheet's id and link are now read from the settings first and
+  0006's `floor_sheet_id` / `floor_sheet_url` columns second. Nothing has
+  written the columns since the settings took over, and a replacement is
+  saved only in the settings.
+- **Checked** against a fake Google (invented ids): a live file costs one
+  read and is left alone; a trashed one is restored; a deleted one (404) is
+  reported gone; a 403 or a 500 throws and is never taken for gone. Not yet
+  run against the real Google account.
+
 ### A project opens in its component (2026-10-07)
 
 Opening a project (`/projects/<id>`), from the dashboard, the projects list,
