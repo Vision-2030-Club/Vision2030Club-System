@@ -66,7 +66,7 @@ import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/inter
  * Within a day tab: a teal "DAY 1 · OCTOBER 12" banner, then rooms two side
  * by side. Each room is a block: a teal title bar naming the ROOM (its booth
  * label, uppercased) — not the company — a header row in the template's
- * mint / lavender / lime, then one row per slot of every session in that
+ * mint and lime (no lavender, by the club's choice of 2026-10-07), then one row per slot of every session in that
  * room that day, booked or not, then a ROOM SUMMARY (total, booked,
  * available). Two companies can share a room in one day (STC 2–5, PwC
  * 5–8): their slots run on in time order and each row names its company.
@@ -110,18 +110,17 @@ const BLOCKS = [0, RIGHT];
 const TEAL = hex('0E5A67');
 const WHITE = hex('FFFFFF');
 const MINT = hex('A6EDDD');
-const LAVENDER = hex('C2B7EF');
 const LIME = hex('C3F04A');
 const NOTES_LINE = hex('D7D7D7');
 /** Header colour, then the paler tint of the same colour for the rows under it. */
 const COLUMN_TONES = [
   { head: MINT, row: hex('EAF9F6') },
-  { head: LAVENDER, row: hex('F0ECFB') },
+  { head: MINT, row: hex('EAF9F6') },
   { head: LIME, row: hex('F3FBD7') },
   { head: MINT, row: hex('EAF9F6') },
-  { head: LAVENDER, row: hex('F0ECFB') },
-  { head: MINT, row: hex('F8F6FC') },
-  { head: MINT, row: hex('F8F6FC') },
+  { head: MINT, row: hex('EAF9F6') },
+  { head: MINT, row: hex('EAF9F6') },
+  { head: MINT, row: hex('EAF9F6') },
 ];
 
 /** The flat tab after the day tabs (buildAllBookings). */
