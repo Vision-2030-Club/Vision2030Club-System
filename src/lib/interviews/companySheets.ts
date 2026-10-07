@@ -110,7 +110,6 @@ const BANNER = hex('326F75');
 const INK = hex('163E43');
 const WHITE = hex('FFFFFF');
 const MINT = hex('A6EDDD');
-const LAVENDER = hex('C2B7EF');
 const LIME = hex('C3F04A');
 const GREY = hex('D9D9D9');
 const LINE = hex('AAC1C1');
@@ -293,7 +292,7 @@ function tabFormatting(sheetId: number, slotCount: number): object[] {
     paint(box(2, 3, 0, VISIBLE_COLS), { bg: LIME }),
     merge(box(2, 3, 0, VISIBLE_COLS)),
     paint(box(3, 4, 0, 3), { ...label, bg: MINT }),
-    paint(box(3, 4, 3, 5), { ...label, bg: LAVENDER }),
+    paint(box(3, 4, 3, 5), { ...label, bg: MINT }),
     paint(box(3, 4, 5, 7), { ...label, bg: MINT }),
     paint(box(4, 5, 0, VISIBLE_COLS), { bg: GREY, fg: BANNER, bold: true }),
     ...[
@@ -308,7 +307,7 @@ function tabFormatting(sheetId: number, slotCount: number): object[] {
       paint(box(FIRST_SLOT_ROW, end, 0, 1), { fg: INK, bold: true }),
       paint(box(FIRST_SLOT_ROW, end, 1, VISIBLE_COLS), { fg: INK }),
       dropdown(box(FIRST_SLOT_ROW, end, STATUS_COL, STATUS_COL + 1), STATUS_CHOICES),
-      whenText(box(FIRST_SLOT_ROW, end, STATUS_COL, STATUS_COL + 1), 'No Show', { bg: LAVENDER, fg: INK }),
+      whenText(box(FIRST_SLOT_ROW, end, STATUS_COL, STATUS_COL + 1), 'No Show', { bg: GREY, fg: INK }),
       whenText(box(FIRST_SLOT_ROW, end, STATUS_COL, STATUS_COL + 1), 'Interview Done', { bg: MINT, fg: INK }),
     );
   }
