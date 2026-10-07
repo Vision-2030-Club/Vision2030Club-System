@@ -1340,8 +1340,10 @@ No migration; everything new is kept in the edition's settings.
   Name, **Phone Number** (the club decided on 2026-10-05 that companies get
   it, as the template shows), Student CV, Feedback Link, Status. Status is the
   system's (Interview Done / No Show / In-progress, from the floor) and is
-  never read back; Interviewer is the company's and is carried across
-  rewrites like the floor's Notes (keyed by slot). Nothing is shared
+  never read back. Interviewer is filled with the company's name on every
+  slot (since 2026-10-07); a person's name typed over it is carried across
+  rewrites like the floor's Notes (keyed by slot), and a cleared cell goes
+  back to the company's name. Nothing is shared
   automatically; HR opens it from the club's Google account and shares it by
   name, and link sharing is revoked on every rebuild. The CV link is the
   interviewer page's own (`/api/interviews/cv?token=<company token>&booking=…`)

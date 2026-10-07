@@ -72,9 +72,10 @@ import {
  *     compare-and-set against the hidden base column, ninth, so the app wins
  *     whenever it moved the student since, and a file can only move its own
  *     company's bookings in its own room).
- *   - Interviewer is the company's: the system has no such data, so it
- *     reads the column before each rewrite and puts each name back on its
- *     time slot (keyed by the hidden eighth column, the slot id).
+ *   - Interviewer starts as the company's name on every slot, and is the
+ *     company's to change: a person's name typed over it is read before each
+ *     rewrite and put back on its time slot (keyed by the hidden eighth
+ *     column, the slot id). A cleared cell goes back to the company's name.
  *   - The CV link is the interviewer page's own (`/api/interviews/cv?token=…`):
  *     it opens only a CV of a student booked with THIS company, and only after
  *     the company's PIN, if it has one. The Feedback link opens the interviewer
@@ -260,7 +261,8 @@ async function loadTabs(db: Db, edition: Edition, pairs: Pair[]): Promise<Map<st
           : '';
         rows.push([
           timeOf(slot.starts_at, zone),
-          '',
+          // The company itself until someone types a person's name over it.
+          plain(company.name_en),
           booking ? plain(slot.student_name) : '',
           booking ? plain(slot.student_phone) : '',
           cv,
@@ -350,7 +352,11 @@ async function writeSheet(db: Db, edition: Edition, pair: Pair, spreadsheetId: s
 
   const interviewers = new Map<string, string>();
   for (const rows of written.values()) {
-    for (const [key, name] of keptValues(rows.slice(FIRST_SLOT_ROW), [0], KEY_COL, INTERVIEWER_COL)) interviewers.set(key, name);
+    for (const [key, name] of keptValues(rows.slice(FIRST_SLOT_ROW), [0], KEY_COL, INTERVIEWER_COL)) {
+      // The company's own name is the default, not something typed: leave it
+      // to the rows, so a renamed company is renamed here too.
+      if (name !== pair.company.name_en) interviewers.set(key, name);
+    }
   }
 
   const existing = await listTabs(spreadsheetId);
