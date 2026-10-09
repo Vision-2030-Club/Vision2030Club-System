@@ -9,12 +9,11 @@ import { formatDate, formatTime, localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { loadCompanies, loadRooms, loadSessions } from '@/lib/interviews/queries';
 import { pages } from '@/lib/interviews/sheetFormat';
+import { PRAYER_BREAKS, SLOT_MINUTES } from '@/lib/interviews/slotRules';
 import type { Room, Session } from '@/lib/interviews/types';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { toDateInput } from '@/lib/time';
 import { createSessionAction, deleteSessionAction, upsertRoomAction } from '../actions';
-
-const SLOT_LENGTHS = [5, 10, 15, 20, 25, 30, 40, 45, 60];
 
 /**
  * The venue: one card per room, made on its own, with no company needed.
@@ -181,7 +180,7 @@ export default async function InterviewsRoomsPage({
                               <Label htmlFor={`${room.id}-day`}>{t('schedule.day')}</Label>
                               <Input id={`${room.id}-day`} name="day" type="date" dir="ltr" defaultValue={defaultDay} required />
                             </div>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <Label htmlFor={`${room.id}-from`}>{t('schedule.from')}</Label>
                                 <Input id={`${room.id}-from`} name="start_time" type="time" dir="ltr" step={300} defaultValue="14:00" required />
@@ -190,17 +189,15 @@ export default async function InterviewsRoomsPage({
                                 <Label htmlFor={`${room.id}-to`}>{t('schedule.to')}</Label>
                                 <Input id={`${room.id}-to`} name="end_time" type="time" dir="ltr" step={300} defaultValue="17:00" required />
                               </div>
-                              <div>
-                                <Label htmlFor={`${room.id}-len`}>{t('schedule.slotMinutes')}</Label>
-                                <Select id={`${room.id}-len`} name="slot_minutes" defaultValue="20" required>
-                                  {SLOT_LENGTHS.map((n) => (
-                                    <option key={n} value={n}>
-                                      {n}
-                                    </option>
-                                  ))}
-                                </Select>
-                              </div>
                             </div>
+                            <p className="text-xs text-ink-muted">
+                              {t('schedule.fixedSlots', { minutes: SLOT_MINUTES })}{' '}
+                              {PRAYER_BREAKS.map(([from, to]) => (
+                                <span key={from} dir="ltr" className="ltr-nums me-2 inline-block">
+                                  {from}–{to}
+                                </span>
+                              ))}
+                            </p>
                           </ActionForm>
                         </Disclosure>
                       )}

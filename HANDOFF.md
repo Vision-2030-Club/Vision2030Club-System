@@ -1128,6 +1128,7 @@ apply form → HR selection → personal link flow decided on 2026-09-16:
 - The past-time rule is back for **active** editions (`app.refuse_past_slot`);
   a **draft** edition ignores the clock so rooms can still be tried out
   against today's date. Set the edition *Active* for the event.
+  **Dropped again by 0012** (2026-10-07): any time can be booked.
 - The sheet is no longer shared "anyone with the link" (it holds names,
   phones and 30-day CV links). `revokeLinkSharing` runs on every sync and
   also closes sheets created before this; share it by name from the club's
@@ -1487,7 +1488,7 @@ them together.
 - **Rooms tab** (`interviews/rooms/page.tsx`, new): one card per room, with
   its name and **location** (`rooms.note`: building, floor…). *Assign a
   company* on a room's card creates a session (`createSessionAction`) for a
-  company, a day, hours and a slot length. One room can host several
+  company, a day and hours (20-minute slots since 0012). One room can host several
   companies on one day at different hours. The card lists who is assigned
   when, with *Remove* (`deleteSessionAction`, refused while students are
   booked). Rooms are retired, never deleted.

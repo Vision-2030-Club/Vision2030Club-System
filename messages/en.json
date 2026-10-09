@@ -925,7 +925,7 @@
       "day": "Day",
       "from": "From",
       "to": "To",
-      "slotMinutes": "Minutes",
+      "fixedSlots": "Every slot is {minutes} minutes. None are made during the prayer breaks:",
       "needSetup": "Add a company and a room first.",
       "rooms": "Rooms",
       "retire": "Retire",

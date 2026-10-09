@@ -9,6 +9,7 @@ import { formatDate, formatTime, localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { loadCompanies, loadDayRows, loadRooms, loadSessions, sessionDays } from '@/lib/interviews/queries';
 import { buildDayGrid, minuteOfDayIn } from '@/lib/interviews/schedule';
+import { PRAYER_BREAKS, SLOT_MINUTES } from '@/lib/interviews/slotRules';
 import { STAGE_TONES } from '@/lib/interviews/ui';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { toDateInput } from '@/lib/time';
@@ -19,8 +20,6 @@ import {
   setSlotClosedAction,
   upsertRoomAction,
 } from '../actions';
-
-const SLOT_LENGTHS = [5, 10, 15, 20, 25, 30, 40, 45, 60];
 
 /**
  * The schedule: rooms across, the day down, one block per session; below it,
@@ -303,7 +302,7 @@ export default async function InterviewsSchedulePage({
                     <Label htmlFor="s_day">{t('schedule.day')}</Label>
                     <Input id="s_day" name="day" type="date" dir="ltr" defaultValue={selectedDay} required />
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
                       <Label htmlFor="s_start">{t('schedule.from')}</Label>
                       <Input id="s_start" name="start_time" type="time" dir="ltr" step={300} defaultValue="14:00" required />
@@ -312,17 +311,15 @@ export default async function InterviewsSchedulePage({
                       <Label htmlFor="s_end">{t('schedule.to')}</Label>
                       <Input id="s_end" name="end_time" type="time" dir="ltr" step={300} defaultValue="17:00" required />
                     </div>
-                    <div>
-                      <Label htmlFor="s_len">{t('schedule.slotMinutes')}</Label>
-                      <Select id="s_len" name="slot_minutes" defaultValue="20" required>
-                        {SLOT_LENGTHS.map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </Select>
-                    </div>
                   </div>
+                  <p className="text-xs text-ink-muted">
+                    {t('schedule.fixedSlots', { minutes: SLOT_MINUTES })}{' '}
+                    {PRAYER_BREAKS.map(([from, to]) => (
+                      <span key={from} dir="ltr" className="ltr-nums me-2 inline-block">
+                        {from}–{to}
+                      </span>
+                    ))}
+                  </p>
                 </ActionForm>
               ) : (
                 <p className="text-sm text-ink-muted">{t('schedule.needSetup')}</p>
