@@ -1536,6 +1536,32 @@ empty clears it.
   lengths are refused, as are more than 14 days; and the fake-Google
   harness confirmed empty rooms, half-assigned rooms and Notes on empty rows.
 
+### A room's own days (2026-10-09)
+
+A room can be given the days it is in use when it is made or edited
+(Rooms tab → *Add room* / *Edit*: **First day**, **Last day**, both
+optional). Kept in the edition's settings as `room_days`
+(`{ "<room id>": { from_day, to_day } }`, read through `roomDays` in
+`src/lib/interviews/floorLayout.ts`). No migration.
+
+- **The floor.** `floorPlan` (floorLayout.ts) decides which rooms the floor
+  Google Sheet and the Floor tab's *By room* view lay out on each day: a
+  room with days on those days only, whether or not they are event days; a
+  room without them on every event day of Settings → Event days and hours,
+  as before. Its empty rows use the layout's hours, or 14:00–20:00 in
+  20-minute rows (`DEFAULT_HOURS`) when no layout is set. Days with
+  sessions still appear as before. Saving a room re-syncs the Sheets.
+- **Assigning.** The *Assign a company* form starts on the room's first day
+  (else the event's first day) and only offers its days.
+  `createSessionAction` refuses a day outside them, from the Rooms tab and
+  the Schedule tab alike (`roomsTab.outsideDays`).
+- **Changing the days.** Narrowing them past a company already assigned to
+  the room is refused, naming the company and day (`roomsTab.daysClash`):
+  remove that assignment first. Emptying both fields puts the room back on
+  every event day. *Retire* and *Bring back* leave the days alone.
+- The check is in the app, not the database: `create_session` called some
+  other way does not know a room's days.
+
 ### 20-minute slots, prayer breaks, past times bookable (2026-10-07)
 
 `supabase/interviews/migrations/0012_fixed_slots_prayer_breaks.sql`,

@@ -40,7 +40,7 @@ import {
   type SheetEdit,
 } from '@/lib/interviews/sheetPull';
 import type { Edition, EditionSettings, Room, SlotStatus, Stage } from '@/lib/interviews/types';
-import { floorLayout, gridTimes, layoutDays, roomDay } from '@/lib/interviews/floorLayout';
+import { floorPlan, roomDay } from '@/lib/interviews/floorLayout';
 import { loadCompanies, loadRooms, loadSessions, sessionDays } from '@/lib/interviews/queries';
 
 /**
@@ -164,7 +164,7 @@ type RoomBlock = { title: string; slots: SlotStatus[]; rows: string[][] };
 
 /**
  * One row per slot of every session in the room that day, booked or not,
- * plus — on an event day of the edition's floor layout (floorLayout.ts) — an
+ * plus — on a day the floor lays rooms out (floorPlan, floorLayout.ts) — an
  * empty row for every grid time no company covers yet. Always BLOCK_COLS wide.
  */
 function buildRoomBlock(
@@ -429,12 +429,11 @@ export async function syncFloorSheet(
   const companyNames = new Map(companies.map((c) => [c.id, c.name_en]));
 
   const zone = edition.time_zone;
-  // Every day with a session, and every event day of the floor layout (set
-  // in Settings), so rooms appear on the floor before companies do.
-  const layout = floorLayout(edition.settings);
-  const eventDays = new Set(layoutDays(layout));
-  const days = [...new Set([...sessionDays(sessions), ...eventDays])].sort();
-  const activeRooms = rooms.filter((r) => r.is_active);
+  // Every day with a session, every event day of the floor layout (set in
+  // Settings) and every room's own days (Rooms tab), so rooms appear on the
+  // floor before companies do.
+  const plan = floorPlan(edition.settings, rooms);
+  const days = [...new Set([...sessionDays(sessions), ...plan.days])].sort();
 
   if (days.length === 0) {
     // Nothing scheduled at all (e.g. everything was just wiped for a fresh
@@ -469,12 +468,10 @@ export async function syncFloorSheet(
     const [, month, dayOfMonth] = day.split('-');
     const label = `${Number(month)}/${Number(dayOfMonth)}`;
 
-    // On an event day every active room is laid out, assigned or not.
+    // The rooms laid out that day (its own days, else the event days) are
+    // shown assigned or not.
     const roomIds = [
-      ...new Set([
-        ...sessions.filter((s) => s.day === day).map((s) => s.room_id),
-        ...(eventDays.has(day) ? activeRooms.map((r) => r.id) : []),
-      ]),
+      ...new Set([...sessions.filter((s) => s.day === day).map((s) => s.room_id), ...plan.roomsOn(day)]),
     ];
     const dayRooms = roomIds
       .map((id) => roomById.get(id))
@@ -493,7 +490,7 @@ export async function syncFloorSheet(
 
     const sheetId = await ensureNamedTab(spreadsheetId, tabs, claimed, label);
     keepIds.add(sheetId);
-    await syncDayTab(spreadsheetId, sheetId, label, `DAY ${i + 1} · ${dayTitle(day)}`, dayRooms, slotsByRoom, layout && eventDays.has(day) ? gridTimes(layout, day, zone) : [], companyNames, notes, zone);
+    await syncDayTab(spreadsheetId, sheetId, label, `DAY ${i + 1} · ${dayTitle(day)}`, dayRooms, slotsByRoom, plan.grid(day, zone), companyNames, notes, zone);
   }
 
   const allSheetId = allTab?.sheetId ?? (await addTab(spreadsheetId, ALL_TAB));

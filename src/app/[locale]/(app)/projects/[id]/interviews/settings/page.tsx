@@ -6,7 +6,7 @@ import { Card, EmptyState, Input, Label, Select, Textarea } from '@/components/u
 import { formatDateTime, toDateTimeInput } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { siteUrl } from '@/lib/interviews/email';
-import { floorLayout, LAYOUT_SLOT_LENGTHS } from '@/lib/interviews/floorLayout';
+import { DEFAULT_HOURS, floorLayout, LAYOUT_SLOT_LENGTHS } from '@/lib/interviews/floorLayout';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { CopyField } from '../CopyField';
 import {
@@ -184,15 +184,15 @@ export default async function InterviewsSettingsPage({
               </div>
               <div>
                 <Label htmlFor="layout_start">{t('layout.start')}</Label>
-                <Input id="layout_start" name="start" type="time" dir="ltr" step={300} defaultValue={layout?.start ?? '14:00'} />
+                <Input id="layout_start" name="start" type="time" dir="ltr" step={300} defaultValue={layout?.start ?? DEFAULT_HOURS.start} />
               </div>
               <div>
                 <Label htmlFor="layout_end">{t('layout.end')}</Label>
-                <Input id="layout_end" name="end" type="time" dir="ltr" step={300} defaultValue={layout?.end ?? '20:00'} />
+                <Input id="layout_end" name="end" type="time" dir="ltr" step={300} defaultValue={layout?.end ?? DEFAULT_HOURS.end} />
               </div>
               <div className="col-span-2">
                 <Label htmlFor="layout_slot">{t('layout.slotMinutes')}</Label>
-                <Select id="layout_slot" name="slot_minutes" defaultValue={String(layout?.slot_minutes ?? 20)}>
+                <Select id="layout_slot" name="slot_minutes" defaultValue={String(layout?.slot_minutes ?? DEFAULT_HOURS.slot_minutes)}>
                   {LAYOUT_SLOT_LENGTHS.map((n) => (
                     <option key={n} value={n}>
                       {n}

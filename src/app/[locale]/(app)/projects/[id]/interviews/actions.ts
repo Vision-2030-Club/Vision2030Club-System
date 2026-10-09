@@ -22,12 +22,21 @@ import { removeCv, uploadCv } from '@/lib/interviews/cv';
 import { kickRegistrationAppend, syncRegistrationSheet } from '@/lib/interviews/registrationSheet';
 import { APPLY_FIELDS, FIELD_LABELS, FIELD_MODES, resolveApplyFields, type FieldMode } from '@/lib/interviews/applyFields';
 import { applicationPayload } from '@/lib/interviews/applyPayload';
-import { layoutProblem, MAX_LAYOUT_DAYS, type FloorLayout } from '@/lib/interviews/floorLayout';
+import {
+  daysBetween,
+  layoutProblem,
+  MAX_LAYOUT_DAYS,
+  roomDays,
+  roomDaysProblem,
+  type FloorLayout,
+  type RoomDays,
+} from '@/lib/interviews/floorLayout';
 import { SLOT_MINUTES } from '@/lib/interviews/slotRules';
 import { choosesFullCompany, fullCompanyIds } from '@/lib/interviews/fullCompanies';
 import { normalisePhone } from '@/lib/interviews/phone';
 import { saveRoomLink } from '@/lib/interviews/roomLinks';
 import type { EditionSettings, Stage } from '@/lib/interviews/types';
+import { formatDate, localized } from '@/lib/format';
 import { fromClubWallClock } from '@/lib/time';
 
 /**
@@ -341,6 +350,12 @@ export async function setCompanyHiddenAction(
  * it later, for a day and hours, as sessions (createSessionAction). Only the
  * fields the form sends are changed, so the Retire button never wipes the
  * location.
+ *
+ * The add/edit form also sends the room's days (`from_day`, `to_day`): the
+ * floor lays the room out on those days only (floorPlan, floorLayout.ts),
+ * and companies can be assigned to it on those days only. Empty means every
+ * event day, as before. Narrowing them past a company already assigned is
+ * refused: remove that assignment first.
  */
 export async function upsertRoomAction(
   _previous: ActionResult,
@@ -348,11 +363,43 @@ export async function upsertRoomAction(
 ): Promise<ActionResult> {
   const g = await guard(formData, can.manage);
   if ('error' in g) return fail(g.error);
+  const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
 
+  const roomId = text(formData, 'room_id');
   const db = createInterviewsClient();
-  const { error } = await db.rpc('upsert_room', {
+
+  // Only the add/edit form has the days; Retire and Bring back leave them be.
+  const setsDays = formData.has('from_day');
+  const fromDay = text(formData, 'from_day');
+  const days: RoomDays | null = fromDay ? { from_day: fromDay, to_day: text(formData, 'to_day') ?? fromDay } : null;
+  if (days) {
+    const problem = roomDaysProblem(days);
+    if (problem) return fail(t(`layout.errors.${problem}`, { max: MAX_LAYOUT_DAYS }));
+  }
+  if (setsDays && days && roomId) {
+    const inUse = new Set(daysBetween(days.from_day, days.to_day));
+    const { data: assigned, error: assignedError } = await db
+      .from('sessions')
+      .select('day, companies(name_en, name_ar)')
+      .eq('edition_id', g.access.edition.id)
+      .eq('room_id', roomId)
+      .order('day');
+    if (assignedError) return fromPostgrest(assignedError);
+    type Assigned = { day: string; companies: { name_en: string; name_ar: string | null } | null };
+    const clash = ((assigned ?? []) as unknown as Assigned[]).find((s) => !inUse.has(s.day));
+    if (clash) {
+      return fail(
+        t('roomsTab.daysClash', {
+          company: localized(clash.companies, 'name', g.locale) || '?',
+          day: formatDate(`${clash.day}T12:00:00Z`, g.locale),
+        }),
+      );
+    }
+  }
+
+  const { data: room, error } = await db.rpc('upsert_room', {
     p_edition: g.access.edition.id,
-    p_room: text(formData, 'room_id'),
+    p_room: roomId,
     p_payload: {
       name: text(formData, 'name'),
       ...(formData.has('note') ? { note: text(formData, 'note') ?? '' } : {}),
@@ -363,10 +410,39 @@ export async function upsertRoomAction(
   });
   if (error) return fromPostgrest(error);
 
-  // Room names head the floor sheet's blocks and the company sheets.
+  if (setsDays) {
+    const savedId = (room as { id: string } | null)?.id ?? roomId;
+    if (savedId) {
+      const daysError = await saveRoomDays(db, g.access.edition.id, savedId, days, g.access.actor);
+      if (daysError) return fail(daysError);
+    }
+  }
+
+  // Room names head the floor sheet's blocks and the company sheets, and its
+  // days decide which day tabs it is laid out on.
   kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
+}
+
+/** Saves (or, with null, clears) one room's days, read fresh so two quick saves do not undo each other. */
+async function saveRoomDays(
+  db: ReturnType<typeof createInterviewsClient>,
+  editionId: string,
+  roomId: string,
+  days: RoomDays | null,
+  actor: unknown,
+): Promise<string | null> {
+  const { data } = await db.rpc('edition_settings', { p_edition: editionId });
+  const all = roomDays(data as EditionSettings | null);
+  if (days) all[roomId] = days;
+  else delete all[roomId];
+  const { error } = await db.rpc('update_edition', {
+    p_edition: editionId,
+    p_patch: { settings: { room_days: all } },
+    p_actor: actor,
+  });
+  return error?.message ?? null;
 }
 
 /**
@@ -763,13 +839,27 @@ export async function createSessionAction(
   const g = await guard(formData, can.manage);
   if ('error' in g) return fail(g.error);
 
+  // A room with its own days (Rooms tab) takes companies on those days only.
+  const roomId = requiredText(formData, 'room_id');
+  const day = requiredText(formData, 'day');
+  const own = roomDays(g.access.settings)[roomId];
+  if (own && !daysBetween(own.from_day, own.to_day).includes(day)) {
+    const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
+    return fail(
+      t('roomsTab.outsideDays', {
+        from: formatDate(`${own.from_day}T12:00:00Z`, g.locale),
+        to: formatDate(`${own.to_day}T12:00:00Z`, g.locale),
+      }),
+    );
+  }
+
   const db = createInterviewsClient();
   const { error } = await db.rpc('create_session', {
     p_edition: g.access.edition.id,
     p_payload: {
       company_id: requiredText(formData, 'company_id'),
-      room_id: requiredText(formData, 'room_id'),
-      day: requiredText(formData, 'day'),
+      room_id: roomId,
+      day,
       start_time: requiredText(formData, 'start_time'),
       end_time: requiredText(formData, 'end_time'),
       // The database makes 20-minute slots whatever it is sent (0012).
