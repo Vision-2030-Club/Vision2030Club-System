@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Alert, Badge, Card } from '@/components/ui';
-import { formatDateTime, formatTime, localized } from '@/lib/format';
+import { formatDate, formatDateTime, formatTime, localized } from '@/lib/format';
 import {
   loadAllSlots,
   loadBookingsOf,
@@ -13,7 +13,7 @@ import { isToken } from '@/lib/interviews/tokens';
 import type { Application, Edition, EditionSettings } from '@/lib/interviews/types';
 import { STAGE_TONES } from '@/lib/interviews/ui';
 import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/interviews';
-import { CancelForm, SlotPicker, type PickableSlot } from './SlotPicker';
+import { CancelForm, SlotPicker, type SlotGroup } from './SlotPicker';
 
 /**
  * A student's own page. The link IS the login: whoever holds it sees only
@@ -71,21 +71,28 @@ export default async function StudentPage({
   const active = bookings.filter((b) => !b.cancelled_at);
 
   // Every slot of each accepted company — open and booked alike, so the
-  // picker always shows the room's whole scheduled range. A past time is
-  // offered too; book_slot refuses it once the edition is active and allows
-  // it while the edition is a draft being tried out (0009).
-  const slotsByCompany = new Map<string, PickableSlot[]>();
+  // picker always shows the room's whole scheduled range — grouped by day
+  // and room, so a company with rooms on several days never shows two
+  // identical-looking times. A past time can be booked too (0012).
+  const slotsByCompany = new Map<string, SlotGroup[]>();
   await Promise.all(
     accepted.map(async (company) => {
-      const slots = await loadAllSlots(db, company.id);
-      slotsByCompany.set(
-        company.id,
-        slots.map((s) => ({
+      const groups: SlotGroup[] = [];
+      for (const s of await loadAllSlots(db, company.id)) {
+        const day = formatDate(s.starts_at, locale);
+        const key = `${day}|${s.room_id}`;
+        let group = groups.find((g) => g.key === key);
+        if (!group) {
+          group = { key, day, room: t('student.room', { room: roomName.get(s.room_id) ?? '' }), slots: [] };
+          groups.push(group);
+        }
+        group.slots.push({
           id: s.id,
           timeLabel: `${formatTime(s.starts_at, locale)} – ${formatTime(s.ends_at, locale)}`,
           taken: s.is_closed || s.booking_id !== null,
-        })),
-      );
+        });
+      }
+      slotsByCompany.set(company.id, groups);
     }),
   );
 
@@ -116,8 +123,8 @@ export default async function StudentPage({
 
       {accepted.map((company) => {
         const booking = active.find((b) => b.company_id === company.id);
-        const slots = slotsByCompany.get(company.id) ?? [];
-        const hasFree = slots.some((s) => !s.taken);
+        const groups = slotsByCompany.get(company.id) ?? [];
+        const hasFree = groups.some((g) => g.slots.some((s) => !s.taken));
         const canChange =
           bookingOpen &&
           booking?.stage === 'scheduled' &&
@@ -152,7 +159,7 @@ export default async function StudentPage({
                         locale={locale}
                         companyId={company.id}
                         bookingId={booking.id}
-                        slots={slots}
+                        groups={groups}
                         mode="move"
                       />
                     ) : null}
@@ -165,7 +172,7 @@ export default async function StudentPage({
             ) : bookingOpen ? (
               hasFree ? (
                 <div className="mt-3">
-                  <SlotPicker token={token} locale={locale} companyId={company.id} slots={slots} mode="book" />
+                  <SlotPicker token={token} locale={locale} companyId={company.id} groups={groups} mode="book" />
                 </div>
               ) : (
                 <p className="mt-3 text-sm text-ink-muted">{t('student.noFreeSlots')}</p>
