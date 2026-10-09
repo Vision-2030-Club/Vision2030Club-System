@@ -4,27 +4,28 @@ import { redirect } from '@/i18n/navigation';
 import { fail, ok, requiredText, text, type ActionResult } from '@/lib/actions';
 import { removeCv, uploadCv } from '@/lib/interviews/cv';
 import { normalisePhone } from '@/lib/interviews/phone';
+import { applicationsByPhone } from '@/lib/interviews/queries';
 import { findRoomByToken } from '@/lib/interviews/roomLinks';
 import { isToken } from '@/lib/interviews/tokens';
 import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/interviews';
 
 /**
- * A student opening one room's link (roomLinks.ts): name, phone, the email
- * they applied with, and a CV. The email and phone together must belong to
- * one application in this edition: phone alone is not enough, because anyone
- * who knows a classmate's number could otherwise open their booking page
- * (the rule .claude/rules/interviews.md keeps). If HR accepted them for this
- * room's company (the Rooms tab's phone list, or Accept on their applicant
- * page), they go straight to their personal booking page; otherwise they are
- * told they are not accepted yet.
+ * A student opening one company's candidate link (roomLinks.ts): name, phone,
+ * email and a CV. They are found by their phone number alone (normalised,
+ * applicationsByPhone): the email is NOT compared with the one they applied
+ * with, a decision the club made on 2026-10-09 to keep the door simple. If HR
+ * accepted that number for this company (the Companies tab's phone list, or
+ * Accept on their applicant page), they go straight to their personal
+ * booking page; otherwise they are told they are not accepted yet.
  *
- * The CV: a new one replaces the one on file; none is needed if one is
- * already there. It is written straight to the row with the service role
- * (no 0001–0004 function updates only a CV), so the audit log records that
- * change as `system`.
+ * Because a phone number alone opens the booking page, what is typed here
+ * never overwrites what is on file: a name or email is filled in only while
+ * the application has none (a number HR added that never applied), and a CV
+ * replaces the one on file only when the typed email is the application's
+ * own. Otherwise a new CV is added only while there is none.
  *
- * Nothing here needs 0005: the link is kept in the edition's settings, the
- * matching is done here, and booking is the personal page from 0002.
+ * Those writes go straight to the row with the service role (no 0001–0004
+ * function updates them), so the audit log records them as `system`.
  */
 export async function roomLoginAction(
   _previous: ActionResult,
@@ -54,15 +55,14 @@ export async function roomLoginAction(
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail('Enter a valid email address.', 'invalid_email');
   if (!phone) return fail('Enter a phone number.', 'missing_phone');
 
+  const match = (await applicationsByPhone(db, room.editionId)).get(phone);
+  if (!match) return fail('No one has been added with that phone number.', 'no_match');
   const { data: application } = await db
     .from('applications')
-    .select('id, phone, personal_token, cv_path')
-    .eq('edition_id', room.editionId)
-    .eq('email', email)
+    .select('id, name, email, personal_token, cv_path')
+    .eq('id', match.id)
     .maybeSingle();
-  if (!application || normalisePhone(application.phone as string | null) !== phone) {
-    return fail('No application matches that phone and email.', 'no_match');
-  }
+  if (!application) return fail('No one has been added with that phone number.', 'no_match');
 
   const { data: accepted } = await db
     .from('application_preferences')
@@ -73,9 +73,17 @@ export async function roomLoginAction(
     .maybeSingle();
   if (!accepted) return ok('notAccepted');
 
+  // Only blanks are filled in. The email may already be another
+  // application's (one per edition); then it simply stays empty.
+  if (!application.name) await db.from('applications').update({ name }).eq('id', application.id);
+  if (!application.email) await db.from('applications').update({ email }).eq('id', application.id);
+  const ownsRecord = !application.email || String(application.email).toLowerCase() === email;
+
   const file = formData.get('cv');
-  if (file instanceof File && file.size > 0) {
-    const uploaded = await uploadCv(db, room.editionId, file);
+  const newCv = file instanceof File && file.size > 0 ? file : null;
+  const hasCv = Boolean(application.cv_path);
+  if (newCv && (!hasCv || ownsRecord)) {
+    const uploaded = await uploadCv(db, room.editionId, newCv);
     if ('error' in uploaded) return fail(uploaded.error, uploaded.error);
     const { error } = await db.from('applications').update({ cv_path: uploaded.path }).eq('id', application.id);
     if (error) {
@@ -83,7 +91,7 @@ export async function roomLoginAction(
       return fail(error.message);
     }
     await removeCv(db, application.cv_path as string | null);
-  } else if (!application.cv_path) {
+  } else if (!hasCv && !newCv) {
     return fail('Attach your CV as a PDF.', 'missing_cv');
   }
 

@@ -1,6 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { addDaysToDateInput, clubTimestamp } from '@/lib/time';
+import { normalisePhone } from '@/lib/interviews/phone';
 import type { BoardBooking } from '@/lib/interviews/board';
 import type {
   Application,
@@ -130,6 +131,40 @@ export async function loadCounters(
 }
 
 export type AcceptedPhone = { application_id: string; phone: string; name: string; decided_at: string | null };
+
+export type PhoneMatch = { id: string; phone: string | null; email: string | null; submitted_at: string };
+
+/**
+ * Every application of the edition by its normalised phone number
+ * (phone.ts), so "+966 50…" and "050…" find the same person. Where several
+ * share a number, the one with an email wins, then the newest. Used by HR's
+ * accepted list and the candidate link, which both match on phone alone.
+ */
+export async function applicationsByPhone(db: SupabaseClient, editionId: string): Promise<Map<string, PhoneMatch>> {
+  const byPhone = new Map<string, PhoneMatch>();
+  for (let from = 0; ; from += 1000) {
+    const { data } = await db
+      .from('applications')
+      .select('id, phone, email, submitted_at')
+      .eq('edition_id', editionId)
+      .not('phone', 'is', null)
+      .order('id')
+      .range(from, from + 999);
+    const rows = (data ?? []) as PhoneMatch[];
+    for (const row of rows) {
+      const key = normalisePhone(row.phone);
+      if (!key) continue;
+      const held = byPhone.get(key);
+      const better =
+        !held ||
+        (row.email !== null && held.email === null) ||
+        ((row.email !== null) === (held.email !== null) && row.submitted_at > held.submitted_at);
+      if (better) byPhone.set(key, row);
+    }
+    if (rows.length < 1000) break;
+  }
+  return byPhone;
+}
 
 /**
  * Who is accepted for one company: every application whose preference for

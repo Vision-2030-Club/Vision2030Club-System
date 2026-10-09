@@ -34,6 +34,7 @@ import {
 import { SLOT_MINUTES } from '@/lib/interviews/slotRules';
 import { choosesFullCompany, fullCompanyIds } from '@/lib/interviews/fullCompanies';
 import { normalisePhone } from '@/lib/interviews/phone';
+import { applicationsByPhone } from '@/lib/interviews/queries';
 import { saveRoomLink } from '@/lib/interviews/roomLinks';
 import type { EditionSettings, Stage } from '@/lib/interviews/types';
 import { formatDate, localized } from '@/lib/format';
@@ -695,18 +696,19 @@ export async function createRoomLinkAction(
 }
 
 /**
- * HR's accepted list for one room, pasted as phone numbers (one per line, or
- * separated by commas). Nothing is added automatically: only the numbers HR
- * types are used. Each is matched to the applicant who applied with it
- * (normalised, so +966 5… and 05… are the same number; an application with an
- * email first, then the newest) and accepted for this room's company with
- * `decide_preference`, the same function as the Accept button on an
- * applicant's page, which needs no migration after 0001. That also queues the
- * student's acceptance email with their personal booking link, delivered once
- * email is configured.
+ * HR's accepted list for one company, pasted as phone numbers (one per line,
+ * or separated by commas). Nothing is added automatically: only the numbers
+ * HR types are used. Each is matched to the applicant who applied with it
+ * (normalised, so +966 5… and 05… are the same number; applicationsByPhone)
+ * and accepted for this company with `accept_for_company` (0013), whether or
+ * not they chose it on the form. A number that never applied becomes a new
+ * applicant with only that phone, who opens the company's candidate link,
+ * types their name and CV, and picks a time. Accepting queues the student's
+ * acceptance email with their personal booking link when they have an email.
  *
- * A number that matches nobody, or a student who did not choose this
- * company, is listed back rather than accepted.
+ * Before 0013 is applied this falls back to `decide_preference` (0001): only
+ * numbers that applied and chose this company are accepted, and the others
+ * are listed back.
  */
 export async function acceptPhonesAction(
   _previous: ActionResult,
@@ -729,36 +731,42 @@ export async function acceptPhonesAction(
 
   const editionId = g.access.edition.id;
   const db = createInterviewsClient();
+  const byPhone = await applicationsByPhone(db, editionId);
 
-  type Candidate = { id: string; phone: string | null; email: string | null; submitted_at: string };
-  const byPhone = new Map<string, Candidate>();
-  for (let from = 0; ; from += 1000) {
-    const { data } = await db
-      .from('applications')
-      .select('id, phone, email, submitted_at')
-      .eq('edition_id', editionId)
-      .not('phone', 'is', null)
-      .range(from, from + 999);
-    const rows = (data ?? []) as Candidate[];
-    for (const row of rows) {
-      const key = normalisePhone(row.phone);
-      if (!key) continue;
-      const held = byPhone.get(key);
-      const better =
-        !held ||
-        (row.email !== null && held.email === null) ||
-        ((row.email !== null) === (held.email !== null) && row.submitted_at > held.submitted_at);
-      if (better) byPhone.set(key, row);
-    }
-    if (rows.length < 1000) break;
-  }
-
+  const notPhones: string[] = [];
   const notFound: string[] = [];
   const notChosen: string[] = [];
-  for (const phone of typed) {
-    const match = byPhone.get(normalisePhone(phone) ?? '');
+  let before0013 = false;
+  for (const typedPhone of typed) {
+    const phone = normalisePhone(typedPhone);
+    if (!phone || phone.length < 9) {
+      notPhones.push(typedPhone);
+      continue;
+    }
+    const match = byPhone.get(phone);
+
+    if (!before0013) {
+      const { data, error } = await db.rpc('accept_for_company', {
+        p_edition: editionId,
+        p_company: companyId,
+        p_application: match?.id ?? null,
+        p_phone: phone,
+        p_token: newToken(),
+        p_actor: g.access.actor,
+      });
+      // PGRST202: the function is not there yet.
+      if (error?.code === 'PGRST202') before0013 = true;
+      else if (error) return fromPostgrest(error);
+      else {
+        // A new phone-only applicant: a second copy of the same number in this list finds it.
+        const app = data as { application_id: string } | null;
+        if (!match && app) byPhone.set(phone, { id: app.application_id, phone, email: null, submitted_at: '' });
+        continue;
+      }
+    }
+
     if (!match) {
-      notFound.push(phone);
+      notFound.push(typedPhone);
       continue;
     }
     const { error } = await db.rpc('decide_preference', {
@@ -768,14 +776,16 @@ export async function acceptPhonesAction(
       p_note: '',
       p_actor: g.access.actor,
     });
-    if (error?.hint === 'not_found') notChosen.push(phone);
+    if (error?.hint === 'not_found') notChosen.push(typedPhone);
     else if (error) return fromPostgrest(error);
   }
 
   kickSheetsSync(editionId);
   revalidate(g.locale, g.projectId);
-  if (notFound.length || notChosen.length) {
-    const parts = [t('companies.phonesAccepted', { count: typed.length - notFound.length - notChosen.length })];
+  const refused = notPhones.length + notFound.length + notChosen.length;
+  if (refused) {
+    const parts = [t('companies.phonesAccepted', { count: typed.length - refused })];
+    if (notPhones.length) parts.push(t('companies.phonesInvalid', { phones: notPhones.join(', ') }));
     if (notFound.length) parts.push(t('companies.phonesNotFound', { phones: notFound.join(', ') }));
     if (notChosen.length) parts.push(t('companies.phonesNotChosen', { phones: notChosen.join(', ') }));
     return fail(parts.join(' '));

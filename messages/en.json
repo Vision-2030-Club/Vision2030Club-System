@@ -811,7 +811,7 @@
       "acceptedPhones": "Accepted phone numbers",
       "noAcceptedPhones": "No phone numbers accepted yet.",
       "addPhones": "Add phone numbers",
-      "addPhonesHint": "One per line. Each number is matched to the student who applied with it and accepted for this company; they must have chosen this company on the form.",
+      "addPhonesHint": "One per line. Each number is accepted for this company, whether or not the student chose it on the form. A number that never applied is added as a new applicant, who completes their name and CV on the candidate link and picks a time.",
       "roomDay": "Day",
       "delete": "Delete room",
       "deleteTitle": "Delete this room?",
@@ -827,8 +827,9 @@
       "logoUploaded": "Logo uploaded on the Applicants tab. Change it there.",
       "phonesEmpty": "Enter at least one phone number.",
       "phonesAccepted": "Accepted {count}.",
-      "phonesNotFound": "No applicant has these numbers: {phones}.",
-      "phonesNotChosen": "These applicants did not choose this company: {phones}.",
+      "phonesInvalid": "These are not phone numbers: {phones}.",
+      "phonesNotFound": "No applicant has these numbers (apply migration 0013 to add them): {phones}.",
+      "phonesNotChosen": "These applicants did not choose this company (apply migration 0013 to accept them anyway): {phones}.",
       "roomCompany": "Company",
       "roomCompanyNew": "New company (type its name)",
       "createLink": "Create room link",
@@ -1069,7 +1070,7 @@
       "logo_too_large": "The logo is larger than 1 MB.",
       "missing_company_name": "Enter the company’s name.",
       "missing_answer": "Answer this question: {question}.",
-      "no_match": "No application matches that phone number and email. Use the ones you applied with.",
+      "no_match": "No one has been added with that phone number. Check the number, or contact the club.",
       "stage_changed": "The student’s status changed before this edit arrived, so the newer status was kept."
     },
     "student": {
@@ -1127,15 +1128,15 @@
       "quiet": "Waiting for the next interview"
     },
     "room": {
-      "intro": "Enter your name, the phone number and email you applied with, and your CV. If you have been accepted for this room, you will choose your interview time next.",
+      "intro": "Enter your name, phone number, email and CV. If you have been accepted for this company, you will choose your interview time next.",
       "name": "Name",
       "phone": "Phone number",
       "cvFile": "CV (PDF, up to 5 MB)",
-      "cvHint": "If you already sent your CV when you applied, you can leave this empty, or attach a new one to replace it.",
+      "cvHint": "If the club already has your CV, you can leave this empty.",
       "submit": "Continue",
       "notAccepted": "You have not been accepted for this company yet. Check back later, or contact the club.",
       "email": "Email",
-      "emailHint": "The email you applied with."
+      "emailHint": "Your interview details are sent here."
     },
     "roomsTab": {
       "add": "Add room",

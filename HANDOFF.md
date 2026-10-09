@@ -1159,10 +1159,9 @@ personal booking link, which goes out once Resend is configured.
 the edition's settings, `room_links` ({ company id: token },
 `src/lib/interviews/roomLinks.ts`); **Add room** creates it, and older rooms
 get a **Create room link** button. The link (`/interviews/room/<token>`) asks
-for name, phone, the email the student applied with, and a CV. Email and
-phone must belong to one application in the edition (phone alone is not
-enough: the rule above), and that application must be accepted for the
-room's company; then the student goes to their personal booking page (0002).
+for name, phone, email and a CV. Since 0013 (below) the phone alone finds
+the application, and that application must be accepted for the room's
+company; then the student goes to their personal booking page (0002).
 A new CV replaces the one on file, written straight to the row (audited as
 `system`); none is needed if one is there. **Add room** can now attach the room
 to an existing company (the one students chose on the form) instead of
@@ -1561,6 +1560,39 @@ optional). Kept in the edition's settings as `room_days`
   every event day. *Retire* and *Bring back* leave the days alone.
 - The check is in the app, not the database: `create_session` called some
   other way does not know a room's days.
+
+### Any number on HR's list, and a phone-only candidate link (0013, 2026-10-09)
+
+`supabase/interviews/migrations/0013_accept_any_phone.sql`, **not yet
+applied**: the project lead pastes it into the interviews project's SQL
+editor (or runs `npm run db:push -- --target interviews`) before the event.
+It needs only 0001–0004 and can be run twice. Checked on an empty local
+Postgres 16, both with 0001–0004 only and with 0001–0012.
+
+- **HR's accepted list takes any number** (Companies tab → *Add phone
+  numbers*, `acceptPhonesAction`). A number is accepted for that company
+  whether or not the student chose it on the form; a number that never
+  applied becomes an applicant with only a phone (no name, no email) and is
+  accepted. `accept_for_company` does both; the app matches the number
+  (`applicationsByPhone` in `queries.ts`) and passes the application it
+  found. `applications.email` may now be empty. Something with fewer than 9
+  digits is listed back as not a phone number.
+- **Before 0013 is applied** the action falls back to `decide_preference`
+  as before: only numbers that applied and chose the company are accepted,
+  and the message says to apply 0013 for the rest.
+- **The candidate link matches on phone only** (`roomLoginAction`). The
+  form is unchanged (name, phone, email, CV), but the email is no longer
+  compared with the one the student applied with: the club chose this on
+  2026-10-09 to keep the door simple. **Risk:** anyone who knows an
+  accepted student's number reaches their booking page and can move or
+  cancel their interview; the open decision below about a second factor
+  still stands. To limit the damage, nothing on file is overwritten: the
+  name and email are filled in only while blank (a number HR added), and a
+  new CV replaces the old one only when the typed email is the
+  application's own; otherwise it is added only while there is none.
+- A student HR added by phone who later fills in the apply form with an
+  email gets a second application; lookups by phone prefer the one with an
+  email.
 
 ### 20-minute slots, prayer breaks, past times bookable (2026-10-07)
 
