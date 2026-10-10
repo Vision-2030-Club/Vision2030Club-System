@@ -7,6 +7,7 @@ import { Disclosure } from '@/components/Disclosure';
 import { Card, EmptyState, Input, Label, Select } from '@/components/ui';
 import { formatDate, formatTime, localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
+import { floorLayout, roomDays, type RoomDays } from '@/lib/interviews/floorLayout';
 import { loadCompanies, loadRooms, loadSessions } from '@/lib/interviews/queries';
 import { pages } from '@/lib/interviews/sheetFormat';
 import { PRAYER_BREAKS, SLOT_MINUTES } from '@/lib/interviews/slotRules';
@@ -24,6 +25,11 @@ import { createSessionAction, deleteSessionAction, upsertRoomAction } from '../a
  * can be assigned to several rooms. Companies themselves are made on the
  * Companies tab, with nothing about rooms.
  *
+ * A room can be given its own days (`room_days` in the edition's settings,
+ * floorLayout.ts): the floor and its Google Sheet lay it out on those days
+ * only, and companies are assigned to it on those days only. Without them
+ * it is on every event day of Settings → Event days and hours.
+ *
  * A room is never deleted, only retired (`is_active`): its history stays,
  * and it can be brought back. An assignment with students booked in it
  * cannot be removed until they are moved or cancelled (delete_session).
@@ -38,7 +44,7 @@ export default async function InterviewsRoomsPage({
 
   const access = await getInterviewAccess(id);
   if (!access?.edition) notFound();
-  const { edition, role } = access;
+  const { edition, settings, role } = access;
 
   const t = await getTranslations('interviews');
   const tCommon = await getTranslations('common');
@@ -70,8 +76,11 @@ export default async function InterviewsRoomsPage({
     sessions.filter((s) => s.room_id === room.id).sort((a, b) => a.starts_at.localeCompare(b.starts_at));
   const active = rooms.filter((r) => r.is_active);
   const retired = rooms.filter((r) => !r.is_active);
-  // A new assignment starts on the edition's latest day with one, else today.
-  const defaultDay = sessions.length ? sessions[sessions.length - 1].day : toDateInput(new Date());
+  const daysOf = roomDays(settings);
+  // A new assignment starts on the room's first day, else the event's first
+  // day, else the edition's latest day with one, else today.
+  const fallbackDay =
+    floorLayout(settings)?.from_day ?? (sessions.length ? sessions[sessions.length - 1].day : toDateInput(new Date()));
 
   return (
     <div className="space-y-4">
@@ -87,17 +96,21 @@ export default async function InterviewsRoomsPage({
         <div className="grid gap-3 md:grid-cols-2">
           {active.map((room) => {
             const assigned = sessionsOf(room);
+            const own = daysOf[room.id];
             return (
               <Card key={room.id}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h2 className="font-semibold">{room.name}</h2>
                     <p className="text-sm text-ink-muted">{room.note ?? t('roomsTab.noLocation')}</p>
+                    <p className="ltr-nums text-sm text-ink-muted">
+                      {own ? daysLabel(own, locale) : t('roomsTab.everyEventDay')}
+                    </p>
                   </div>
                   {manage ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <Disclosure label={tCommon('edit')} title={room.name}>
-                        <RoomFields locale={locale} projectId={id} room={room} t={t} submitLabel={tCommon('save')} />
+                        <RoomFields locale={locale} projectId={id} room={room} days={own} t={t} submitLabel={tCommon('save')} />
                       </Disclosure>
                       <ActionForm action={upsertRoomAction} submitLabel={t('roomsTab.retire')} variant="secondary" className="space-y-0">
                         <input type="hidden" name="locale" value={locale} />
@@ -178,7 +191,16 @@ export default async function InterviewsRoomsPage({
                             </div>
                             <div>
                               <Label htmlFor={`${room.id}-day`}>{t('schedule.day')}</Label>
-                              <Input id={`${room.id}-day`} name="day" type="date" dir="ltr" defaultValue={defaultDay} required />
+                              <Input
+                                id={`${room.id}-day`}
+                                name="day"
+                                type="date"
+                                dir="ltr"
+                                defaultValue={own?.from_day ?? fallbackDay}
+                                min={own?.from_day}
+                                max={own?.to_day}
+                                required
+                              />
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               <div>
@@ -236,17 +258,25 @@ export default async function InterviewsRoomsPage({
 
 type T = Awaited<ReturnType<typeof getTranslations<'interviews'>>>;
 
-/** Add a room (no `room`) or edit one: its name and where it is. */
+/** "12 Oct 2026", or "12 Oct 2026 – 13 Oct 2026" for more than one day. */
+function daysLabel(days: RoomDays, locale: string): string {
+  const from = formatDate(`${days.from_day}T12:00:00Z`, locale);
+  return days.to_day === days.from_day ? from : `${from} – ${formatDate(`${days.to_day}T12:00:00Z`, locale)}`;
+}
+
+/** Add a room (no `room`) or edit one: its name, where it is, and the days it is in use. */
 function RoomFields({
   locale,
   projectId,
   room,
+  days,
   t,
   submitLabel,
 }: {
   locale: string;
   projectId: string;
   room?: Room;
+  days?: RoomDays;
   t: T;
   submitLabel: string;
 }) {
@@ -265,7 +295,16 @@ function RoomFields({
           <Label htmlFor={`${key}-room-location`}>{t('roomsTab.location')}</Label>
           <Input id={`${key}-room-location`} name="note" defaultValue={room?.note ?? ''} placeholder={t('roomsTab.locationHint')} />
         </div>
+        <div>
+          <Label htmlFor={`${key}-room-from`}>{t('roomsTab.fromDay')}</Label>
+          <Input id={`${key}-room-from`} name="from_day" type="date" dir="ltr" defaultValue={days?.from_day ?? ''} />
+        </div>
+        <div>
+          <Label htmlFor={`${key}-room-to`}>{t('roomsTab.toDay')}</Label>
+          <Input id={`${key}-room-to`} name="to_day" type="date" dir="ltr" defaultValue={days?.to_day ?? ''} />
+        </div>
       </div>
+      <p className="text-xs text-ink-muted">{t('roomsTab.daysHint')}</p>
     </ActionForm>
   );
 }

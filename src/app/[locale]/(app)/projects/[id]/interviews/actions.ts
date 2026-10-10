@@ -22,12 +22,22 @@ import { removeCv, uploadCv } from '@/lib/interviews/cv';
 import { kickRegistrationAppend, syncRegistrationSheet } from '@/lib/interviews/registrationSheet';
 import { APPLY_FIELDS, FIELD_LABELS, FIELD_MODES, resolveApplyFields, type FieldMode } from '@/lib/interviews/applyFields';
 import { applicationPayload } from '@/lib/interviews/applyPayload';
-import { layoutProblem, MAX_LAYOUT_DAYS, type FloorLayout } from '@/lib/interviews/floorLayout';
+import {
+  daysBetween,
+  layoutProblem,
+  MAX_LAYOUT_DAYS,
+  roomDays,
+  roomDaysProblem,
+  type FloorLayout,
+  type RoomDays,
+} from '@/lib/interviews/floorLayout';
 import { SLOT_MINUTES } from '@/lib/interviews/slotRules';
 import { choosesFullCompany, fullCompanyIds } from '@/lib/interviews/fullCompanies';
 import { normalisePhone } from '@/lib/interviews/phone';
+import { applicationsByPhone } from '@/lib/interviews/queries';
 import { saveRoomLink } from '@/lib/interviews/roomLinks';
 import type { EditionSettings, Stage } from '@/lib/interviews/types';
+import { formatDate, localized } from '@/lib/format';
 import { fromClubWallClock } from '@/lib/time';
 
 /**
@@ -341,6 +351,12 @@ export async function setCompanyHiddenAction(
  * it later, for a day and hours, as sessions (createSessionAction). Only the
  * fields the form sends are changed, so the Retire button never wipes the
  * location.
+ *
+ * The add/edit form also sends the room's days (`from_day`, `to_day`): the
+ * floor lays the room out on those days only (floorPlan, floorLayout.ts),
+ * and companies can be assigned to it on those days only. Empty means every
+ * event day, as before. Narrowing them past a company already assigned is
+ * refused: remove that assignment first.
  */
 export async function upsertRoomAction(
   _previous: ActionResult,
@@ -348,11 +364,43 @@ export async function upsertRoomAction(
 ): Promise<ActionResult> {
   const g = await guard(formData, can.manage);
   if ('error' in g) return fail(g.error);
+  const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
 
+  const roomId = text(formData, 'room_id');
   const db = createInterviewsClient();
-  const { error } = await db.rpc('upsert_room', {
+
+  // Only the add/edit form has the days; Retire and Bring back leave them be.
+  const setsDays = formData.has('from_day');
+  const fromDay = text(formData, 'from_day');
+  const days: RoomDays | null = fromDay ? { from_day: fromDay, to_day: text(formData, 'to_day') ?? fromDay } : null;
+  if (days) {
+    const problem = roomDaysProblem(days);
+    if (problem) return fail(t(`layout.errors.${problem}`, { max: MAX_LAYOUT_DAYS }));
+  }
+  if (setsDays && days && roomId) {
+    const inUse = new Set(daysBetween(days.from_day, days.to_day));
+    const { data: assigned, error: assignedError } = await db
+      .from('sessions')
+      .select('day, companies(name_en, name_ar)')
+      .eq('edition_id', g.access.edition.id)
+      .eq('room_id', roomId)
+      .order('day');
+    if (assignedError) return fromPostgrest(assignedError);
+    type Assigned = { day: string; companies: { name_en: string; name_ar: string | null } | null };
+    const clash = ((assigned ?? []) as unknown as Assigned[]).find((s) => !inUse.has(s.day));
+    if (clash) {
+      return fail(
+        t('roomsTab.daysClash', {
+          company: localized(clash.companies, 'name', g.locale) || '?',
+          day: formatDate(`${clash.day}T12:00:00Z`, g.locale),
+        }),
+      );
+    }
+  }
+
+  const { data: room, error } = await db.rpc('upsert_room', {
     p_edition: g.access.edition.id,
-    p_room: text(formData, 'room_id'),
+    p_room: roomId,
     p_payload: {
       name: text(formData, 'name'),
       ...(formData.has('note') ? { note: text(formData, 'note') ?? '' } : {}),
@@ -363,10 +411,39 @@ export async function upsertRoomAction(
   });
   if (error) return fromPostgrest(error);
 
-  // Room names head the floor sheet's blocks and the company sheets.
+  if (setsDays) {
+    const savedId = (room as { id: string } | null)?.id ?? roomId;
+    if (savedId) {
+      const daysError = await saveRoomDays(db, g.access.edition.id, savedId, days, g.access.actor);
+      if (daysError) return fail(daysError);
+    }
+  }
+
+  // Room names head the floor sheet's blocks and the company sheets, and its
+  // days decide which day tabs it is laid out on.
   kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
   return ok();
+}
+
+/** Saves (or, with null, clears) one room's days, read fresh so two quick saves do not undo each other. */
+async function saveRoomDays(
+  db: ReturnType<typeof createInterviewsClient>,
+  editionId: string,
+  roomId: string,
+  days: RoomDays | null,
+  actor: unknown,
+): Promise<string | null> {
+  const { data } = await db.rpc('edition_settings', { p_edition: editionId });
+  const all = roomDays(data as EditionSettings | null);
+  if (days) all[roomId] = days;
+  else delete all[roomId];
+  const { error } = await db.rpc('update_edition', {
+    p_edition: editionId,
+    p_patch: { settings: { room_days: all } },
+    p_actor: actor,
+  });
+  return error?.message ?? null;
 }
 
 /**
@@ -619,18 +696,19 @@ export async function createRoomLinkAction(
 }
 
 /**
- * HR's accepted list for one room, pasted as phone numbers (one per line, or
- * separated by commas). Nothing is added automatically: only the numbers HR
- * types are used. Each is matched to the applicant who applied with it
- * (normalised, so +966 5… and 05… are the same number; an application with an
- * email first, then the newest) and accepted for this room's company with
- * `decide_preference`, the same function as the Accept button on an
- * applicant's page, which needs no migration after 0001. That also queues the
- * student's acceptance email with their personal booking link, delivered once
- * email is configured.
+ * HR's accepted list for one company, pasted as phone numbers (one per line,
+ * or separated by commas). Nothing is added automatically: only the numbers
+ * HR types are used. Each is matched to the applicant who applied with it
+ * (normalised, so +966 5… and 05… are the same number; applicationsByPhone)
+ * and accepted for this company with `accept_for_company` (0013), whether or
+ * not they chose it on the form. A number that never applied becomes a new
+ * applicant with only that phone, who opens the company's candidate link,
+ * types their name and CV, and picks a time. Accepting queues the student's
+ * acceptance email with their personal booking link when they have an email.
  *
- * A number that matches nobody, or a student who did not choose this
- * company, is listed back rather than accepted.
+ * Before 0013 is applied this falls back to `decide_preference` (0001): only
+ * numbers that applied and chose this company are accepted, and the others
+ * are listed back.
  */
 export async function acceptPhonesAction(
   _previous: ActionResult,
@@ -653,36 +731,42 @@ export async function acceptPhonesAction(
 
   const editionId = g.access.edition.id;
   const db = createInterviewsClient();
+  const byPhone = await applicationsByPhone(db, editionId);
 
-  type Candidate = { id: string; phone: string | null; email: string | null; submitted_at: string };
-  const byPhone = new Map<string, Candidate>();
-  for (let from = 0; ; from += 1000) {
-    const { data } = await db
-      .from('applications')
-      .select('id, phone, email, submitted_at')
-      .eq('edition_id', editionId)
-      .not('phone', 'is', null)
-      .range(from, from + 999);
-    const rows = (data ?? []) as Candidate[];
-    for (const row of rows) {
-      const key = normalisePhone(row.phone);
-      if (!key) continue;
-      const held = byPhone.get(key);
-      const better =
-        !held ||
-        (row.email !== null && held.email === null) ||
-        ((row.email !== null) === (held.email !== null) && row.submitted_at > held.submitted_at);
-      if (better) byPhone.set(key, row);
-    }
-    if (rows.length < 1000) break;
-  }
-
+  const notPhones: string[] = [];
   const notFound: string[] = [];
   const notChosen: string[] = [];
-  for (const phone of typed) {
-    const match = byPhone.get(normalisePhone(phone) ?? '');
+  let before0013 = false;
+  for (const typedPhone of typed) {
+    const phone = normalisePhone(typedPhone);
+    if (!phone || phone.length < 9) {
+      notPhones.push(typedPhone);
+      continue;
+    }
+    const match = byPhone.get(phone);
+
+    if (!before0013) {
+      const { data, error } = await db.rpc('accept_for_company', {
+        p_edition: editionId,
+        p_company: companyId,
+        p_application: match?.id ?? null,
+        p_phone: phone,
+        p_token: newToken(),
+        p_actor: g.access.actor,
+      });
+      // PGRST202: the function is not there yet.
+      if (error?.code === 'PGRST202') before0013 = true;
+      else if (error) return fromPostgrest(error);
+      else {
+        // A new phone-only applicant: a second copy of the same number in this list finds it.
+        const app = data as { application_id: string } | null;
+        if (!match && app) byPhone.set(phone, { id: app.application_id, phone, email: null, submitted_at: '' });
+        continue;
+      }
+    }
+
     if (!match) {
-      notFound.push(phone);
+      notFound.push(typedPhone);
       continue;
     }
     const { error } = await db.rpc('decide_preference', {
@@ -692,14 +776,16 @@ export async function acceptPhonesAction(
       p_note: '',
       p_actor: g.access.actor,
     });
-    if (error?.hint === 'not_found') notChosen.push(phone);
+    if (error?.hint === 'not_found') notChosen.push(typedPhone);
     else if (error) return fromPostgrest(error);
   }
 
   kickSheetsSync(editionId);
   revalidate(g.locale, g.projectId);
-  if (notFound.length || notChosen.length) {
-    const parts = [t('companies.phonesAccepted', { count: typed.length - notFound.length - notChosen.length })];
+  const refused = notPhones.length + notFound.length + notChosen.length;
+  if (refused) {
+    const parts = [t('companies.phonesAccepted', { count: typed.length - refused })];
+    if (notPhones.length) parts.push(t('companies.phonesInvalid', { phones: notPhones.join(', ') }));
     if (notFound.length) parts.push(t('companies.phonesNotFound', { phones: notFound.join(', ') }));
     if (notChosen.length) parts.push(t('companies.phonesNotChosen', { phones: notChosen.join(', ') }));
     return fail(parts.join(' '));
@@ -763,13 +849,27 @@ export async function createSessionAction(
   const g = await guard(formData, can.manage);
   if ('error' in g) return fail(g.error);
 
+  // A room with its own days (Rooms tab) takes companies on those days only.
+  const roomId = requiredText(formData, 'room_id');
+  const day = requiredText(formData, 'day');
+  const own = roomDays(g.access.settings)[roomId];
+  if (own && !daysBetween(own.from_day, own.to_day).includes(day)) {
+    const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
+    return fail(
+      t('roomsTab.outsideDays', {
+        from: formatDate(`${own.from_day}T12:00:00Z`, g.locale),
+        to: formatDate(`${own.to_day}T12:00:00Z`, g.locale),
+      }),
+    );
+  }
+
   const db = createInterviewsClient();
   const { error } = await db.rpc('create_session', {
     p_edition: g.access.edition.id,
     p_payload: {
       company_id: requiredText(formData, 'company_id'),
-      room_id: requiredText(formData, 'room_id'),
-      day: requiredText(formData, 'day'),
+      room_id: roomId,
+      day,
       start_time: requiredText(formData, 'start_time'),
       end_time: requiredText(formData, 'end_time'),
       // The database makes 20-minute slots whatever it is sent (0012).

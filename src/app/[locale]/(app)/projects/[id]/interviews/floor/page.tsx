@@ -4,7 +4,7 @@ import { Link } from '@/i18n/navigation';
 import { Badge, Button, Card, EmptyState, Label, Select, cx } from '@/components/ui';
 import { formatDate, formatTime, localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
-import { floorLayout, gridTimes, layoutDays, roomDay } from '@/lib/interviews/floorLayout';
+import { floorPlan, roomDay } from '@/lib/interviews/floorLayout';
 import { loadCompanies, loadDayRows, loadRooms, loadSessions, sessionDays, toFloorRow } from '@/lib/interviews/queries';
 import { STAGE_TONES } from '@/lib/interviews/ui';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
@@ -21,7 +21,8 @@ import { FloorBoard } from './FloorBoard';
  *     can watch the same day without anything being pushed.
  *   - By room: every room of the day side by side, each with its whole time
  *     grid — on an event day of the edition's floor layout (Settings →
- *     Event days and hours, floorLayout.ts) that includes rooms no company is
+ *     Event days and hours) or a day a room is in use (its own days, Rooms
+ *     tab; floorPlan in floorLayout.ts) that includes rooms no company is
  *     assigned to yet, as empty rows. Read only; the stage buttons stay on
  *     the company view.
  */
@@ -51,9 +52,8 @@ export default async function InterviewsFloorPage({
     loadRooms(db, edition.id),
   ]);
 
-  const layout = floorLayout(settings);
-  const eventDays = new Set(layoutDays(layout));
-  const days = [...new Set([...sessionDays(sessions), ...eventDays])].sort();
+  const plan = floorPlan(settings, rooms);
+  const days = [...new Set([...sessionDays(sessions), ...plan.days])].sort();
   const today = toDateInput(new Date());
   const selectedDay =
     day && days.includes(day) ? day : days.includes(today) ? today : (days[0] ?? today);
@@ -104,11 +104,8 @@ export default async function InterviewsFloorPage({
   if (byRoom) {
     const hidden = new Set(companies.filter((c) => c.is_hidden).map((c) => c.id));
     const rows = (await loadDayRows(db, edition.id, selectedDay, edition.time_zone)).filter((r) => !hidden.has(r.company_id));
-    const grid = layout && eventDays.has(selectedDay) ? gridTimes(layout, selectedDay, edition.time_zone) : [];
-    const roomIds = new Set([
-      ...rows.map((r) => r.room_id),
-      ...(eventDays.has(selectedDay) ? rooms.filter((r) => r.is_active).map((r) => r.id) : []),
-    ]);
+    const grid = plan.grid(selectedDay, edition.time_zone);
+    const roomIds = new Set([...rows.map((r) => r.room_id), ...plan.roomsOn(selectedDay)]);
     const dayRooms = rooms
       .filter((r) => roomIds.has(r.id))
       .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));

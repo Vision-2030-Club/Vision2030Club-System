@@ -21,10 +21,12 @@ short:
 - Two flows exist side by side and both must keep working until the club
   decides: the apply form → HR selection → personal link by email, and the
   room link → phone number → HR's accepted list. Do not remove either.
-- A phone number is compared through `app.normalise_phone`; never compare
-  raw strings. Identity by phone alone is weak: never let a phone-only
-  login overwrite an existing applicant's name, CV, or booking, or reach
-  an application that has an email.
+- A phone number is compared normalised (`app.normalise_phone` in SQL,
+  `normalisePhone` in the app); never compare raw strings. The candidate
+  link finds a student by phone alone, including one who applied with an
+  email (the club's decision, 2026-10-09). Identity by phone is weak, so it
+  never overwrites what is on file: name and email only while blank, the CV
+  only when the typed email is the application's own.
 - Nothing is ever hard-deleted: rooms, companies and bookings are hidden or
   cancelled with a flag, and every change is logged with who made it.
 - Anything written to the floor Google Sheet or a public page carries

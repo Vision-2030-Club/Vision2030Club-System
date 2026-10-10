@@ -23,6 +23,8 @@ export type FloorLayout = {
 };
 
 export const LAYOUT_SLOT_LENGTHS = [5, 10, 15, 20, 25, 30, 40, 45, 60];
+/** The hours the Settings form starts with, and the floor's rows for a room with its own days when no layout is set. */
+export const DEFAULT_HOURS = { start: '14:00', end: '20:00', slot_minutes: 20 };
 /** A guard against a typo turning one week into a year of empty tabs. */
 export const MAX_LAYOUT_DAYS = 14;
 
@@ -74,6 +76,67 @@ export function layoutDays(layout: FloorLayout | null): string[] {
   return layout ? daysBetween(layout.from_day, layout.to_day) : [];
 }
 
+/**
+ * The days one room is in use, set when it is made or edited (Rooms tab).
+ * A room with days is laid out on the floor on those days only, whether or
+ * not they are event days; a room without them on every event day. Kept in
+ * the edition's settings as `room_days` ({ room id: { from_day, to_day } }),
+ * so it needs no migration.
+ */
+export type RoomDays = { from_day: string; to_day: string };
+
+/** Why a room's days cannot be saved (a key under interviews.layout.errors), or null when they are fine. */
+export function roomDaysProblem(d: RoomDays): string | null {
+  if (!DAY.test(d.from_day) || !DAY.test(d.to_day)) return 'badDay';
+  const days = daysBetween(d.from_day, d.to_day).length;
+  if (days === 0) return 'daysBackwards';
+  if (days > MAX_LAYOUT_DAYS) return 'tooManyDays';
+  return null;
+}
+
+/** Every room's days, by room id; a room without (or with unusable) days is left out. */
+export function roomDays(settings: { room_days?: unknown } | null | undefined): Record<string, RoomDays> {
+  const raw = settings?.room_days;
+  if (!raw || typeof raw !== 'object') return {};
+  const out: Record<string, RoomDays> = {};
+  for (const [id, value] of Object.entries(raw as Record<string, Partial<RoomDays> | null>)) {
+    const d = { from_day: String(value?.from_day ?? ''), to_day: String(value?.to_day ?? '') };
+    if (!roomDaysProblem(d)) out[id] = d;
+  }
+  return out;
+}
+
+/**
+ * What the floor (the Floor tab's room view and the floor Google Sheet)
+ * lays out before companies: the days, the rooms on each, and their rows.
+ * Days with sessions are added by the callers, as before.
+ */
+export function floorPlan(
+  settings: { floor_layout?: unknown; room_days?: unknown } | null | undefined,
+  rooms: { id: string; is_active: boolean }[],
+) {
+  const layout = floorLayout(settings);
+  const eventDays = new Set(layoutDays(layout));
+  const dated = roomDays(settings);
+  const active = rooms.filter((r) => r.is_active);
+  const daysOf = new Map(Object.entries(dated).map(([id, d]) => [id, new Set(daysBetween(d.from_day, d.to_day))]));
+
+  const roomsOn = (day: string): string[] =>
+    active.filter((r) => daysOf.get(r.id)?.has(day) ?? eventDays.has(day)).map((r) => r.id);
+
+  const days = [
+    ...new Set([...eventDays, ...active.flatMap((r) => [...(daysOf.get(r.id) ?? [])])]),
+  ].sort();
+
+  return {
+    days,
+    roomsOn,
+    /** The rows of `day`: the layout's hours, or DEFAULT_HOURS when only a room's own days put it on the floor. */
+    grid: (day: string, zone: string): string[] =>
+      roomsOn(day).length ? gridTimes(layout ?? DEFAULT_HOURS, day, zone) : [],
+  };
+}
+
 /** How far `zone` is ahead of UTC at `instant`, in milliseconds. */
 function zoneOffsetMs(instant: Date, zone: string): number {
   const parts = Object.fromEntries(
@@ -106,7 +169,7 @@ function wallClock(day: string, minute: number, zone: string): string {
  * before `end`, picking up after each prayer break the way the database
  * makes slots (slotRules.ts), so empty rows line up with assigned ones.
  */
-export function gridTimes(layout: FloorLayout, day: string, zone: string): string[] {
+export function gridTimes(layout: Pick<FloorLayout, 'start' | 'end' | 'slot_minutes'>, day: string, zone: string): string[] {
   const out: string[] = [];
   const len = layout.slot_minutes;
   for (let m = nextSlotStart(minutes(layout.start), len); m + len <= minutes(layout.end); m = nextSlotStart(m + len, len)) {
