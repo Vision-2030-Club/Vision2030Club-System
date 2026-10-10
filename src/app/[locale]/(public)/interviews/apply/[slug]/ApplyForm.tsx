@@ -73,7 +73,7 @@ export function ApplyForm({
             <p className="mt-1 text-xs text-ink-muted">{t('apply.emailHint')}</p>
           </div>
         </div>
-        <ApplicationQuestions fields={fields} idPrefix="apply" />
+        <ApplicationQuestions fields={fields} idPrefix="apply" clubMemberLabel="apply.clubMember" />
       </fieldset>
 
       <fieldset className="space-y-3">
