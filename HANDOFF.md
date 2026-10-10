@@ -1318,7 +1318,10 @@ No migration; everything new is kept in the edition's settings.
   column is gone**, because the template has none, and with it the 30-day
   signed CV URLs (`signCvLong` is deleted). Status uses the template's words:
   Arrived, In-interview, Completed, Late (= no-show), Gap (a slot closed for
-  a break), blank for booked-but-not-arrived. *Pull from Sheet* reads the
+  a break), blank for booked-but-not-arrived. Since 2026-10-10 each word
+  colours its cell (conditional formatting, `STATUS_TONES` in
+  `sheetFormat.ts`, shared with the company sheets): Completed green,
+  Arrived blue, In-interview yellow, Late red, Gap grey. *Pull from Sheet* reads the
   first four back, and only calls `advance_stage` for rows that differ from
   the database. **Notes are the organizers'**: each rewrite reads the tab
   first and puts every note back on its row, matched by the hidden eighth
@@ -1340,7 +1343,8 @@ No migration; everything new is kept in the edition's settings.
   COMPANY / DATE / ROOM band, then a row per slot: Time, Interviewer, Student
   Name, **Phone Number** (the club decided on 2026-10-05 that companies get
   it, as the template shows), Student CV, Feedback Link, Status. Status is the
-  system's (Interview Done / No Show / In-progress, from the floor) and is
+  system's (Interview Done / No Show / In-progress, from the floor; coloured
+  green / red / yellow like the floor's) and is
   never read back. Interviewer is filled with the company's name on every
   slot (since 2026-10-07); a person's name typed over it is carried across
   rewrites like the floor's Notes (keyed by slot), and a cleared cell goes

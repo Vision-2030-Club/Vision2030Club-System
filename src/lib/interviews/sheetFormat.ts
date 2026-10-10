@@ -214,6 +214,20 @@ export function whenText(b: Box, text: string, style: { bg: Rgb; fg?: Rgb }): ob
   };
 }
 
+/** The Status colours both kinds of sheet share: a traffic light, plus grey for a gap. */
+export const STATUS_TONES = {
+  done: { bg: hex('B7E1CD'), fg: hex('0D652D') },
+  arrived: { bg: hex('C9DAF8'), fg: hex('1C4587') },
+  inside: { bg: hex('FFE599'), fg: hex('7F6000') },
+  missed: { bg: hex('F4C7C3'), fg: hex('990000') },
+  gap: { bg: hex('D9D9D9'), fg: hex('434343') },
+} satisfies Record<string, { bg: Rgb; fg: Rgb }>;
+
+/** One `whenText` rule per Status word, so a cell recolours the moment its Status changes. */
+export function statusColours(b: Box, tones: Record<string, { bg: Rgb; fg: Rgb }>): object[] {
+  return Object.entries(tones).map(([text, style]) => whenText(b, text, style));
+}
+
 /** Pixel widths from `startCol` on. */
 export function widths(sheetId: number, startCol: number, px: number[]): object[] {
   return px.map((pixelSize, i) => ({
