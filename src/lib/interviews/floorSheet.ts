@@ -27,6 +27,8 @@ import {
   plain,
   stamp,
   STAGE_NAMES,
+  statusColours,
+  STATUS_TONES,
   timeOf,
   widths,
   type Box,
@@ -234,6 +236,13 @@ function blockFormatting(sheetId: number, row: number, col: number, block: RoomB
       mergeRows(box(first, last, NOTES_COL, NOTES_COL + 2)),
       grid(box(row + 1, last, NOTES_COL, NOTES_COL + 2), NOTES_LINE),
       dropdown(box(first, last, STATUS_COL, STATUS_COL + 1), STATUS_CHOICES),
+      ...statusColours(box(first, last, STATUS_COL, STATUS_COL + 1), {
+        Completed: STATUS_TONES.done,
+        Arrived: STATUS_TONES.arrived,
+        'In-interview': STATUS_TONES.inside,
+        Late: STATUS_TONES.missed,
+        [GAP]: STATUS_TONES.gap,
+      }),
     );
   }
   return requests;

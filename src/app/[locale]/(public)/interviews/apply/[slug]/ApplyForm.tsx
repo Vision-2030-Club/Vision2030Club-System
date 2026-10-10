@@ -64,11 +64,11 @@ export function ApplyForm({
         <legend className="mb-1 text-base font-semibold">{t('apply.aboutYou')}</legend>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <Label htmlFor="apply-name">{t('applicants.name')}</Label>
+            <Label htmlFor="apply-name">{t('apply.name')}</Label>
             <Input id="apply-name" name="name" required autoComplete="name" />
           </div>
           <div>
-            <Label htmlFor="apply-email">{t('applicants.email')}</Label>
+            <Label htmlFor="apply-email">{t('apply.email')}</Label>
             <Input id="apply-email" name="email" type="email" dir="ltr" required autoComplete="email" />
             <p className="mt-1 text-xs text-ink-muted">{t('apply.emailHint')}</p>
           </div>

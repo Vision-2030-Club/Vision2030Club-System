@@ -26,8 +26,9 @@ import {
   pages,
   paint,
   plain,
+  statusColours,
+  STATUS_TONES,
   timeOf,
-  whenText,
   widths,
   type Box,
 } from '@/lib/interviews/sheetFormat';
@@ -308,8 +309,11 @@ function tabFormatting(sheetId: number, slotCount: number): object[] {
       paint(box(FIRST_SLOT_ROW, end, 0, 1), { fg: INK, bold: true }),
       paint(box(FIRST_SLOT_ROW, end, 1, VISIBLE_COLS), { fg: INK }),
       dropdown(box(FIRST_SLOT_ROW, end, STATUS_COL, STATUS_COL + 1), STATUS_CHOICES),
-      whenText(box(FIRST_SLOT_ROW, end, STATUS_COL, STATUS_COL + 1), 'No Show', { bg: GREY, fg: INK }),
-      whenText(box(FIRST_SLOT_ROW, end, STATUS_COL, STATUS_COL + 1), 'Interview Done', { bg: MINT, fg: INK }),
+      ...statusColours(box(FIRST_SLOT_ROW, end, STATUS_COL, STATUS_COL + 1), {
+        'Interview Done': STATUS_TONES.done,
+        'In-progress': STATUS_TONES.inside,
+        'No Show': STATUS_TONES.missed,
+      }),
     );
   }
   requests.push(grid(box(3, end, 0, VISIBLE_COLS), LINE));
