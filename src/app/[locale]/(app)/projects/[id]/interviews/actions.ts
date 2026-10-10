@@ -35,7 +35,7 @@ import { SLOT_MINUTES } from '@/lib/interviews/slotRules';
 import { choosesFullCompany, fullCompanyIds } from '@/lib/interviews/fullCompanies';
 import { normalisePhone } from '@/lib/interviews/phone';
 import { applicationsByPhone } from '@/lib/interviews/queries';
-import { saveRoomLink } from '@/lib/interviews/roomLinks';
+import { saveSessionLink } from '@/lib/interviews/roomLinks';
 import type { EditionSettings, Stage } from '@/lib/interviews/types';
 import { formatDate, localized } from '@/lib/format';
 import { fromClubWallClock } from '@/lib/time';
@@ -667,28 +667,28 @@ export async function registerAction(
 }
 
 /**
- * A room's public link (roomLinks.ts), for a room made before links existed,
- * or a new one to replace a link that was passed around: the old one stops
+ * An assignment's candidate link (roomLinks.ts): made on the Rooms tab, or
+ * made again to replace a link that was passed around; the old one stops
  * working at once.
  */
-export async function createRoomLinkAction(
+export async function createSessionLinkAction(
   _previous: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
   const g = await guard(formData, can.manage);
   if ('error' in g) return fail(g.error);
 
-  const companyId = requiredText(formData, 'company_id');
+  const sessionId = requiredText(formData, 'session_id');
   const db = createInterviewsClient();
-  const { data: company } = await db
-    .from('companies')
+  const { data: session } = await db
+    .from('sessions')
     .select('id')
-    .eq('id', companyId)
+    .eq('id', sessionId)
     .eq('edition_id', g.access.edition.id)
     .maybeSingle();
-  if (!company) return fail('No such company.', 'not_found');
+  if (!session) return fail('No such assignment.', 'not_found');
 
-  const { error } = await saveRoomLink(db, g.access.edition.id, companyId, newToken(), g.access.actor);
+  const { error } = await saveSessionLink(db, g.access.edition.id, sessionId, newToken(), g.access.actor);
   if (error) return fail(error);
 
   revalidate(g.locale, g.projectId);
@@ -696,21 +696,19 @@ export async function createRoomLinkAction(
 }
 
 /**
- * HR's accepted list for one company, pasted as phone numbers (one per line,
- * or separated by commas). Nothing is added automatically: only the numbers
- * HR types are used. Each is matched to the applicant who applied with it
- * (normalised, so +966 5… and 05… are the same number; applicationsByPhone)
- * and accepted for this company with `accept_for_company` (0013), whether or
- * not they chose it on the form. A number that never applied becomes a new
- * applicant with only that phone, who opens the company's candidate link,
- * types their name and CV, and picks a time. Accepting queues the student's
- * acceptance email with their personal booking link when they have an email.
- *
- * Before 0013 is applied this falls back to `decide_preference` (0001): only
- * numbers that applied and chose this company are accepted, and the others
- * are listed back.
+ * An assignment's accepted list (Rooms tab), pasted as phone numbers (one
+ * per line, or separated by commas). Nothing is added automatically: only
+ * the numbers HR types are used. Each is matched to the applicant who applied
+ * with it (normalised, so +966 5… and 05… are the same number;
+ * applicationsByPhone) and accepted for this assignment with
+ * `accept_for_session` (0014): they book only this assignment's times, and
+ * are accepted for its company whether or not they chose it on the form. A
+ * number that never applied becomes a new applicant with only that phone,
+ * who opens the assignment's candidate link, types their name and CV, and
+ * picks a time. Accepting queues the acceptance email when they have an
+ * email. Before 0014 is applied nothing is accepted and the message says so.
  */
-export async function acceptPhonesAction(
+export async function acceptSessionPhonesAction(
   _previous: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
@@ -718,7 +716,7 @@ export async function acceptPhonesAction(
   if ('error' in g) return fail(g.error);
   const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
 
-  const companyId = requiredText(formData, 'company_id');
+  const sessionId = requiredText(formData, 'session_id');
   const typed = Array.from(
     new Set(
       (text(formData, 'phones') ?? '')
@@ -731,12 +729,11 @@ export async function acceptPhonesAction(
 
   const editionId = g.access.edition.id;
   const db = createInterviewsClient();
+  const { data: session } = await db.from('sessions').select('id').eq('id', sessionId).eq('edition_id', editionId).maybeSingle();
+  if (!session) return fail('No such assignment.', 'not_found');
   const byPhone = await applicationsByPhone(db, editionId);
 
   const notPhones: string[] = [];
-  const notFound: string[] = [];
-  const notChosen: string[] = [];
-  let before0013 = false;
   for (const typedPhone of typed) {
     const phone = normalisePhone(typedPhone);
     if (!phone || phone.length < 9) {
@@ -744,72 +741,49 @@ export async function acceptPhonesAction(
       continue;
     }
     const match = byPhone.get(phone);
-
-    if (!before0013) {
-      const { data, error } = await db.rpc('accept_for_company', {
-        p_edition: editionId,
-        p_company: companyId,
-        p_application: match?.id ?? null,
-        p_phone: phone,
-        p_token: newToken(),
-        p_actor: g.access.actor,
-      });
-      // PGRST202: the function is not there yet.
-      if (error?.code === 'PGRST202') before0013 = true;
-      else if (error) return fromPostgrest(error);
-      else {
-        // A new phone-only applicant: a second copy of the same number in this list finds it.
-        const app = data as { application_id: string } | null;
-        if (!match && app) byPhone.set(phone, { id: app.application_id, phone, email: null, submitted_at: '' });
-        continue;
-      }
-    }
-
-    if (!match) {
-      notFound.push(typedPhone);
-      continue;
-    }
-    const { error } = await db.rpc('decide_preference', {
-      p_application: match.id,
-      p_company: companyId,
-      p_decision: 'accepted',
-      p_note: '',
+    const { data, error } = await db.rpc('accept_for_session', {
+      p_session: sessionId,
+      p_application: match?.id ?? null,
+      p_phone: phone,
+      p_token: newToken(),
       p_actor: g.access.actor,
     });
-    if (error?.hint === 'not_found') notChosen.push(typedPhone);
-    else if (error) return fromPostgrest(error);
+    // PGRST202: the function is not there yet.
+    if (error?.code === 'PGRST202') return fail(t('roomsTab.needs0014'));
+    if (error) return fromPostgrest(error);
+    // A new phone-only applicant: a second copy of the number in this list finds it.
+    const created = data as { application_id: string } | null;
+    if (!match && created) byPhone.set(phone, { id: created.application_id, phone, email: null, submitted_at: '' });
   }
 
   kickSheetsSync(editionId);
   revalidate(g.locale, g.projectId);
-  const refused = notPhones.length + notFound.length + notChosen.length;
-  if (refused) {
-    const parts = [t('companies.phonesAccepted', { count: typed.length - refused })];
-    if (notPhones.length) parts.push(t('companies.phonesInvalid', { phones: notPhones.join(', ') }));
-    if (notFound.length) parts.push(t('companies.phonesNotFound', { phones: notFound.join(', ') }));
-    if (notChosen.length) parts.push(t('companies.phonesNotChosen', { phones: notChosen.join(', ') }));
-    return fail(parts.join(' '));
+  if (notPhones.length) {
+    return fail(
+      [
+        t('companies.phonesAccepted', { count: typed.length - notPhones.length }),
+        t('companies.phonesInvalid', { phones: notPhones.join(', ') }),
+      ].join(' '),
+    );
   }
   return ok('saved', { count: String(typed.length) });
 }
 
 /**
  * A plain form action (no useActionState, no per-row error UI) — same shape
- * as signOutAction in the app layout. Removing someone from an "accepted"
+ * as signOutAction in the app layout. Taking someone off an assignment's
  * list is low-stakes and reversible by pasting their number back in, so it
- * does not need a confirmation dialog or its own feedback state. Puts their
- * preference for this company back to pending (decide_preference again).
+ * needs no confirmation. unaccept_for_session (0014) also puts the company
+ * back to pending when no other list of that company holds them.
  */
-export async function unacceptPhoneAction(formData: FormData): Promise<void> {
+export async function unacceptSessionPhoneAction(formData: FormData): Promise<void> {
   const g = await guard(formData, can.decide);
   if ('error' in g) return;
 
   const db = createInterviewsClient();
-  await db.rpc('decide_preference', {
+  await db.rpc('unaccept_for_session', {
+    p_session: requiredText(formData, 'session_id'),
     p_application: requiredText(formData, 'application_id'),
-    p_company: requiredText(formData, 'company_id'),
-    p_decision: 'pending',
-    p_note: '',
     p_actor: g.access.actor,
   });
 
@@ -912,8 +886,21 @@ export async function deleteSessionAction(
   if ('error' in g) return fail(g.error);
 
   const db = createInterviewsClient();
+  const sessionId = requiredText(formData, 'session_id');
+  // Its accepted list would go with it (0014), and those students would be
+  // left accepted for the company with no day: refuse until it is emptied.
+  const { count } = await db
+    .from('session_acceptances')
+    .select('id', { count: 'exact', head: true })
+    .eq('session_id', sessionId)
+    .is('revoked_at', null);
+  if (count) {
+    const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
+    return fail(t('roomsTab.stillAccepted', { count }));
+  }
+
   const { error } = await db.rpc('delete_session', {
-    p_session: requiredText(formData, 'session_id'),
+    p_session: sessionId,
     p_actor: g.access.actor,
   });
   if (error) return fromPostgrest(error);

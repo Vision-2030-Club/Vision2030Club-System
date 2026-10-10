@@ -26,6 +26,8 @@ export type EditionSettings = {
   floor_sheet_url?: string;
   /** Each room's public link token, by company id; read through roomLinks (roomLinks.ts). */
   room_links?: Record<string, string>;
+  /** Each assignment's candidate link token, by session id; read through sessionLinks (roomLinks.ts). */
+  session_links?: Record<string, string>;
   /** The event's days and hours for the floor; read through floorLayout (floorLayout.ts). */
   floor_layout?: { from_day: string; to_day: string; start: string; end: string; slot_minutes: number } | null;
   /** The days each room is in use, by room id; read through roomDays (floorLayout.ts). */
@@ -61,6 +63,16 @@ export type Room = {
   note: string | null;
   sort_order: number;
   is_active: boolean;
+};
+
+/** HR's accepted list for one assignment (a session), 0014. Taken off = revoked_at, never deleted. */
+export type SessionAcceptance = {
+  id: string;
+  edition_id: string;
+  session_id: string;
+  application_id: string;
+  accepted_at: string;
+  revoked_at: string | null;
 };
 
 export type Company = {

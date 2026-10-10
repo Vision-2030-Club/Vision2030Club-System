@@ -167,35 +167,49 @@ export async function applicationsByPhone(db: SupabaseClient, editionId: string)
 }
 
 /**
- * Who is accepted for one company: every application whose preference for
- * it is `accepted`, however it got there (the Rooms tab's phone list or the
- * Accept button on an applicant's page). Read straight from the tables
- * 0001 made, so it needs no later migration.
+ * Who is on each assignment's accepted list (0014's session_acceptances),
+ * by session id, newest first. `ready` is false until 0014 is applied, so
+ * the Rooms tab can say so instead of showing empty lists.
  */
-export async function loadAcceptedPhones(
+export async function loadSessionAcceptances(
   db: SupabaseClient,
-  companyId: string,
-): Promise<AcceptedPhone[]> {
-  const { data } = await db
-    .from('application_preferences')
-    .select('application_id, decided_at, applications(name, phone)')
-    .eq('company_id', companyId)
-    .eq('decision', 'accepted')
-    .order('decided_at', { ascending: false });
+  editionId: string,
+): Promise<{ ready: boolean; bySession: Map<string, AcceptedPhone[]> }> {
+  const bySession = new Map<string, AcceptedPhone[]>();
   type Row = {
+    session_id: string;
     application_id: string;
-    decided_at: string | null;
+    accepted_at: string;
     applications: { name: string; phone: string | null } | { name: string; phone: string | null }[] | null;
   };
-  return ((data ?? []) as Row[]).map((row) => {
-    const app = Array.isArray(row.applications) ? row.applications[0] : row.applications;
-    return {
-      application_id: row.application_id,
-      phone: app?.phone ?? '',
-      name: app?.name ?? '',
-      decided_at: row.decided_at,
-    };
-  });
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db
+      .from('session_acceptances')
+      .select('session_id, application_id, accepted_at, applications(name, phone)')
+      .eq('edition_id', editionId)
+      .is('revoked_at', null)
+      .order('accepted_at', { ascending: false })
+      .range(from, from + 999);
+    if (error) return { ready: false, bySession };
+    for (const row of (data ?? []) as Row[]) {
+      const app = Array.isArray(row.applications) ? row.applications[0] : row.applications;
+      const list = bySession.get(row.session_id) ?? [];
+      list.push({ application_id: row.application_id, phone: app?.phone ?? '', name: app?.name ?? '', decided_at: row.accepted_at });
+      bySession.set(row.session_id, list);
+    }
+    if ((data ?? []).length < 1000) break;
+  }
+  return { ready: true, bySession };
+}
+
+/** The assignments a student is on the accepted list of (none before 0014). */
+export async function loadSessionsAcceptedFor(db: SupabaseClient, applicationId: string): Promise<Set<string>> {
+  const { data, error } = await db
+    .from('session_acceptances')
+    .select('session_id')
+    .eq('application_id', applicationId)
+    .is('revoked_at', null);
+  return new Set(error ? [] : (data ?? []).map((r) => r.session_id as string));
 }
 
 export async function countApplications(db: SupabaseClient, editionId: string): Promise<number> {

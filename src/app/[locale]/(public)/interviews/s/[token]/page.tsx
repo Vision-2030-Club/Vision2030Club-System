@@ -8,6 +8,7 @@ import {
   loadCompanies,
   loadPreferences,
   loadRooms,
+  loadSessionsAcceptedFor,
 } from '@/lib/interviews/queries';
 import { isToken } from '@/lib/interviews/tokens';
 import type { Application, Edition, EditionSettings } from '@/lib/interviews/types';
@@ -41,7 +42,7 @@ export default async function StudentPage({
   const application = applicationRow as Application | null;
   if (!application) notFound();
 
-  const [{ data: editionRow }, { data: settingsRow }, companies, rooms, preferences, bookings] =
+  const [{ data: editionRow }, { data: settingsRow }, companies, rooms, preferences, bookings, mySessions] =
     await Promise.all([
       db.from('editions').select('*').eq('id', application.edition_id).maybeSingle(),
       db.rpc('edition_settings', { p_edition: application.edition_id }),
@@ -49,6 +50,7 @@ export default async function StudentPage({
       loadRooms(db, application.edition_id),
       loadPreferences(db, application.id),
       loadBookingsOf(db, application.id),
+      loadSessionsAcceptedFor(db, application.id),
     ]);
   const edition = editionRow as Edition | null;
   const settings = settingsRow as EditionSettings | null;
@@ -70,7 +72,8 @@ export default async function StudentPage({
     .filter((c): c is NonNullable<typeof c> => Boolean(c));
   const active = bookings.filter((b) => !b.cancelled_at);
 
-  // Every slot of each accepted company — open and booked alike, so the
+  // Every slot of each accepted company (or of the student's assignments of
+  // it) — open and booked alike, so the
   // picker always shows the room's whole scheduled range — grouped by day
   // and room, so a company with rooms on several days never shows two
   // identical-looking times. A past time can be booked too (0012).
@@ -78,7 +81,11 @@ export default async function StudentPage({
   await Promise.all(
     accepted.map(async (company) => {
       const groups: SlotGroup[] = [];
-      for (const s of await loadAllSlots(db, company.id)) {
+      const all = await loadAllSlots(db, company.id);
+      // On an assignment's list (Rooms tab, 0014): only that assignment's
+      // times, the day HR chose. Accepted the older way: every time.
+      const mine = all.filter((s) => mySessions.has(s.session_id));
+      for (const s of mine.length ? mine : all) {
         const day = formatDate(s.starts_at, locale);
         const key = `${day}|${s.room_id}`;
         let group = groups.find((g) => g.key === key);
