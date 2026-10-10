@@ -13,7 +13,16 @@ import { ENGLISH_LEVELS, LEVELS, UNIVERSITIES } from '@/lib/interviews/types';
  * same thing. "Why your first choice?" is its own export because it reads
  * best after the companies.
  */
-export function ApplicationQuestions({ fields, idPrefix }: { fields: ApplyFields; idPrefix: string }) {
+export function ApplicationQuestions({
+  fields,
+  idPrefix,
+  clubMemberLabel = 'applicants.clubMember',
+}: {
+  fields: ApplyFields;
+  idPrefix: string;
+  /** The public form names the club in full; the team's register form keeps the short label. */
+  clubMemberLabel?: string;
+}) {
   const t = useTranslations('interviews');
   const tCommon = useTranslations('common');
   const [university, setUniversity] = useState('');
@@ -108,7 +117,7 @@ export function ApplicationQuestions({ fields, idPrefix }: { fields: ApplyFields
       ) : null}
       {asked('is_club_member') ? (
         <div className="sm:col-span-2">
-          <span className="mb-1 block text-sm font-medium text-ink">{t('applicants.clubMember')}</span>
+          <span className="mb-1 block text-sm font-medium text-ink">{t(clubMemberLabel)}</span>
           <div className="flex gap-4 text-sm">
             <label className="flex items-center gap-2">
               <input type="radio" name="is_club_member" value="yes" className="accent-brand-600" />
