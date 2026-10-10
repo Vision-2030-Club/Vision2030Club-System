@@ -62,8 +62,10 @@ export async function proxy(request: NextRequest) {
   // A link typed without its locale (`/interviews/apply/…`) keeps every
   // segment: dropping the first one used to read it as `/apply/…`, which is
   // not public, and sent students to the login page instead of the form.
-  const hasLocale = routing.locales.includes(segments[0] as never);
-  const locale = hasLocale ? segments[0] : routing.defaultLocale;
+  // Compared without case, as next-intl does, so `/AR/…` still counts.
+  const first = segments[0]?.toLowerCase();
+  const hasLocale = routing.locales.includes(first as never);
+  const locale = hasLocale ? (first as string) : routing.defaultLocale;
   const pathAfterLocale = '/' + (hasLocale ? segments.slice(1) : segments).join('/');
   const isPublic = PUBLIC_PATHS.some(
     (p) => pathAfterLocale === p || pathAfterLocale.startsWith(`${p}/`),
