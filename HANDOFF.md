@@ -1004,9 +1004,12 @@ short version:
 - **Exports.** `edition_snapshot` renders an edition as one JSON document;
   the sweep writes it to the private `exports` bucket once a night after 03:00
   club time, and Settings has *Take a copy now* and *Download JSON*.
-- **CVs** are PDFs (5 MB) in the private `cvs` bucket; `/api/interviews/cv`
-  signs a ten-minute URL for HR, managers, or the company that holds the
-  booking (past its PIN if one is set).
+- **CVs** are PDFs (4 MB, `src/lib/interviews/cvLimits.ts`) in the private
+  `cvs` bucket; `/api/interviews/cv` signs a ten-minute URL for HR, managers,
+  or the company that holds the booking (past its PIN if one is set). The
+  limit is 4 MB, not the bucket's 5, because Vercel refuses a request body
+  over about 4.45 MB with a 413 before the app runs (measured on production
+  2026-10-11); see "The apply form keeps what was typed" below.
 
 Pages: signed-in under `/projects/[id]/interviews/…` (overview, applicants, register,
 companies, schedule with the session generator, floor board, bookings, people,
@@ -1188,6 +1191,39 @@ The first attempt failed on 0005's unique phone index, because real
 applications share a number; 0005 was corrected in place (see below) and
 the second attempt went through. The teammate's `scripts/interviews-tests.mjs`
 coverage was not extended; the room flow is untested by script.
+
+### The apply form keeps what was typed (2026-10-11)
+
+Found by a launch-readiness review the night before the public opening:
+
+- **A CV over about 4.45 MB never reached the app.** A server action posts
+  the whole form, CV included, as one request, and Vercel refuses a body
+  over that size with a 413 (`next.config.ts`'s 12 MB `bodySizeLimit` cannot
+  lift it). The page then crashed to Next's English error screen and the
+  form was lost. `cvLimits.ts` now holds one 4 MB limit for the server
+  (`cv.ts`) and the three forms, which refuse a bigger file or a non-PDF
+  before sending: the apply form in its message box, the Register tab under
+  the drop zone, the room link through the browser's own bubble.
+- **React resets a form after its action, refusals included.** The apply
+  form therefore sends from `onSubmit` (`preventDefault` plus
+  `startTransition(formAction)`); React sees the prevented event and skips
+  the reset. It also checks that a company was chosen before sending.
+- **A request that fails outright** (dropped connection, 413, a deploy while
+  the page was open, which changes the server action ids) is caught around
+  the action and shown as `errors.network`, with the answers still there.
+  A database error that is not one of `submit_application`'s refusals is
+  logged by code only (its message can hold the email) and shown as
+  `errors.generic`; a storage error as `errors.upload_failed`.
+- **Phones typed in Arabic digits** (٠٥…) are stored as 05… (`westernDigits`
+  in `phone.ts`, used by `applyPayload.ts` for the phone and GPA, and by
+  `normalisePhone`). Before this, both normalisers turned them into nothing,
+  so HR's list could never match that student.
+- **A PDF a phone labels `''` or `application/octet-stream`** is uploaded as
+  `application/pdf`; the bucket accepts nothing else, and for a File the
+  upload ignores the `contentType` option.
+- **A link without `/ar` or `/en`** (`/interviews/apply/<slug>`) used to send
+  students to the login page: the proxy dropped the first path segment when
+  there was no locale. It now keeps it, and next-intl adds `/ar`.
 
 ### Registering, full companies, and the registrations sheet (0010)
 
