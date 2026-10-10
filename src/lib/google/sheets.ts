@@ -21,6 +21,16 @@ const DRIVE_API = 'https://www.googleapis.com/drive/v3';
  */
 const RETRY_WAITS_MS = [5_000, 20_000, 40_000];
 
+/** Google refused a request; `status` is the HTTP status (404: no such file for this account). */
+export class GoogleApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 async function googleFetch(base: string, path: string, init: RequestInit = {}) {
   for (let attempt = 0; ; attempt++) {
     const token = await getAccessToken();
@@ -41,7 +51,7 @@ async function googleFetch(base: string, path: string, init: RequestInit = {}) {
     }
     if (!response.ok) {
       const message = body?.error?.message ?? `Google returned ${response.status}`;
-      throw new Error(message);
+      throw new GoogleApiError(message, response.status);
     }
     return body;
   }
@@ -80,6 +90,35 @@ export async function createSpreadsheet(title: string, tabTitle: string): Promis
   });
   const id = created.spreadsheetId as string;
   return { id, url: `https://docs.google.com/spreadsheets/d/${id}/edit` };
+}
+
+/**
+ * Whether a spreadsheet the app saved earlier can still be written. Someone
+ * signed in to the club's Google account can delete one in Drive, and the
+ * app would otherwise keep writing to the missing file forever, every sync
+ * failing and no new file ever made. A file in the trash is taken back out
+ * (same link, sharing and Notes); one deleted for good, or not visible to the
+ * connected account (404), is reported gone (false) so the caller makes a
+ * new one. Any other error is thrown: Google being down or busy must never
+ * replace a file.
+ */
+export async function spreadsheetUsable(spreadsheetId: string): Promise<boolean> {
+  const path = `/files/${encodeURIComponent(spreadsheetId)}`;
+  try {
+    const file = await googleFetch(DRIVE_API, `${path}?fields=trashed`);
+    if (!file?.trashed) return true;
+    await googleFetch(DRIVE_API, path, { method: 'PATCH', body: JSON.stringify({ trashed: false }) });
+    console.warn(`[google/sheets] ${spreadsheetId} was in the trash; restored it`);
+    return true;
+  } catch (error) {
+    // Only a 404 means gone. Drive also answers 403 for rate limits, and
+    // taking that for a deleted file would leave a duplicate behind.
+    if (error instanceof GoogleApiError && error.status === 404) {
+      console.warn(`[google/sheets] ${spreadsheetId} is gone (${error.status}); a new file will be made`);
+      return false;
+    }
+    throw error;
+  }
 }
 
 /**

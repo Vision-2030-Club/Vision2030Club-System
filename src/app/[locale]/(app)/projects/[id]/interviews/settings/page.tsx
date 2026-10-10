@@ -55,8 +55,9 @@ export default async function InterviewsSettingsPage({
       .maybeSingle(),
   ]);
 
-  // The floor sheet's link: 0006's column where it exists, else the settings (floorSheet.ts).
-  const floorSheetUrl = edition.floor_sheet_url ?? settings.floor_sheet_url ?? null;
+  // The floor sheet's link: the settings first (a replacement for a deleted
+  // file is saved there), else 0006's column where it exists (floorSheet.ts).
+  const floorSheetUrl = settings.floor_sheet_url ?? edition.floor_sheet_url ?? null;
   const whenInput = (iso: string | null) => (iso ? toDateTimeInput(new Date(iso)) : '');
   const tvUrl = edition.tv_token ? `${siteUrl()}/${locale}/interviews/tv/${edition.tv_token}` : null;
   const layout = floorLayout(settings);

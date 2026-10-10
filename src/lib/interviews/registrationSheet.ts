@@ -7,6 +7,7 @@ import {
   forgetWritten,
   listTabs,
   rememberWritten,
+  spreadsheetUsable,
   revokeLinkSharing,
   writeTab,
   writtenAlready,
@@ -212,10 +213,14 @@ async function savedSheet(db: Db, editionId: string): Promise<string | null> {
   return typeof id === 'string' && id ? id : null;
 }
 
-/** The edition's sheet, created and remembered the first time it is needed. */
+/**
+ * The edition's sheet, created and remembered the first time it is needed,
+ * and made again if the saved one was deleted in Drive (one in the trash is
+ * restored instead).
+ */
 async function ensureSheet(db: Db, edition: Edition): Promise<string> {
   const saved = await savedSheet(db, edition.id);
-  if (saved) return saved;
+  if (saved && (await spreadsheetUsable(saved))) return saved;
   const { id, url } = await createSpreadsheet(`${edition.name_en} — Registrations`, TAB);
   const { error } = await db.rpc('update_edition', {
     p_edition: edition.id,
@@ -292,8 +297,10 @@ async function rebuild(editionId: string, force: boolean): Promise<void> {
     (column, i) => Boolean(column.field) && asked[column.field!] === 'off' && rows.slice(1).every((r) => !r[i]),
   );
 
+  // An unchanged sheet costs no Google call, not even the check that it still exists.
+  const saved = await savedSheet(db, editionId);
+  if (!force && saved && writtenAlready(cacheKey(saved), { rows, hidden })) return;
   const spreadsheetId = await ensureSheet(db, edition);
-  if (!force && writtenAlready(cacheKey(spreadsheetId), { rows, hidden })) return;
 
   await revokeLinkSharing(spreadsheetId);
   const tab = await tabOf(spreadsheetId);
@@ -327,7 +334,8 @@ async function appendRegistration(editionId: string, applicationId: string, repl
   const edition = await loadEdition(db, editionId);
   if (!edition) return;
   const sheetId = await savedSheet(db, editionId);
-  if (!sheetId) {
+  if (!sheetId || !(await spreadsheetUsable(sheetId))) {
+    // No sheet yet, or it was deleted in Drive: build a new one whole.
     await syncRegistrationSheet(editionId);
     return;
   }
