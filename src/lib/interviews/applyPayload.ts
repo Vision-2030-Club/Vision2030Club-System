@@ -1,11 +1,13 @@
 import 'server-only';
 import { all, text } from '@/lib/actions';
 import type { ApplyField, ApplyFields } from './applyFields';
+import { westernDigits } from './phone';
 
 /**
  * The answers a submitted form carries, as submit_application reads them.
  * A question the edition does not ask is sent as null whatever the form
  * posted, so a hand-crafted request cannot fill a field nobody was asked.
+ * The phone and GPA are stored with 0–9 even when typed in Arabic digits.
  *
  * `missing` names the first required question left blank — the form marks
  * them `required`, but only the server's check counts.
@@ -17,15 +19,19 @@ export function applicationPayload(
 ): { payload: Record<string, unknown>; missing: ApplyField | null } {
   const asked = (field: ApplyField) => fields[field] !== 'off';
   const answer = (field: ApplyField) => (asked(field) ? text(formData, field) : null);
+  const numeric = (field: ApplyField) => {
+    const value = answer(field);
+    return value === null ? null : westernDigits(value);
+  };
 
   const university = answer('university');
   const answers: Record<ApplyField, string | null> = {
-    phone: answer('phone'),
+    phone: numeric('phone'),
     university,
     level: answer('level'),
     major: answer('major'),
     college: answer('college'),
-    gpa: answer('gpa'),
+    gpa: numeric('gpa'),
     english_level: answer('english_level'),
     is_club_member: answer('is_club_member'),
     why_first: answer('why_first'),

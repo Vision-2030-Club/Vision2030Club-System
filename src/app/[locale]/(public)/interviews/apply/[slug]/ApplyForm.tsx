@@ -1,12 +1,13 @@
 'use client';
 
-import { useActionState } from 'react';
+import { startTransition, useActionState, useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { ApplicationQuestions, WhyFirstQuestion } from '@/components/ApplicationQuestions';
 import { CompanyPicker, type PickerCompany } from '@/components/CompanyPicker';
 import { Alert, Button, Input, Label } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
 import type { ApplyFields } from '@/lib/interviews/applyFields';
+import { cvProblem } from '@/lib/interviews/cvLimits';
 import { applyAction } from './actions';
 
 /**
@@ -14,6 +15,16 @@ import { applyAction } from './actions';
  * on the Applicants tab), the CV, and the companies. Company preferences are
  * chosen on cards (CompanyPicker), in the order they are tapped; a full
  * company stays on the grid, blurred, and cannot be chosen.
+ *
+ * Whatever goes wrong, the student keeps what they typed:
+ * - The CV (PDF, size) and the companies are checked here before anything
+ *   is sent. A CV too big for Vercel's request limit would otherwise never
+ *   reach the server's check.
+ * - The submit is sent from onSubmit rather than by the form's own action,
+ *   because React resets a form after its action runs, refusals included.
+ * - A request that fails outright (a dropped connection, a 413, a deploy
+ *   while the page was open) becomes a translated message instead of
+ *   Next's error page.
  */
 export function ApplyForm({
   locale,
@@ -30,9 +41,33 @@ export function ApplyForm({
 }) {
   const t = useTranslations('interviews');
   const tCommon = useTranslations('common');
-  const [state, formAction, pending] = useActionState<ActionResult, FormData>(applyAction, {
-    ok: false,
-  });
+  const [state, formAction, pending] = useActionState<ActionResult, FormData>(
+    async (previous, formData) => {
+      try {
+        return await applyAction(previous, formData);
+      } catch {
+        return { ok: false, error: 'network', hint: 'network' };
+      }
+    },
+    { ok: false },
+  );
+  // A problem found before sending; cleared on every new attempt.
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    // React sees the prevented event and leaves the form alone (no reset).
+    event.preventDefault();
+    if (pending) return;
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const cv = formData.get('cv');
+    const found =
+      (cv instanceof File && cv.size > 0 ? cvProblem(cv) : null) ??
+      (formData.getAll('preference').length === 0 ? 'no_preferences' : null);
+    setProblem(found);
+    if (found) return;
+    startTransition(() => formAction(formData));
+  };
 
   if (state.ok) {
     return (
@@ -43,14 +78,12 @@ export function ApplyForm({
     );
   }
 
-  const errorText = state.error
-    ? state.hint && t.has(`errors.${state.hint}`)
-      ? t(`errors.${state.hint}`)
-      : state.error
-    : null;
+  const hint = problem ?? state.hint;
+  const errorText =
+    problem || state.error ? (hint && t.has(`errors.${hint}`) ? t(`errors.${hint}`) : (state.error ?? null)) : null;
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form action={formAction} onSubmit={onSubmit} className="space-y-5">
       <input type="hidden" name="edition_id" value={editionId} />
       <input type="hidden" name="locale" value={locale} />
       {/* A field no person sees; anything in it means a bot filled the form. */}
