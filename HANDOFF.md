@@ -1195,6 +1195,14 @@ coverage was not extended; the room flow is untested by script.
   whether it is taking applications, and the questions it asks) and, for
   managers, the companies students choose from (their رغبات): add, edit,
   logo, Mark as full, Remove/Restore (`CompanyManager.tsx`).
+- **The applicant list at volume** (`loadApplicants` in `queries.ts`, fixed
+  2026-10-11). Applications and preferences are read in pages of 1000, the
+  preferences by edition. The company and decision filters run over every
+  application, and the list shows the newest 500 matches with "Showing the
+  newest 500 of N". Before, the filters only saw the newest 500, and the
+  preferences were fetched with an `.in()` of up to 500 ids. With a few
+  hundred applicants that URL grew too long, the error was dropped, and every
+  Choices badge and filter came back empty.
 - **The questions are a setting.** `editions.settings.apply_fields`, edited
   under *Edit questions* on the Applicants tab, says for phone, university,
   year (`level`), major, college, GPA, English, club member and "why your

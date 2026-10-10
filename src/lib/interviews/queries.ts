@@ -2,6 +2,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { addDaysToDateInput, clubTimestamp } from '@/lib/time';
 import { normalisePhone } from '@/lib/interviews/phone';
+import { pages } from '@/lib/interviews/sheetFormat';
 import type { BoardBooking } from '@/lib/interviews/board';
 import type {
   Application,
@@ -235,48 +236,59 @@ export type ApplicantFilters = {
   decision?: string;
 };
 
+/** How many rows HR's list shows; `total` says how many matched. */
+export const APPLICANTS_SHOWN = 500;
+
 /**
- * The applicant pool with every preference, for HR's list. Capped at 500
- * rows; the search box is how a bigger pool is narrowed, not paging.
+ * The applicant pool with every preference, for HR's list. The search box
+ * narrows in the database; the company and decision filters narrow by what
+ * the student asked for. The list shows the newest APPLICANTS_SHOWN matches
+ * and `total` counts them all.
+ *
+ * Everything is read in pages (an edition passes PostgREST's 1000 rows), and
+ * the preferences by edition rather than by a list of ids. The old version
+ * filtered the newest 500 only, so the 8 AM wave fell outside every company
+ * filter once more arrived, and it sent their ids in the URL: with a few
+ * hundred applicants the request was too long, the error was dropped, and
+ * every Choices badge and filter came back empty.
  */
 export async function loadApplicants(
   db: SupabaseClient,
   editionId: string,
   filters: ApplicantFilters,
-): Promise<{ applications: Application[]; preferences: Preference[] }> {
-  let query = db
-    .from('applications')
-    .select('*')
-    .eq('edition_id', editionId)
-    .order('submitted_at', { ascending: false })
-    .limit(500);
-
+): Promise<{ applications: Application[]; preferences: Preference[]; total: number }> {
   const q = filters.q?.trim();
-  if (q) {
-    const term = q.replace(/[%,]/g, ' ');
-    query = query.or(`name.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%`);
-  }
+  const term = q ? q.replace(/[%,()]/g, ' ') : null;
 
-  const { data: applications } = await query;
-  const rows = (applications ?? []) as Application[];
-  if (rows.length === 0) return { applications: [], preferences: [] };
+  const [rows, allPrefs] = await Promise.all([
+    pages<Application>((from, to) => {
+      let query = db
+        .from('applications')
+        .select('*')
+        .eq('edition_id', editionId)
+        .order('submitted_at', { ascending: false })
+        .order('id')
+        .range(from, to);
+      if (term) query = query.or(`name.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%`);
+      return query;
+    }),
+    pages<Preference>((from, to) =>
+      db
+        .from('application_preferences')
+        .select('*')
+        .eq('edition_id', editionId)
+        .order('application_id')
+        .order('rank')
+        .range(from, to),
+    ),
+  ]);
+  if (rows.length === 0) return { applications: [], preferences: [], total: 0 };
 
-  const { data: preferences } = await db
-    .from('application_preferences')
-    .select('*')
-    .in(
-      'application_id',
-      rows.map((a) => a.id),
-    )
-    .order('rank');
-
-  let prefs = (preferences ?? []) as Preference[];
   let apps = rows;
-
   // Company and decision filters narrow by what the student asked for.
   if (filters.companyId || filters.decision) {
     const keep = new Set(
-      prefs
+      allPrefs
         .filter(
           (p) =>
             (!filters.companyId || p.company_id === filters.companyId) &&
@@ -285,10 +297,15 @@ export async function loadApplicants(
         .map((p) => p.application_id),
     );
     apps = apps.filter((a) => keep.has(a.id));
-    prefs = prefs.filter((p) => keep.has(p.application_id));
   }
 
-  return { applications: apps, preferences: prefs };
+  const shown = apps.slice(0, APPLICANTS_SHOWN);
+  const ids = new Set(shown.map((a) => a.id));
+  return {
+    applications: shown,
+    preferences: allPrefs.filter((p) => ids.has(p.application_id)),
+    total: apps.length,
+  };
 }
 
 export async function loadApplication(
