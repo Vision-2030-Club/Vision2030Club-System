@@ -27,10 +27,11 @@ alter table companies add column candidate_token text unique;
 -- (edition_id, email) stays unique — multiple NULLs satisfy that on their own.
 alter table applications alter column email drop not null;
 
--- A candidate is looked up by phone within one edition. Nulls (imported rows
--- with no phone on file) are excluded, so they never collide with each other.
-create unique index applications_edition_phone_uidx
-  on applications (edition_id, phone) where phone is not null;
+-- Corrected in place (2026-10-11): this file used to create a UNIQUE index on
+-- (edition_id, phone). The live data has applications sharing a phone, so it
+-- could not be built and 0005 failed on the real project; 0009 drops it anyway
+-- and creates the plain applications_edition_phone_idx that lookups use. It
+-- was applied without that index, so this edit only matches what ran.
 
 -- Lets the room link's public page set a candidate_token at creation time —
 -- the same way access_token already works. Update behaviour is unchanged.
