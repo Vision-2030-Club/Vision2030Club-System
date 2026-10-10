@@ -10,13 +10,14 @@ import { isToken } from '@/lib/interviews/tokens';
 import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/interviews';
 
 /**
- * A student opening one company's candidate link (roomLinks.ts): name, phone,
+ * A student opening one assignment's candidate link (roomLinks.ts): name, phone,
  * email and a CV. They are found by their phone number alone (normalised,
  * applicationsByPhone): the email is NOT compared with the one they applied
  * with, a decision the club made on 2026-10-09 to keep the door simple. If HR
- * accepted that number for this company (the Companies tab's phone list, or
- * Accept on their applicant page), they go straight to their personal
- * booking page; otherwise they are told they are not accepted yet.
+ * put that number on this assignment's accepted list (Rooms tab), they go
+ * straight to their personal booking page, which offers only that
+ * assignment's times; otherwise they are told they are not accepted yet. An
+ * older per-company link checks acceptance for the company instead.
  *
  * Because a phone number alone opens the booking page, what is typed here
  * never overwrites what is on file: a name or email is filled in only while
@@ -64,13 +65,23 @@ export async function roomLoginAction(
     .maybeSingle();
   if (!application) return fail('No one has been added with that phone number.', 'no_match');
 
-  const { data: accepted } = await db
-    .from('application_preferences')
-    .select('id')
-    .eq('application_id', application.id)
-    .eq('company_id', room.companyId)
-    .eq('decision', 'accepted')
-    .maybeSingle();
+  // An assignment's link: on that assignment's list (0014). An older
+  // company link: accepted for the company.
+  const { data: accepted } = room.sessionId
+    ? await db
+        .from('session_acceptances')
+        .select('id')
+        .eq('application_id', application.id)
+        .eq('session_id', room.sessionId)
+        .is('revoked_at', null)
+        .maybeSingle()
+    : await db
+        .from('application_preferences')
+        .select('id')
+        .eq('application_id', application.id)
+        .eq('company_id', room.companyId)
+        .eq('decision', 'accepted')
+        .maybeSingle();
   if (!accepted) return ok('notAccepted');
 
   // Only blanks are filled in. The email may already be another

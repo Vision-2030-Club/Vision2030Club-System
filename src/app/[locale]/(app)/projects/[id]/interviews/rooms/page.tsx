@@ -7,14 +7,25 @@ import { Disclosure } from '@/components/Disclosure';
 import { Card, EmptyState, Input, Label, Select } from '@/components/ui';
 import { formatDate, formatTime, localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
+import { companySheets, sheetKey } from '@/lib/interviews/companySheets';
+import { siteUrl } from '@/lib/interviews/email';
 import { floorLayout, roomDays, type RoomDays } from '@/lib/interviews/floorLayout';
-import { loadCompanies, loadRooms, loadSessions } from '@/lib/interviews/queries';
+import { sessionLinks } from '@/lib/interviews/roomLinks';
+import { loadCompanies, loadRooms, loadSessionAcceptances, loadSessions } from '@/lib/interviews/queries';
 import { pages } from '@/lib/interviews/sheetFormat';
 import { PRAYER_BREAKS, SLOT_MINUTES } from '@/lib/interviews/slotRules';
 import type { Room, Session } from '@/lib/interviews/types';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { toDateInput } from '@/lib/time';
-import { createSessionAction, deleteSessionAction, upsertRoomAction } from '../actions';
+import { CopyField } from '../CopyField';
+import {
+  createSessionAction,
+  createSessionLinkAction,
+  deleteSessionAction,
+  syncCompanySheetAction,
+  upsertRoomAction,
+} from '../actions';
+import { AcceptedPhones } from './AcceptedPhones';
 
 /**
  * The venue: one card per room, made on its own, with no company needed.
@@ -29,6 +40,11 @@ import { createSessionAction, deleteSessionAction, upsertRoomAction } from '../a
  * floorLayout.ts): the floor and its Google Sheet lay it out on those days
  * only, and companies are assigned to it on those days only. Without them
  * it is on every event day of Settings → Event days and hours.
+ *
+ * Each assignment carries what belongs to that company on that day: its
+ * candidate link (roomLinks.ts), its accepted phone list (0014: a student on
+ * it books only this assignment's times, so HR decides their day by the list
+ * they are put on), and the company's Google Sheet for this room.
  *
  * A room is never deleted, only retired (`is_active`): its history stays,
  * and it can be brought back. An assignment with students booked in it
@@ -50,13 +66,15 @@ export default async function InterviewsRoomsPage({
   const tCommon = await getTranslations('common');
   if (role === 'organizer') return <EmptyState>{tCommon('notPermitted')}</EmptyState>;
   const manage = can.manage(role);
+  const decide = can.decide(role);
 
   const db = createInterviewsClient();
   type SlotRow = { session_id: string; booking_id: string | null; is_closed: boolean };
-  const [rooms, companies, sessions, slotRows] = await Promise.all([
+  const [rooms, companies, sessions, acceptances, slotRows] = await Promise.all([
     loadRooms(db, edition.id),
     loadCompanies(db, edition.id),
     loadSessions(db, edition.id),
+    loadSessionAcceptances(db, edition.id),
     pages<SlotRow>((from, to) =>
       db.from('slot_status').select('session_id, booking_id, is_closed').eq('edition_id', edition.id).order('id').range(from, to),
     ),
@@ -77,6 +95,8 @@ export default async function InterviewsRoomsPage({
   const active = rooms.filter((r) => r.is_active);
   const retired = rooms.filter((r) => !r.is_active);
   const daysOf = roomDays(settings);
+  const links = sessionLinks(settings);
+  const sheets = companySheets(settings);
   // A new assignment starts on the room's first day, else the event's first
   // day, else the edition's latest day with one, else today.
   const fallbackDay =
@@ -127,35 +147,103 @@ export default async function InterviewsRoomsPage({
                   {assigned.length === 0 ? (
                     <p className="text-sm text-ink-muted">{t('roomsTab.noAssignments')}</p>
                   ) : (
-                    <ul className="space-y-1.5 text-sm">
+                    <ul className="space-y-2 text-sm">
                       {assigned.map((s) => {
                         const c = counts.get(s.id) ?? { booked: 0, total: 0 };
+                        const link = links[s.id];
+                        const sheet = sheets[sheetKey(s.company_id, room.id)];
                         return (
-                          <li key={s.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-line px-3 py-1.5">
-                            <span className="font-medium">{companyName.get(s.company_id) ?? '?'}</span>
-                            <Link
-                              href={`/projects/${id}/interviews/schedule?day=${s.day}&session=${s.id}`}
-                              className="ltr-nums text-xs text-ink-muted hover:underline"
-                            >
-                              {formatDate(`${s.day}T12:00:00Z`, locale)} · {formatTime(s.starts_at, locale)}–
-                              {formatTime(s.ends_at, locale)} · {t('schedule.slotLength', { minutes: s.slot_minutes })}
-                            </Link>
-                            <span className="ltr-nums ms-auto text-xs text-ink-muted">
-                              {t('roomsTab.booked', { booked: c.booked, total: c.total })}
-                            </span>
-                            {manage ? (
-                              <ConfirmForm
-                                action={deleteSessionAction}
-                                trigger={t('roomsTab.unassign')}
-                                title={t('roomsTab.unassignTitle')}
-                                body={t('roomsTab.unassignBody')}
-                                confirmLabel={t('roomsTab.unassign')}
-                                variant="secondary"
+                          <li key={s.id} className="space-y-2 rounded-lg border border-line px-3 py-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium">{companyName.get(s.company_id) ?? '?'}</span>
+                              <Link
+                                href={`/projects/${id}/interviews/schedule?day=${s.day}&session=${s.id}`}
+                                className="ltr-nums text-xs text-ink-muted hover:underline"
                               >
-                                <input type="hidden" name="locale" value={locale} />
-                                <input type="hidden" name="project_id" value={id} />
-                                <input type="hidden" name="session_id" value={s.id} />
-                              </ConfirmForm>
+                                {formatDate(`${s.day}T12:00:00Z`, locale)} · {formatTime(s.starts_at, locale)}–
+                                {formatTime(s.ends_at, locale)} · {t('schedule.slotLength', { minutes: s.slot_minutes })}
+                              </Link>
+                              <span className="ltr-nums ms-auto text-xs text-ink-muted">
+                                {t('roomsTab.booked', { booked: c.booked, total: c.total })}
+                              </span>
+                              {manage ? (
+                                <ConfirmForm
+                                  action={deleteSessionAction}
+                                  trigger={t('roomsTab.unassign')}
+                                  title={t('roomsTab.unassignTitle')}
+                                  body={t('roomsTab.unassignBody')}
+                                  confirmLabel={t('roomsTab.unassign')}
+                                  variant="secondary"
+                                >
+                                  <input type="hidden" name="locale" value={locale} />
+                                  <input type="hidden" name="project_id" value={id} />
+                                  <input type="hidden" name="session_id" value={s.id} />
+                                </ConfirmForm>
+                              ) : null}
+                            </div>
+
+                            {decide ? (
+                              <div className="space-y-2">
+                                {link ? (
+                                  <CopyField label={t('companies.candidateLink')} value={`${siteUrl()}/${locale}/interviews/room/${link}`} />
+                                ) : null}
+                                {manage ? (
+                                  <ActionForm
+                                    action={createSessionLinkAction}
+                                    submitLabel={link ? t('roomsTab.newLink') : t('roomsTab.createLink')}
+                                    variant="secondary"
+                                    className="space-y-0"
+                                  >
+                                    <input type="hidden" name="locale" value={locale} />
+                                    <input type="hidden" name="project_id" value={id} />
+                                    <input type="hidden" name="session_id" value={s.id} />
+                                  </ActionForm>
+                                ) : null}
+                                <Disclosure
+                                  label={`${t('companies.acceptedPhones')} (${acceptances.bySession.get(s.id)?.length ?? 0})`}
+                                  title={`${t('companies.acceptedPhones')} · ${companyName.get(s.company_id) ?? ''}`}
+                                >
+                                  {acceptances.ready ? (
+                                    <AcceptedPhones
+                                      locale={locale}
+                                      projectId={id}
+                                      sessionId={s.id}
+                                      phones={acceptances.bySession.get(s.id) ?? []}
+                                    />
+                                  ) : (
+                                    <p className="text-sm text-ink-muted">{t('roomsTab.needs0014')}</p>
+                                  )}
+                                </Disclosure>
+                                {manage ? (
+                                  <Disclosure label={t('roomsTab.sheet')} title={`${t('roomsTab.sheet')} · ${companyName.get(s.company_id) ?? ''}`}>
+                                    <div className="space-y-3">
+                                      <p className="text-xs text-ink-muted">{t('companies.sheetHint')}</p>
+                                      {sheet ? (
+                                        <a
+                                          href={sheet.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-sm font-medium text-brand-600 hover:underline"
+                                        >
+                                          {t('companies.sheetOpen')}
+                                        </a>
+                                      ) : (
+                                        <p className="text-sm text-ink-muted">{t('companies.sheetNone')}</p>
+                                      )}
+                                      <ActionForm
+                                        action={syncCompanySheetAction}
+                                        submitLabel={sheet ? t('companies.sheetSync') : t('companies.sheetCreate')}
+                                        variant="secondary"
+                                        className="space-y-2"
+                                      >
+                                        <input type="hidden" name="locale" value={locale} />
+                                        <input type="hidden" name="project_id" value={id} />
+                                        <input type="hidden" name="company_id" value={s.company_id} />
+                                      </ActionForm>
+                                    </div>
+                                  </Disclosure>
+                                ) : null}
+                              </div>
                             ) : null}
                           </li>
                         );

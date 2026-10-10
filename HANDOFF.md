@@ -1561,6 +1561,42 @@ optional). Kept in the edition's settings as `room_days`
 - The check is in the app, not the database: `create_session` called some
   other way does not know a room's days.
 
+### Candidate link and accepted list per assignment (0014, 2026-10-10)
+
+`supabase/interviews/migrations/0014_session_acceptances.sql`, **not yet
+applied**: the project lead applies it **after 0012 and 0013** (it
+redefines 0012's `book_slot` and `move_booking`). It can be run twice.
+Checked on an empty local Postgres 16 with 0001–0014.
+
+A company that interviews on several days stays one company. What used to
+be per company is now per **assignment** (a session: one company in one
+room on one day and hours), on the **Rooms tab**, under each assignment:
+
+- **Candidate link**: kept in the edition's settings as `session_links`
+  (`{ session id: token }`, `roomLinks.ts`), *Create candidate link* /
+  *New candidate link*. The page names the room and day.
+- **Accepted phone numbers**: `session_acceptances` (0014) through
+  `accept_for_session` / `unaccept_for_session`. A student on an
+  assignment's list books **only that assignment's times**: HR decides
+  their day by the list they put them on. `book_slot` and `move_booking`
+  refuse anything else (`not_your_session`) when the student has any list
+  of that company; the booking page shows only those times. Accepting also
+  accepts them for the company (application_preferences), which `do_book`
+  still checks; taking them off the last list of a company puts it back to
+  pending. Staff booking (Bookings tab) is not restricted by day.
+- **Google Sheet for the company**: the same per company-and-room sheet
+  as before (`company_sheets`), moved here. Two days in one room share it.
+- **Removing an assignment** is refused while anyone is on its list
+  (`deleteSessionAction`), so nobody is left accepted with no day.
+- **Companies tab** keeps only the company itself and its interviewer link
+  and PIN.
+- **Kept working:** students accepted the old way (per company, no list)
+  can still book any time of that company, and per-company links already
+  handed out (`room_links`) still open; they are no longer shown or made.
+  0013's `accept_for_company` is no longer called by the app.
+- **Before 0014 is applied** the lists say the migration is needed and
+  accept nothing; links, sheets and booking work as before.
+
 ### Any number on HR's list, and a phone-only candidate link (0013, 2026-10-09)
 
 `supabase/interviews/migrations/0013_accept_any_phone.sql`, **not yet

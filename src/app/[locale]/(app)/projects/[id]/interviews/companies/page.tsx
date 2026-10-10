@@ -6,42 +6,29 @@ import { Logo } from '@/components/CompanyPicker';
 import { ConfirmForm } from '@/components/ConfirmForm';
 import { Disclosure } from '@/components/Disclosure';
 import { LogoInput } from '@/components/LogoInput';
-import { Badge, Card, EmptyState, Input, Label, Textarea } from '@/components/ui';
+import { Badge, Card, EmptyState, Input, Label } from '@/components/ui';
 import { localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
-import { companySheets, sheetKey } from '@/lib/interviews/companySheets';
 import { siteUrl } from '@/lib/interviews/email';
 import { fullCompanyIds } from '@/lib/interviews/fullCompanies';
-import { roomLinks } from '@/lib/interviews/roomLinks';
-import {
-  loadAcceptedPhones,
-  loadCompanies,
-  loadCounters,
-  loadRooms,
-  loadSessions,
-  type AcceptedPhone,
-} from '@/lib/interviews/queries';
+import { loadCompanies, loadCounters, loadRooms, loadSessions } from '@/lib/interviews/queries';
 import type { Company, Room } from '@/lib/interviews/types';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { CopyField } from '../CopyField';
 import {
-  acceptPhonesAction,
-  createRoomLinkAction,
   rotateCompanyTokenAction,
   setCompanyFullAction,
   setCompanyHiddenAction,
-  syncCompanySheetAction,
-  unacceptPhoneAction,
   upsertCompanyAction,
 } from '../actions';
 
 /**
  * The companies, one card each, made on their own with nothing about rooms:
- * the names and logo students see on the apply form, full or open, and
- * everything that belongs to the company itself — its candidate link (the
- * room flow), the phone numbers HR accepted for it, its interviewer link and
- * PIN, and its Google Sheets. Which rooms it interviews in, and when, is
- * decided later on the Rooms tab; the card lists what has been assigned.
+ * the names and logo students see on the apply form, full or open, and its
+ * interviewer link and PIN. Which rooms it interviews in, and when, is
+ * decided on the Rooms tab, and each of those assignments carries its own
+ * candidate link, accepted phone list and Google Sheet there; the card
+ * lists the rooms assigned.
  *
  * Removing a company is a soft hide (setCompanyHiddenAction): off the form
  * and the floor, restorable from the section at the bottom, with its rooms
@@ -63,7 +50,6 @@ export default async function InterviewsCompaniesPage({
   const tCommon = await getTranslations('common');
   if (role === 'organizer') return <EmptyState>{tCommon('notPermitted')}</EmptyState>;
   const manage = can.manage(role);
-  const decide = can.decide(role);
 
   const db = createInterviewsClient();
   const [companies, counters, rooms, sessions] = await Promise.all([
@@ -72,11 +58,6 @@ export default async function InterviewsCompaniesPage({
     loadRooms(db, edition.id),
     loadSessions(db, edition.id),
   ]);
-  const acceptedPhonesByCompany = new Map(
-    await Promise.all(
-      companies.map(async (c): Promise<[string, AcceptedPhone[]]> => [c.id, await loadAcceptedPhones(db, c.id)]),
-    ),
-  );
 
   const visible = companies.filter((c) => !c.is_hidden);
   const removed = companies.filter((c) => c.is_hidden);
@@ -93,14 +74,6 @@ export default async function InterviewsCompaniesPage({
     ).values(),
   ];
 
-  // The company's public candidate link (roomLinks.ts, kept in the edition's
-  // settings); a candidate_token from 0005, where that migration ran, as a fallback.
-  const links = roomLinks(settings);
-  const sheets = companySheets(settings);
-  const candidateLinkFor = (company: Company) => {
-    const token = links[company.id] ?? company.candidate_token;
-    return token ? `${siteUrl()}/${locale}/interviews/room/${token}` : null;
-  };
   const interviewerLinkFor = (company: Company) => `${siteUrl()}/${locale}/interviews/c/${company.access_token}`;
 
   return (
@@ -120,7 +93,6 @@ export default async function InterviewsCompaniesPage({
             const full = fullIds.has(company.id);
             const c = counters.get(company.id);
             const companyRooms = roomsFor(company);
-            const roomSheets = companyRooms.map((r) => ({ room: r, sheet: sheets[sheetKey(company.id, r.id)] }));
             return (
               <Card key={company.id}>
                 <div className="flex flex-wrap items-start gap-3">
@@ -183,102 +155,30 @@ export default async function InterviewsCompaniesPage({
                   </div>
                 ) : null}
 
-                {decide ? (
-                  <div className="mt-4 space-y-3 border-t border-line pt-3">
-                    {candidateLinkFor(company) ? (
-                      <CopyField label={t('companies.candidateLink')} value={candidateLinkFor(company)!} />
-                    ) : manage ? (
-                      <ActionForm
-                        action={createRoomLinkAction}
-                        submitLabel={t('companies.createLink')}
+                {manage ? (
+                  <div className="mt-4 border-t border-line pt-3">
+                  <Disclosure label={t('companies.interviewerSide')}>
+                    <div className="space-y-3">
+                      <CopyField label={t('companies.interviewerLink')} value={interviewerLinkFor(company)} />
+                      <p className="text-xs text-ink-muted">
+                        {company.access_pin
+                          ? t('companies.pinIs', { pin: company.access_pin })
+                          : t('companies.noPin')}
+                      </p>
+                      <ConfirmForm
+                        action={rotateCompanyTokenAction}
+                        trigger={t('companies.rotate')}
+                        title={t('companies.rotateTitle')}
+                        body={t('companies.rotateBody')}
+                        confirmLabel={t('companies.rotate')}
                         variant="secondary"
-                        className="space-y-2"
                       >
                         <input type="hidden" name="locale" value={locale} />
                         <input type="hidden" name="project_id" value={id} />
                         <input type="hidden" name="company_id" value={company.id} />
-                      </ActionForm>
-                    ) : null}
-
-                    <Disclosure label={t('companies.acceptedPhones')}>
-                      <AcceptedPhones
-                        locale={locale}
-                        projectId={id}
-                        company={company}
-                        phones={acceptedPhonesByCompany.get(company.id) ?? []}
-                        t={t}
-                        tCommon={tCommon}
-                      />
-                    </Disclosure>
-
-                    {manage ? (
-                      <Disclosure label={t('companies.interviewerSide')}>
-                        <div className="space-y-3">
-                          <CopyField label={t('companies.interviewerLink')} value={interviewerLinkFor(company)} />
-                          <p className="text-xs text-ink-muted">
-                            {company.access_pin
-                              ? t('companies.pinIs', { pin: company.access_pin })
-                              : t('companies.noPin')}
-                          </p>
-                          <ConfirmForm
-                            action={rotateCompanyTokenAction}
-                            trigger={t('companies.rotate')}
-                            title={t('companies.rotateTitle')}
-                            body={t('companies.rotateBody')}
-                            confirmLabel={t('companies.rotate')}
-                            variant="secondary"
-                          >
-                            <input type="hidden" name="locale" value={locale} />
-                            <input type="hidden" name="project_id" value={id} />
-                            <input type="hidden" name="company_id" value={company.id} />
-                          </ConfirmForm>
-                        </div>
-                      </Disclosure>
-                    ) : null}
-
-                    {manage ? (
-                      <Disclosure label={t('companies.sheet')}>
-                        <div className="space-y-3">
-                          <p className="text-xs text-ink-muted">{t('companies.sheetHint')}</p>
-                          {roomSheets.length ? (
-                            <ul className="space-y-1">
-                              {roomSheets.map(({ room: r, sheet }) => (
-                                <li key={r.id} className="text-sm">
-                                  <span className="font-medium">{r.name}</span>
-                                  {' · '}
-                                  {sheet ? (
-                                    <a
-                                      href={sheet.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="font-medium text-brand-600 hover:underline"
-                                    >
-                                      {t('companies.sheetOpen')}
-                                    </a>
-                                  ) : (
-                                    <span className="text-ink-muted">{t('companies.sheetNone')}</span>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="text-sm text-ink-muted">{t('companies.sheetNoRooms')}</p>
-                          )}
-                          {roomSheets.length ? (
-                            <ActionForm
-                              action={syncCompanySheetAction}
-                              submitLabel={roomSheets.every(({ sheet }) => sheet) ? t('companies.sheetSync') : t('companies.sheetCreate')}
-                              variant="secondary"
-                              className="space-y-2"
-                            >
-                              <input type="hidden" name="locale" value={locale} />
-                              <input type="hidden" name="project_id" value={id} />
-                              <input type="hidden" name="company_id" value={company.id} />
-                            </ActionForm>
-                          ) : null}
-                        </div>
-                      </Disclosure>
-                    ) : null}
+                      </ConfirmForm>
+                    </div>
+                  </Disclosure>
                   </div>
                 ) : null}
               </Card>
@@ -309,7 +209,6 @@ export default async function InterviewsCompaniesPage({
 }
 
 type T = Awaited<ReturnType<typeof getTranslations<'interviews'>>>;
-type TCommon = Awaited<ReturnType<typeof getTranslations<'common'>>>;
 
 /** Add (no company) or edit one: both names and the logo. */
 function CompanyForm({
@@ -351,71 +250,5 @@ function CompanyForm({
         </label>
       ) : null}
     </ActionForm>
-  );
-}
-
-
-/**
- * Who HR accepted for this room's company, and a box to accept more by phone
- * number (acceptPhonesAction). Starts empty: only numbers HR types are used.
- */
-function AcceptedPhones({
-  locale,
-  projectId,
-  company,
-  phones,
-  t,
-  tCommon,
-}: {
-  locale: string;
-  projectId: string;
-  company: Company;
-  phones: AcceptedPhone[];
-  t: T;
-  tCommon: TCommon;
-}) {
-  return (
-    <div className="space-y-3">
-      {phones.length ? (
-        <ul className="space-y-1 text-sm">
-          {phones.map((p) => (
-            <li key={p.application_id} className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-1.5">
-              <span className="ltr-nums">
-                {p.phone}
-                {p.name ? ` · ${p.name}` : ''}
-              </span>
-              <form action={unacceptPhoneAction}>
-                <input type="hidden" name="locale" value={locale} />
-                <input type="hidden" name="project_id" value={projectId} />
-                <input type="hidden" name="company_id" value={company.id} />
-                <input type="hidden" name="application_id" value={p.application_id} />
-                <button type="submit" className="text-xs text-ink-muted hover:text-danger-600">
-                  {tCommon('delete')}
-                </button>
-              </form>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-xs text-ink-muted">{t('companies.noAcceptedPhones')}</p>
-      )}
-
-      <ActionForm action={acceptPhonesAction} submitLabel={tCommon('save')}>
-        <input type="hidden" name="locale" value={locale} />
-        <input type="hidden" name="project_id" value={projectId} />
-        <input type="hidden" name="company_id" value={company.id} />
-        <div>
-          <Label htmlFor={`${company.id}-phones`}>{t('companies.addPhones')}</Label>
-          <Textarea
-            id={`${company.id}-phones`}
-            name="phones"
-            rows={3}
-            placeholder={'05xxxxxxxx\n05xxxxxxxx'}
-            dir="ltr"
-          />
-          <p className="mt-1 text-xs text-ink-muted">{t('companies.addPhonesHint')}</p>
-        </div>
-      </ActionForm>
-    </div>
   );
 }

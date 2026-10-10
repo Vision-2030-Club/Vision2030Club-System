@@ -811,7 +811,7 @@
       "acceptedPhones": "Accepted phone numbers",
       "noAcceptedPhones": "No phone numbers accepted yet.",
       "addPhones": "Add phone numbers",
-      "addPhonesHint": "One per line. Each number is accepted for this company, whether or not the student chose it on the form. A number that never applied is added as a new applicant, who completes their name and CV on the candidate link and picks a time.",
+      "addPhonesHint": "One per line. Each number is accepted for this company on this day and room only: the student books one of these times, whether or not they chose the company on the form. A number that never applied is added as a new applicant, who completes their name and CV on the candidate link and picks a time.",
       "roomDay": "Day",
       "delete": "Delete room",
       "deleteTitle": "Delete this room?",
@@ -828,18 +828,13 @@
       "phonesEmpty": "Enter at least one phone number.",
       "phonesAccepted": "Accepted {count}.",
       "phonesInvalid": "These are not phone numbers: {phones}.",
-      "phonesNotFound": "No applicant has these numbers (apply migration 0013 to add them): {phones}.",
-      "phonesNotChosen": "These applicants did not choose this company (apply migration 0013 to accept them anyway): {phones}.",
       "roomCompany": "Company",
       "roomCompanyNew": "New company (type its name)",
-      "createLink": "Create room link",
-      "sheet": "Google Sheets for the company",
       "sheetHint": "One sheet per room this company interviews in, laid out like the club’s Company template: one tab per day, with a row for each of the company’s own time slots in that room — the student’s name, phone number, CV link, a link to their feedback form, and the status. When two companies share a room, each sees only its own hours. It works both ways: the company can set Status (Interview Done / No Show / In-progress) and within a minute it becomes the student’s stage in the app and on the floor sheet — unless the floor moved that student in the meantime, in which case the app’s value wins. A sheet can only change its own company’s students in that room. The Interviewer column starts as the company’s name on every slot; a person’s name typed over it is kept. A room added for the company later gets its sheet automatically. Nobody gets access automatically: open each sheet from the club’s Google account and share it with the company’s people by name — it holds students’ phone numbers. The CV and feedback links work like the interviewer link: without a PIN, anyone who can see the sheet can open them; with one, only a browser that has entered the PIN.",
       "sheetCreate": "Create Google Sheets",
       "sheetSync": "Sync now",
       "sheetOpen": "Open sheet",
-      "sheetNone": "not created yet",
-      "sheetNoRooms": "This company has no room with a session yet."
+      "sheetNone": "not created yet"
     },
     "people": {
       "add": "Add",
@@ -1071,7 +1066,8 @@
       "missing_company_name": "Enter the company’s name.",
       "missing_answer": "Answer this question: {question}.",
       "no_match": "No one has been added with that phone number. Check the number, or contact the club.",
-      "stage_changed": "The student’s status changed before this edit arrived, so the newer status was kept."
+      "stage_changed": "The student’s status changed before this edit arrived, so the newer status was kept.",
+      "not_your_session": "This time is not on the day you were given. Pick a time from your own day."
     },
     "student": {
       "hello": "Hello, {name}.",
@@ -1159,10 +1155,15 @@
       "booked": "{booked}/{total} booked",
       "unassign": "Remove",
       "unassignTitle": "Remove this company from the room?",
-      "unassignBody": "Its time slots in this room on this day are removed. This is refused while students are booked in them: move or cancel them first.",
+      "unassignBody": "Its time slots in this room on this day are removed, and its candidate link stops working. This is refused while students are booked in them or on its accepted list: move them or take them off first.",
       "retire": "Retire",
       "bringBack": "Bring back",
-      "retiredSection": "Retired rooms ({count})"
+      "retiredSection": "Retired rooms ({count})",
+      "createLink": "Create candidate link",
+      "newLink": "New candidate link",
+      "sheet": "Google Sheet for the company",
+      "needs0014": "Accepted lists per room need database migration 0014. Ask the project lead to apply it.",
+      "stillAccepted": "{count, plural, one {# student is} other {# students are}} on this assignment’s accepted list. Take them off it first (Accepted phone numbers)."
     },
     "companiesTab": {
       "noRoom": "No room yet — assign one on",
