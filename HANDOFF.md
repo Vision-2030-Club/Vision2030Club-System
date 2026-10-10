@@ -1199,10 +1199,11 @@ coverage was not extended; the room flow is untested by script.
   2026-10-11). Applications and preferences are read in pages of 1000, the
   preferences by edition. The company and decision filters run over every
   application, and the list shows the newest 500 matches with "Showing the
-  newest 500 of N". Before, the filters only saw the newest 500, and the
-  preferences were fetched with an `.in()` of up to 500 ids. With a few
-  hundred applicants that URL grew too long, the error was dropped, and every
-  Choices badge and filter came back empty.
+  newest 500 of N". Before, the filters only saw the newest 500 (on the April
+  2026 archive's 876 applications the tab said "500 applicants"), so once an
+  edition passed 500 the earliest applicants matched no filter. The
+  preferences were also fetched with an `.in()` of up to 500 ids, a URL of
+  about 20 KB. Hosted Supabase still answered that, but any error was dropped.
 - **The questions are a setting.** `editions.settings.apply_fields`, edited
   under *Edit questions* on the Applicants tab, says for phone, university,
   year (`level`), major, college, GPA, English, club member and "why your

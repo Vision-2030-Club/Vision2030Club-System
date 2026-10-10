@@ -247,10 +247,9 @@ export const APPLICANTS_SHOWN = 500;
  *
  * Everything is read in pages (an edition passes PostgREST's 1000 rows), and
  * the preferences by edition rather than by a list of ids. The old version
- * filtered the newest 500 only, so the 8 AM wave fell outside every company
- * filter once more arrived, and it sent their ids in the URL: with a few
- * hundred applicants the request was too long, the error was dropped, and
- * every Choices badge and filter came back empty.
+ * filtered the newest 500 only, so the earliest applicants fell outside every
+ * company and decision filter once more than 500 had applied, and it sent
+ * those 500 ids in the request URL (about 20 KB, with any error dropped).
  */
 export async function loadApplicants(
   db: SupabaseClient,
