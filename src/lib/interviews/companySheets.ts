@@ -8,6 +8,7 @@ import {
   listTabs,
   readAllTabs,
   rememberWritten,
+  spreadsheetUsable,
   revokeLinkSharing,
   writeTab,
   writtenAlready,
@@ -391,11 +392,15 @@ async function loadEdition(db: Db, editionId: string): Promise<Edition | null> {
   return data as Edition | null;
 }
 
-/** The pair's file, created and remembered the first time it is needed. */
+/**
+ * The pair's file, created and remembered the first time it is needed, and
+ * made again if the saved one was deleted in Drive (one in the trash is
+ * restored instead).
+ */
 async function ensureSheet(db: Db, edition: Edition, pair: Pair, sheets: Record<string, Saved>): Promise<Saved> {
   const key = sheetKey(pair.company.id, pair.room.id);
   const saved = sheets[key];
-  if (saved) return saved;
+  if (saved && (await spreadsheetUsable(saved.id))) return saved;
   const created = await createSpreadsheet(`${edition.name_en} — ${pair.company.name_en} — ${pair.room.name}`, 'Schedule');
   await saveSheet(db, edition.id, key, created);
   sheets[key] = created;
@@ -445,8 +450,10 @@ export async function refreshCompanySheets(editionId: string): Promise<PullResul
   for (const pair of pairs) {
     const tabs = tabsByPair.get(sheetKey(pair.company.id, pair.room.id)) ?? [];
     try {
+      // An unchanged file costs no Google call, not even the check that it still exists.
+      const saved = sheets[sheetKey(pair.company.id, pair.room.id)];
+      if (saved && writtenAlready(`company:${saved.id}`, tabs)) continue;
       const sheet = await ensureSheet(db, edition, pair, sheets);
-      if (writtenAlready(`company:${sheet.id}`, tabs)) continue;
       result = addResults(result, await writeSheet(db, edition, pair, sheet.id, tabs));
     } catch (error) {
       // One file (deleted in Drive, say) must not stop the others.

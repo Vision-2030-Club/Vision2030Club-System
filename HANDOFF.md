@@ -1536,49 +1536,43 @@ empty clears it.
   lengths are refused, as are more than 14 days; and the fake-Google
   harness confirmed empty rooms, half-assigned rooms and Notes on empty rows.
 
-### 20-minute slots, prayer breaks, past times bookable (2026-10-07)
+### A sheet deleted in Drive is restored or replaced (2026-10-07)
 
-`supabase/interviews/migrations/0012_fixed_slots_prayer_breaks.sql`,
-**not yet applied**: the project lead pastes it into the interviews
-project's SQL editor (or runs `npm run db:push -- --target interviews`)
-before the event. It can be run twice.
+Each Google Sheet (floor, registrations, one per company and room) is made
+once and its id saved in the edition's settings; every sync rewrites that
+same file. If someone signed in to the club's Google account deleted it in
+Drive, the app kept writing to the missing file: every sync failed, no new
+file was made, and the saved link opened Google's "the file you have
+requested has been deleted" page.
 
-- **Every slot is 20 minutes.** The slot-length picker is gone from the
-  Rooms and Schedule tabs, and `create_session` makes 20-minute slots
-  (`app.slot_minutes()`) whatever it is sent. Mixing a 20- and a 30-minute
-  assignment for one company filled the student's picker with overlapping
-  times. Sessions made before keep their own length; `extend_session` grows
-  them at it.
-- **Prayer breaks: 15:00–15:30 and 17:30–18:00** on the edition's clock
-  (`app.prayer_breaks`). No slot is made across one; slots run up to the
-  break and pick up when it ends (14:00 … 14:40, 15:30 … 17:10, 18:00 …).
-  Because of that ten-minute shift an assignment's end no longer has to be
-  a whole number of slots: slots are made while one fits and the session is
-  trimmed to its last slot. Hours with no room for any slot are refused
-  (`no_slot_fits`). The same times are in `src/lib/interviews/slotRules.ts`,
-  which the floor grid (`gridTimes`) uses so its empty rows line up;
-  **change both together**, with a new migration for the SQL side.
-- **Existing slots inside a break are closed** (`is_closed`) by the
-  migration, unless a student holds one; those stay for HR to move. Nothing
-  is deleted. A company already assigned on 30-minute slots keeps them:
-  *Remove* that assignment on the Rooms tab and assign it again.
-- **A past time can be booked** in every edition: `book_slot` and
-  `move_booking` no longer call `app.refuse_past_slot` (dropped). The team
-  books on students' behalf and the refusal only got in the way. The
-  change-cutoff (`within_cutoff`) still applies to moving a booking.
-- **The student's picker groups times under a date and room heading**, so a
-  company with rooms on several days no longer shows two identical-looking
-  times side by side.
-- **Before the migration is applied** nothing breaks: the app sends 20
-  minutes, which the old `create_session` accepts whenever the hours are a
-  whole number of 20-minute slots; breaks are not skipped and past times are
-  still refused until it runs.
-- **Checked** on an empty local Postgres 16 with 0001–0012 applied and
-  invented data: 14:00–17:00 makes seven slots ending 16:50; extending to
-  20:00 adds 16:50, 17:10, then 18:00–19:40; 15:00–15:30 alone is refused
-  and leaves no session behind; a slot whose time has passed books; a
-  30-minute slot at 17:30 is closed while a booked one at 15:00 is left;
-  re-running the file changes nothing more.
+- **Before writing, the app checks the saved file** (`spreadsheetUsable` in
+  `src/lib/google/sheets.ts`, one Drive read). A file **in the trash is
+  taken back out**, so the link, its sharing and the Notes survive. A file
+  **deleted for good** (Drive answers 404, also when the connected Google
+  account cannot see it) is **replaced**: a new file is made, saved in the
+  settings, and filled from the database, so every booking is in it. Any
+  other error (Google down, 403 rate limit) fails the sync as before and
+  never replaces a file.
+- **What a replacement loses:** its link is new (the Settings page and the
+  Companies tab show it), it is shared with nobody until someone shares it by
+  name from the club's account, and what lived only in the old file is gone
+  (Notes, Interviewer names typed over the company's, a Status edit made in
+  the last minute before the pull read it).
+- **When it happens:** the floor sheet on its next sync (every booking or
+  stage change); the registrations and company sheets on their next change
+  or *Sync now*. An unchanged sheet still costs no Google call, so a
+  deleted one is noticed only when something is written to it.
+- **To retire a sheet for good**, deleting it in Drive is no longer enough
+  while the app still syncs it: the trash is undone and a deleted file is
+  made again.
+- The floor sheet's id and link are now read from the settings first and
+  0006's `floor_sheet_id` / `floor_sheet_url` columns second. Nothing has
+  written the columns since the settings took over, and a replacement is
+  saved only in the settings.
+- **Checked** against a fake Google (invented ids): a live file costs one
+  read and is left alone; a trashed one is restored; a deleted one (404) is
+  reported gone; a 403 or a 500 throws and is never taken for gone. Not yet
+  run against the real Google account.
 
 ### A project opens in its component (2026-10-07)
 
