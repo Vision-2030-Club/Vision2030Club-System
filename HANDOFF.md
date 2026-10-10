@@ -1180,16 +1180,14 @@ safe as HR's list: anyone who knows an accepted person's number can act as
 them there. If the room flow is chosen for real, add a second factor (a
 PIN HR hands out, or an SMS code) before the event.
 
-**Migrations 0005–0009 have NOT been confirmed applied to the interviews
-project `qadhnttgtytnibgumrax`** (this machine cannot reach port 5432, and
-the reviewer had no read access). Until they run, room links 404, the
-accepted-phones lists stay empty, new rooms get no candidate link, and the
-sheet cannot remember its id — nothing crashes, the features just do
-nothing. Apply them in order with `npm run db:push -- --target interviews`
-from a network where 5432 works, or paste each file into the dashboard's
-SQL editor and insert its name into `schema_migrations` as was done for
-0001–0004. The teammate's `scripts/interviews-tests.mjs` coverage was not
-extended; the room flow is untested by script.
+**Migrations 0005–0014 are applied to the interviews project
+`qadhnttgtytnibgumrax` (2026-10-11).** The project lead pasted them into the
+dashboard's SQL editor as one script (one transaction, each file followed by
+its `schema_migrations` row), so `db:push` reports the database up to date.
+The first attempt failed on 0005's unique phone index, because real
+applications share a number; 0005 was corrected in place (see below) and
+the second attempt went through. The teammate's `scripts/interviews-tests.mjs`
+coverage was not extended; the room flow is untested by script.
 
 ### Registering, full companies, and the registrations sheet (0010)
 
@@ -1257,12 +1255,11 @@ extended; the room flow is untested by script.
   a leading apostrophe so a name starting with `=` stays text and `05…` keeps
   its zero.
 
-**Not applied yet.** `0010_register_full_companies.sql` must be applied to
-the interviews project after 0005–0009 (0009 is fixed now, see below). Until
-then nothing crashes, and the question settings, Mark as full, logos and the
-registrations sheet all work without it; the one thing that waits on 0010 is
-staff registration outside the public window (until then it follows the
-window). The registrations sheet's id and link are kept in the edition's
+**Applied 2026-10-11**, with 0005–0014. On a database without
+`0010_register_full_companies.sql`, nothing crashes, and the question
+settings, Mark as full, logos and the registrations sheet all work without
+it; the one thing that waits on 0010 is staff registration outside the
+public window (until then it follows the window). The registrations sheet's id and link are kept in the edition's
 settings (`registrations_sheet_id`, `registrations_sheet_url`), so 0010's
 columns of that name and `set_registrations_sheet` are unused, as are its
 `logos` bucket and `is_full` column; if the SQL cannot create the bucket,
@@ -1277,6 +1274,14 @@ migration is normally forbidden because a recorded one would never re-run;
 at all. 0010 redefines the same function as a backstop. All ten interviews
 migrations now apply in order to an empty Postgres 16, each in one
 transaction.
+
+**0005 was corrected in place (2026-10-11)** for the same reason. It
+created a UNIQUE index on `applications (edition_id, phone)`, which cannot
+be built on the real data (applications share phone numbers, as 0009's
+header predicted), so 0005 failed on the live project. 0009 drops that index
+anyway and creates the plain `applications_edition_phone_idx`, and nothing
+in between relies on it, so the line was removed. 0005 had never been
+recorded anywhere, and the live project ran the corrected version.
 
 ### Verified
 
@@ -1462,7 +1467,10 @@ Interviewer (company) are free text that lives only in the sheet.
   the sheet is corrected. Every other caller passes no `p_expected` and
   behaves exactly as before. The old four-argument function is dropped,
   because keeping both would make calls ambiguous.
-  **Applied to the interviews project** (reported 2026-10-07). On a database
+  **Applied to the interviews project** (reported 2026-10-07, though not
+  recorded in `schema_migrations`; re-run and recorded with 0005–0014 on
+  2026-10-11, which is harmless because the file drops and recreates the
+  function). On a database
   without it, the app gets PostgREST's `PGRST202` for the unknown parameter
   and falls back to the old call, so nothing breaks; only the millisecond
   window stays open. It was applied, with 0001–0010, to an empty embedded Postgres
@@ -1567,9 +1575,9 @@ optional). Kept in the edition's settings as `room_days`
 
 ### Candidate link and accepted list per assignment (0014, 2026-10-10)
 
-`supabase/interviews/migrations/0014_session_acceptances.sql`, **not yet
-applied**: the project lead applies it **after 0012 and 0013** (it
-redefines 0012's `book_slot` and `move_booking`). It can be run twice.
+`supabase/interviews/migrations/0014_session_acceptances.sql`, **applied
+2026-10-11** after 0012 and 0013 (it redefines 0012's `book_slot` and
+`move_booking`). It can be run twice.
 Checked on an empty local Postgres 16 with 0001–0014.
 
 A company that interviews on several days stays one company. What used to
@@ -1603,10 +1611,8 @@ room on one day and hours), on the **Rooms tab**, under each assignment:
 
 ### Any number on HR's list, and a phone-only candidate link (0013, 2026-10-09)
 
-`supabase/interviews/migrations/0013_accept_any_phone.sql`, **not yet
-applied**: the project lead pastes it into the interviews project's SQL
-editor (or runs `npm run db:push -- --target interviews`) before the event.
-It needs only 0001–0004 and can be run twice. Checked on an empty local
+`supabase/interviews/migrations/0013_accept_any_phone.sql`, **applied
+2026-10-11**. It needs only 0001–0004 and can be run twice. Checked on an empty local
 Postgres 16, both with 0001–0004 only and with 0001–0012.
 
 - **HR's accepted list takes any number** (Companies tab → *Add phone
@@ -1637,9 +1643,7 @@ Postgres 16, both with 0001–0004 only and with 0001–0012.
 ### 20-minute slots, prayer breaks, past times bookable (2026-10-07)
 
 `supabase/interviews/migrations/0012_fixed_slots_prayer_breaks.sql`,
-**not yet applied**: the project lead pastes it into the interviews
-project's SQL editor (or runs `npm run db:push -- --target interviews`)
-before the event. It can be run twice.
+**applied 2026-10-11**. It can be run twice.
 
 - **Every slot is 20 minutes.** The slot-length picker is gone from the
   Rooms and Schedule tabs, and `create_session` makes 20-minute slots
