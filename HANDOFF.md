@@ -1033,9 +1033,9 @@ mint as `accent` / `accent-2`), paints the page itself a near-white mint
 (`--color-canvas` `#f2fbf8`, what `body` and the public frame sit on) with
 mint boxes (`--color-surface` `#a6eddd`) standing on it (lavender was
 dropped on 2026-10-07; every text colour stays above 5.7:1 contrast), and switches the typeface to TheSansArabic
-(`src/fonts/TheSansArabic-Light.ttf`, LucasFonts, one Light cut that covers
-Arabic, Latin and both sets of digits; bolder weights are synthesised; it
-replaced DG Heaven on 2026-10-11). The tokens are registered with `@property` in `globals.css`, so
+(`src/fonts/TheSansArabic-Light.ttf` and `-Bold.ttf`, LucasFonts; both cover
+Arabic, Latin and both sets of digits; Light serves weights 300–500 and Bold
+600–800, so nothing is synthesised; it replaced DG Heaven on 2026-10-11). The tokens are registered with `@property` in `globals.css`, so
 the colour change is animated (700 ms) rather than cut, and the page and
 sidebar fade in over the typeface swap; the root layout's inline script sets
 the attribute before the first paint on a direct load, and `theme-animate` is
