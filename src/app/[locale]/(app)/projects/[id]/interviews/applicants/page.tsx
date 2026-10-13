@@ -33,7 +33,7 @@ export default async function InterviewsApplicantsPage({
   }
 
   const db = createInterviewsClient();
-  const [companies, { applications, preferences }] = await Promise.all([
+  const [companies, { applications, preferences, total }] = await Promise.all([
     loadCompanies(db, edition.id),
     loadApplicants(db, edition.id, {
       q,
@@ -115,7 +115,11 @@ export default async function InterviewsApplicantsPage({
         </form>
       </Card>
 
-      <p className="text-xs text-ink-muted">{t('applicants.count', { count: applications.length })}</p>
+      <p className="text-xs text-ink-muted">
+        {total > applications.length
+          ? t('applicants.countShown', { shown: applications.length, count: total })
+          : t('applicants.count', { count: total })}
+      </p>
 
       {applications.length === 0 ? (
         <EmptyState>{t('applicants.empty')}</EmptyState>
