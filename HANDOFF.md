@@ -999,7 +999,13 @@ short version:
   (`npm run interviews:cron` schedules it with pg_cron in the CLUB project,
   same mechanism as push; since 2026-10-05 it also schedules the
   every-minute Google Sheets pull, `/api/interviews/sheets`). Without `RESEND_API_KEY` rows wait and the
-  Messages page says so. Feedback is **email only** and held until a manager
+  Messages page says so. **On hold since 2026-10-13:** the club may not use
+  email at all, so the apply form and the student page now say "we will
+  contact you" instead of promising an email with a link
+  (`apply.whatNext`, `apply.emailHint`, `student.nothingYet`). Accepted
+  students reach their booking page through an assignment's candidate link
+  and HR's accepted phone list. If Resend is switched on later, every row
+  queued since 11 Oct goes out at once: look at the Messages tab first. Feedback is **email only** and held until a manager
   presses *Send feedback emails* (or sent at once, per edition setting).
 - **Exports.** `edition_snapshot` renders an edition as one JSON document;
   the sweep writes it to the private `exports` bucket once a night after 03:00
