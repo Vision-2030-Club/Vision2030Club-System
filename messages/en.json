@@ -849,6 +849,7 @@
       "searchPlaceholder": "Name, email or phone",
       "decision": "Decision",
       "count": "{count} applicants",
+      "countShown": "Showing the newest {shown} of {count} applicants. Search or filter to narrow the list.",
       "empty": "No applicants match.",
       "name": "Name",
       "university": "University",

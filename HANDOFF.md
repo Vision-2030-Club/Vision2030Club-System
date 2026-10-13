@@ -1232,6 +1232,15 @@ Found by a launch-readiness review the night before the public opening:
   whether it is taking applications, and the questions it asks) and, for
   managers, the companies students choose from (their رغبات): add, edit,
   logo, Mark as full, Remove/Restore (`CompanyManager.tsx`).
+- **The applicant list at volume** (`loadApplicants` in `queries.ts`, fixed
+  2026-10-11). Applications and preferences are read in pages of 1000, the
+  preferences by edition. The company and decision filters run over every
+  application, and the list shows the newest 500 matches with "Showing the
+  newest 500 of N". Before, the filters only saw the newest 500 (on the April
+  2026 archive's 876 applications the tab said "500 applicants"), so once an
+  edition passed 500 the earliest applicants matched no filter. The
+  preferences were also fetched with an `.in()` of up to 500 ids, a URL of
+  about 20 KB. Hosted Supabase still answered that, but any error was dropped.
 - **The questions are a setting.** `editions.settings.apply_fields`, edited
   under *Edit questions* on the Applicants tab, says for phone, university,
   year (`level`), major, college, GPA, English, club member and "why your
