@@ -72,7 +72,13 @@ export async function applyAction(
 
   if (error) {
     await removeCv(db, cvPath);
-    return fromPostgrest(error);
+    const refused = fromPostgrest(error);
+    if (refused.hint) return refused;
+    // Not one of submit_application's refusals (e.g. a duplicate-key race on
+    // a double tap): a translated "try again" for the student, the code for
+    // the log. The message is left out of the log; it can hold the email.
+    console.error('[interviews/apply] submit failed', error.code);
+    return fail('Something went wrong. Try again.', 'generic');
   }
 
   const result = data as { id: string; replaced: boolean; previous_cv_path: string | null };

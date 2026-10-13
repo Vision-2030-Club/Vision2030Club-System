@@ -1,6 +1,7 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { MAX_CV_BYTES, isPdf } from './cvLimits';
 
 /**
  * CVs live in the PRIVATE `cvs` bucket of the interviews project (migration
@@ -10,17 +11,15 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * no key for that project.
  */
 export const CV_BUCKET = 'cvs';
-export const MAX_CV_BYTES = 5 * 1024 * 1024;
 const SIGNED_URL_TTL_SECONDS = 10 * 60;
-
-export function isPdf(file: File): boolean {
-  return file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-}
 
 /**
  * Stores a CV under a fresh folder. The path carries no student id on purpose:
  * it is created before the application row exists, and a re-submission simply
  * gets a new path while the old file is deleted afterwards.
+ *
+ * Every refusal is an `errors.*` key the forms translate; the storage error
+ * itself only goes to the server log.
  */
 export async function uploadCv(
   db: SupabaseClient,
@@ -31,11 +30,19 @@ export async function uploadCv(
   if (file.size === 0) return { error: 'missing_cv' };
   if (file.size > MAX_CV_BYTES) return { error: 'cv_too_large' };
 
+  // Some phones label a PDF '' or application/octet-stream. The bucket takes
+  // only application/pdf, and for a File the upload sends the File's own type
+  // (the contentType option is ignored), so give it the right one.
+  const body = file.type === 'application/pdf' ? file : new Blob([await file.arrayBuffer()], { type: 'application/pdf' });
+
   const path = `${editionId}/${randomUUID()}/${Date.now()}.pdf`;
   const { error } = await db.storage
     .from(CV_BUCKET)
-    .upload(path, file, { contentType: 'application/pdf', upsert: false });
-  if (error) return { error: error.message };
+    .upload(path, body, { contentType: 'application/pdf', upsert: false });
+  if (error) {
+    console.error('[interviews/cv] upload failed', error.message);
+    return { error: 'upload_failed' };
+  }
   return { path };
 }
 

@@ -7,6 +7,7 @@ import { CompanyPicker, type PickerCompany } from '@/components/CompanyPicker';
 import { Alert, Button, Input, Label, cx } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
 import type { ApplyFields } from '@/lib/interviews/applyFields';
+import { cvProblem } from '@/lib/interviews/cvLimits';
 import { registerAction } from '../actions';
 
 /**
@@ -95,15 +96,26 @@ function Form({
 
 /**
  * A file input dressed as a drop target. Dropping a file puts it in the real
- * input, so the form posts it like any other field; the PDF and 5 MB rules
- * are checked on the server. Not `required`: the database asks for a CV on a
- * new registration (missing_cv) and keeps the old one on an update.
+ * input, so the form posts it like any other field. The PDF and 4 MB rules
+ * are checked here as the file is chosen (a file over Vercel's request limit
+ * never reaches the server, see cvLimits.ts) and again on the server. Not
+ * `required`: the database asks for a CV on a new registration (missing_cv)
+ * and keeps the old one on an update.
  */
 function CvDropzone() {
   const t = useTranslations('interviews');
   const input = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
   const [over, setOver] = useState(false);
+
+  // A refused file is taken out of the input, so the form cannot post it.
+  const choose = (file: File | undefined) => {
+    const found = file ? cvProblem(file) : null;
+    setProblem(found);
+    if (found && input.current) input.current.value = '';
+    setFileName(file && !found ? file.name : null);
+  };
 
   const onDrop = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
@@ -111,7 +123,7 @@ function CvDropzone() {
     const files = event.dataTransfer.files;
     if (!input.current || files.length === 0) return;
     input.current.files = files;
-    setFileName(files[0].name);
+    choose(files[0]);
   };
 
   return (
@@ -141,8 +153,13 @@ function CvDropzone() {
         type="file"
         accept="application/pdf,.pdf"
         className="sr-only"
-        onChange={(event) => setFileName(event.target.files?.[0]?.name ?? null)}
+        onChange={(event) => choose(event.target.files?.[0])}
       />
+      {problem ? (
+        <div className="mt-2">
+          <Alert tone="danger">{t(`errors.${problem}`)}</Alert>
+        </div>
+      ) : null}
     </div>
   );
 }

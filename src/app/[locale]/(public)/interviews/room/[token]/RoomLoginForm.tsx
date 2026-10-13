@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Alert, Button, Input, Label } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
+import { cvProblem } from '@/lib/interviews/cvLimits';
 import { roomLoginAction } from './actions';
 
 export function RoomLoginForm({ locale, token }: { locale: string; token: string }) {
@@ -43,7 +44,21 @@ export function RoomLoginForm({ locale, token }: { locale: string; token: string
       </div>
       <div>
         <Label htmlFor="cv">{t('room.cvFile')}</Label>
-        <Input id="cv" name="cv" type="file" accept="application/pdf,.pdf" />
+        <Input
+          id="cv"
+          name="cv"
+          type="file"
+          accept="application/pdf,.pdf"
+          onChange={(event) => {
+            // Refused here, not on the server: a file over Vercel's request
+            // limit never reaches the server's check (cvLimits.ts). The
+            // browser then blocks the submit and shows this message.
+            const file = event.currentTarget.files?.[0];
+            const found = file ? cvProblem(file) : null;
+            event.currentTarget.setCustomValidity(found ? t(`errors.${found}`) : '');
+            if (found) event.currentTarget.reportValidity();
+          }}
+        />
         <p className="mt-1 text-xs text-ink-muted">{t('room.cvHint')}</p>
       </div>
 
