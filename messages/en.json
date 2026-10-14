@@ -1078,7 +1078,13 @@
       "missing_answer": "Answer this question: {question}.",
       "no_match": "No one has been added with that phone number. Check the number, or contact the club.",
       "stage_changed": "The student’s status changed before this edit arrived, so the newer status was kept.",
-      "not_your_session": "This time is not on the day you were given. Pick a time from your own day."
+      "not_your_session": "This time is not on the day you were given. Pick a time from your own day.",
+      "walkins_closed": "Walk-in registration is closed right now.",
+      "no_walkin_slots": "That company has no free time left today. Choose another.",
+      "walkin_already_booked": "You already have an interview with this company. Go to the reception desk.",
+      "walkin_pending": "There is already a request waiting at the reception desk for this email.",
+      "walkin_not_pending": "This request was already answered.",
+      "not_today": "A walk-in is given a time today."
     },
     "student": {
       "hello": "Hello, {name}.",
@@ -1218,6 +1224,53 @@
       "today": "today",
       "noDays": "No company has interview times yet.",
       "refused": "That did not go through. Try again."
+    },
+    "walkins": {
+      "title": "Walk-ins waiting",
+      "none": "Nobody is waiting.",
+      "newStudent": "New: did not apply online.",
+      "appliedOnline": "Applied online:",
+      "hasInterviews": "Interviews:",
+      "waitingFor": "waiting {minutes} min",
+      "time": "Time",
+      "confirm": "Confirm and check in",
+      "noTimes": "This company has no free time left today. Turn the request down, or ask the student to register again for another company.",
+      "rejectReason": "Reason (optional, the student sees it)",
+      "reject": "Turn down",
+      "decidedToday": "Answered today",
+      "confirmed": "Confirmed",
+      "rejected": "Turned down",
+      "undo": "Undo"
+    },
+    "walkinForm": {
+      "intro": "No interview booked? Choose one company with free time today, fill in your details and attach your CV. The reception desk will give you a time.",
+      "company": "Company",
+      "companyHint": "One company. A greyed-out company has no free time left today.",
+      "submit": "Send to reception",
+      "sent": "Sent. Opening your page…",
+      "closed": "Walk-in registration is closed right now.",
+      "noneToday": "No company is interviewing today.",
+      "allFull": "There is no free interview time left today."
+    },
+    "walkinStatus": {
+      "number": "Your number",
+      "waiting": "Waiting for the reception desk. Show this number at the desk; this page updates by itself.",
+      "confirmed": "Your interview: {company}, {room}, at {time}. You are checked in: wait near the room until you are called.",
+      "rejected": "The reception desk could not give you a time."
+    },
+    "walkinSettings": {
+      "title": "Walk-ins",
+      "hint": "Students without an interview register at the venue through this link (print the QR code) for one company with free time today. Reception confirms each one into a free time on the Reception tab.",
+      "status": "Walk-in registration",
+      "closed": "Closed",
+      "open": "Open",
+      "companies": "Companies taking walk-ins",
+      "link": "Walk-in link",
+      "qrAlt": "QR code for the walk-in link",
+      "downloadQr": "Download QR (PNG)",
+      "newLink": "New link",
+      "newLinkTitle": "Make a new walk-in link?",
+      "newLinkBody": "The current link and every printed QR code stop working at once. Requests already sent are kept."
     }
   },
   "outreach": {

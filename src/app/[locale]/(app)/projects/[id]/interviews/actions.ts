@@ -278,6 +278,62 @@ export async function pullFloorSheetAction(
   }
 }
 
+/**
+ * Settings → Walk-ins (0016, walkins.ts): open or closed, and which
+ * companies take walk-ins (every company listed on the form; an unticked one
+ * is kept out). Opening them the first time makes the link.
+ */
+export async function updateWalkinsAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const listed = all(formData, 'listed_company');
+  const takes = new Set(all(formData, 'walkin_company'));
+  const open = text(formData, 'walkins_open') === 'on';
+
+  const db = createInterviewsClient();
+  const { data: current } = await db.rpc('edition_settings', { p_edition: g.access.edition.id });
+  const hasToken = typeof (current as { walkin_token?: unknown } | null)?.walkin_token === 'string';
+  const { error } = await db.rpc('update_edition', {
+    p_edition: g.access.edition.id,
+    p_patch: {
+      settings: {
+        walkins_open: open,
+        walkins_off_companies: listed.filter((id) => !takes.has(id)),
+        ...(open && !hasToken ? { walkin_token: newToken() } : {}),
+      },
+    },
+    p_actor: g.access.actor,
+  });
+  if (error) return fromPostgrest(error);
+
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
+/** Settings → Walk-ins → New link: the old link and its QR code stop working at once. */
+export async function rotateWalkinLinkAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const db = createInterviewsClient();
+  const { error } = await db.rpc('update_edition', {
+    p_edition: g.access.edition.id,
+    p_patch: { settings: { walkin_token: newToken() } },
+    p_actor: g.access.actor,
+  });
+  if (error) return fromPostgrest(error);
+
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
 export async function releaseFeedbackAction(
   _previous: ActionResult,
   formData: FormData,
@@ -1083,6 +1139,101 @@ export async function checkInAction(input: {
   if (error) return fromPostgrest(error);
 
   kickSheetsSync(access.edition.id);
+  revalidate(input.locale, input.projectId);
+  return ok();
+}
+
+// -----------------------------------------------------------------------------
+// Walk-ins at the reception desk (0016, walkins.ts)
+// -----------------------------------------------------------------------------
+
+type Desk =
+  | { refused: ActionResult }
+  | { access: Awaited<ReturnType<typeof requireInterviewAccess>>; db: ReturnType<typeof createInterviewsClient> };
+
+/** The desk's access, and the request only if it is this project's edition's. */
+async function walkinDesk(projectId: string, requestId: string): Promise<Desk> {
+  let access: Awaited<ReturnType<typeof requireInterviewAccess>>;
+  try {
+    access = await requireInterviewAccess(projectId, can.reception);
+  } catch (error) {
+    return { refused: fail(error instanceof Error ? error.message : 'Not allowed.') };
+  }
+  const db = createInterviewsClient();
+  const { data } = await db
+    .from('walkin_requests')
+    .select('id')
+    .eq('id', requestId)
+    .eq('edition_id', access.edition.id)
+    .maybeSingle();
+  if (!data) return { refused: fail('No such walk-in request.', 'not_found') };
+  return { access, db };
+}
+
+/**
+ * Confirms a walk-in into one of the company's free times today. The
+ * database does all of it in one step (confirm_walkin): the student's
+ * application (their own if they applied online, else a new one), the
+ * acceptance for that company, the booking, and checking them in. It
+ * refuses a time that has started, is closed, is taken, or is another
+ * company's or another day's.
+ */
+export async function confirmWalkinAction(input: {
+  projectId: string;
+  locale: string;
+  requestId: string;
+  slotId: string;
+}): Promise<ActionResult> {
+  const desk = await walkinDesk(input.projectId, input.requestId);
+  if ('refused' in desk) return desk.refused;
+
+  const { error } = await desk.db.rpc('confirm_walkin', {
+    p_request: input.requestId,
+    p_slot: input.slotId,
+    p_token: newToken(),
+    p_actor: desk.access.actor,
+  });
+  if (error) return fromPostgrest(error);
+
+  kickEmailDelivery();
+  kickSheetsSync(desk.access.edition.id);
+  revalidate(input.locale, input.projectId);
+  return ok();
+}
+
+export async function rejectWalkinAction(input: {
+  projectId: string;
+  locale: string;
+  requestId: string;
+  note: string;
+}): Promise<ActionResult> {
+  const desk = await walkinDesk(input.projectId, input.requestId);
+  if ('refused' in desk) return desk.refused;
+
+  const { error } = await desk.db.rpc('reject_walkin', {
+    p_request: input.requestId,
+    p_note: input.note.trim().slice(0, 300),
+    p_actor: desk.access.actor,
+  });
+  if (error) return fromPostgrest(error);
+
+  revalidate(input.locale, input.projectId);
+  return ok();
+}
+
+/** Undo: a confirmed walk-in's booking is cancelled (before the interview starts) and the request waits again. */
+export async function reopenWalkinAction(input: {
+  projectId: string;
+  locale: string;
+  requestId: string;
+}): Promise<ActionResult> {
+  const desk = await walkinDesk(input.projectId, input.requestId);
+  if ('refused' in desk) return desk.refused;
+
+  const { error } = await desk.db.rpc('reopen_walkin', { p_request: input.requestId, p_actor: desk.access.actor });
+  if (error) return fromPostgrest(error);
+
+  kickSheetsSync(desk.access.edition.id);
   revalidate(input.locale, input.projectId);
   return ok();
 }

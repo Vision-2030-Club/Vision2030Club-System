@@ -34,6 +34,10 @@ export type EditionSettings = {
   room_days?: Record<string, { from_day: string; to_day: string }>;
   /** Each company's own Google Sheet, by company id; read through companySheets (companySheets.ts). */
   company_sheets?: Record<string, { id: string; url: string }>;
+  /** Walk-ins (0016); read through walkinSettings (walkins.ts). */
+  walkins_open?: boolean;
+  walkin_token?: string;
+  walkins_off_companies?: string[];
 };
 
 export type Edition = {
@@ -63,6 +67,38 @@ export type Room = {
   note: string | null;
   sort_order: number;
   is_active: boolean;
+};
+
+/** A walk-in's request (0016): what the walk-in form said, until reception confirms or turns it down. */
+export type WalkinRequest = {
+  id: string;
+  edition_id: string;
+  seq: number;
+  request_token: string;
+  company_id: string;
+  day: string;
+  email: string;
+  phone: string | null;
+  name: string;
+  is_club_member: boolean | null;
+  university: string | null;
+  university_other: string | null;
+  level: string | null;
+  college: string | null;
+  major: string | null;
+  gpa: string | null;
+  english_level: string | null;
+  why_first: string | null;
+  locale: 'ar' | 'en';
+  cv_path: string;
+  status: 'pending' | 'confirmed' | 'rejected';
+  application_id: string | null;
+  booking_id: string | null;
+  decided_at: string | null;
+  decided_by: string | null;
+  decision_note: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 /** HR's accepted list for one assignment (a session), 0014. Taken off = revoked_at, never deleted. */
