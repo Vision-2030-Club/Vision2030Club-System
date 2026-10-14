@@ -34,6 +34,8 @@ export type EditionSettings = {
   room_days?: Record<string, { from_day: string; to_day: string }>;
   /** Each company's own Google Sheet, by company id; read through companySheets (companySheets.ts). */
   company_sheets?: Record<string, { id: string; url: string }>;
+  /** Whether the company's feedback finishes an interview; read through companyFinishes (companyFinish.ts). On unless false. */
+  company_finishes?: boolean;
 };
 
 export type Edition = {
@@ -273,4 +275,6 @@ export type FloorRow = {
   stage: Stage | null;
   arrived_at: string | null;
   stage_changed_at: string | null;
+  /** Whether a finished interview has the company's feedback; set by the floor only (withFeedbackFlags). */
+  has_feedback?: boolean;
 };

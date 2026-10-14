@@ -231,6 +231,18 @@ async function run() {
   check('release_feedback queues the emails', released.n === 1);
   check('released feedback is frozen', /already been sent/.test((await refused(`select submit_feedback($1, $2, $3::jsonb)`, [c1.access_token, b, J({})])) ?? ''));
 
+  // --- 0015: the company finishes an interview with its feedback -----------
+  if ((await one(`select to_regprocedure('public.finish_interview(text, uuid, jsonb)') as f`)).f) {
+    const sb = saraBooking.id;
+    check('finishing needs feedback', /at least one rating/.test((await refused(`select finish_interview($1, $2, $3::jsonb)`, [c1.access_token, sb, J({})])) ?? ''));
+    check('another company cannot finish it', /not on your list/.test((await refused(`select finish_interview($1, $2, $3::jsonb)`, [c2.access_token, sb, J({ overall: 'x' })])) ?? ''));
+    const fin = await one(`select * from finish_interview($1, $2, $3::jsonb)`, [c1.access_token, sb, J({ ratings: { communication: 5 } })]);
+    const finished = await one(`select stage, finished_at from bookings where id = $1`, [sb]);
+    check('the company’s feedback finishes the interview', fin.ratings.communication === 5 && finished.stage === 'done' && finished.finished_at !== null);
+  } else {
+    console.log('  skip  finish_interview (0015 is not applied)');
+  }
+
   // --- reminders, outbox ------------------------------------------------------
   await q(`update bookings set booked_at = now() - interval '3 hours' where edition_id = $1`, [editionId]);
   await q(`update bookings set stage = 'scheduled' where id = $1`, [b]);

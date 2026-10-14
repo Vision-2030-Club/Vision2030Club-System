@@ -5,6 +5,7 @@ import { ConfirmForm } from '@/components/ConfirmForm';
 import { Card, EmptyState, Input, Label, Select, Textarea } from '@/components/ui';
 import { formatDateTime, toDateTimeInput } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
+import { companyFinishes } from '@/lib/interviews/companyFinish';
 import { siteUrl } from '@/lib/interviews/email';
 import { DEFAULT_HOURS, floorLayout, LAYOUT_SLOT_LENGTHS } from '@/lib/interviews/floorLayout';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
@@ -14,6 +15,7 @@ import {
   pullFloorSheetAction,
   releaseFeedbackAction,
   rotateTvTokenAction,
+  setCompanyFinishesAction,
   syncFloorSheetAction,
   syncRegistrationSheetAction,
   updateEditionAction,
@@ -301,6 +303,21 @@ export default async function InterviewsSettingsPage({
             <input type="hidden" name="locale" value={locale} />
             <input type="hidden" name="project_id" value={id} />
           </ConfirmForm>
+
+          <div className="mt-4 border-t border-line pt-3">
+            <ActionForm action={setCompanyFinishesAction} submitLabel={tCommon('save')}>
+              <input type="hidden" name="locale" value={locale} />
+              <input type="hidden" name="project_id" value={id} />
+              <div>
+                <Label htmlFor="company_finishes">{t('settings.companyFinishes')}</Label>
+                <Select id="company_finishes" name="company_finishes" defaultValue={companyFinishes(settings) ? 'on' : 'off'}>
+                  <option value="on">{t('settings.companyFinishesOn')}</option>
+                  <option value="off">{t('settings.companyFinishesOff')}</option>
+                </Select>
+              </div>
+              <p className="text-xs text-ink-muted">{t('settings.companyFinishesHint')}</p>
+            </ActionForm>
+          </div>
         </Card>
 
         <Card>

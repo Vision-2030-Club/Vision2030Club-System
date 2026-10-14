@@ -278,6 +278,31 @@ export async function pullFloorSheetAction(
   }
 }
 
+/**
+ * Settings → Feedback: whether a company's feedback is what finishes an
+ * interview (companyFinish.ts, 0015). On by default; off puts the
+ * interviewer's page back to feedback only, with organizers marking
+ * interviews done.
+ */
+export async function setCompanyFinishesAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const db = createInterviewsClient();
+  const { error } = await db.rpc('update_edition', {
+    p_edition: g.access.edition.id,
+    p_patch: { settings: { company_finishes: text(formData, 'company_finishes') !== 'off' } },
+    p_actor: g.access.actor,
+  });
+  if (error) return fromPostgrest(error);
+
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
 export async function releaseFeedbackAction(
   _previous: ActionResult,
   formData: FormData,

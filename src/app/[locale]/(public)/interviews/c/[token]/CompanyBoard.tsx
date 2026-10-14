@@ -55,6 +55,7 @@ export function CompanyBoard({
   feedback,
   ratingLabels,
   initialOpen,
+  finishes,
 }: {
   token: string;
   locale: string;
@@ -64,6 +65,8 @@ export function CompanyBoard({
   ratingLabels: { key: string; label: string }[];
   /** A booking to open on arrival: the Feedback link in the company's Google Sheet (companySheets.ts). */
   initialOpen: string | null;
+  /** Saving the feedback finishes the interview (companyFinish.ts, 0015). */
+  finishes: boolean;
 }) {
   const t = useTranslations('interviews');
   const router = useRouter();
@@ -117,6 +120,11 @@ export function CompanyBoard({
                       <span className="min-w-0 flex-1 truncate text-sm font-medium">{row.student_name}</span>
                       <Badge tone={STAGE_TONES[row.stage]}>{t(`stage.${row.stage}`)}</Badge>
                       {fb ? <Badge tone={fb.released ? 'ok' : 'brand'}>{fb.released ? t('companyPage.feedbackSent') : t('companyPage.feedbackSaved')}</Badge> : null}
+                      {finishes && !open && row.stage !== 'done' && row.stage !== 'no_show' ? (
+                        <Button type="button" className="px-2.5 py-1 text-xs" onClick={() => setOpenId(row.booking_id)}>
+                          {t('companyPage.interviewDone')}
+                        </Button>
+                      ) : null}
                       <Button type="button" variant="secondary" className="px-2.5 py-1 text-xs" onClick={() => setOpenId(open ? null : row.booking_id)}>
                         {open ? t('companyPage.hide') : t('companyPage.details')}
                       </Button>
@@ -163,7 +171,18 @@ export function CompanyBoard({
                       )}
                     </div>
 
-                    <FeedbackForm token={token} locale={locale} bookingId={row.booking_id} initial={fb} ratingLabels={ratingLabels} />
+                    {finishes && row.stage === 'no_show' ? (
+                      <Alert tone="warn">{t('companyPage.noShowNote')}</Alert>
+                    ) : (
+                      <FeedbackForm
+                        token={token}
+                        locale={locale}
+                        bookingId={row.booking_id}
+                        initial={fb}
+                        ratingLabels={ratingLabels}
+                        finishing={finishes && row.stage !== 'done'}
+                      />
+                    )}
                   </div>
                 ) : null}
               </li>
@@ -201,18 +220,22 @@ function FeedbackForm({
   bookingId,
   initial,
   ratingLabels,
+  finishing,
 }: {
   token: string;
   locale: string;
   bookingId: string;
   initial?: FeedbackState;
   ratingLabels: { key: string; label: string }[];
+  /** Saving marks the interview done (the student is not done yet). */
+  finishing: boolean;
 }) {
   const t = useTranslations('interviews');
   const [state, formAction, pending] = useActionState<ActionResult, FormData>(feedbackAction, {
     ok: false,
   });
   const frozen = initial?.released ?? false;
+  const error = state.hint && t.has(`errors.${state.hint}`) ? t(`errors.${state.hint}`) : state.error;
 
   return (
     <form action={formAction} className="space-y-3 rounded-lg border border-line bg-surface p-3">
@@ -220,6 +243,7 @@ function FeedbackForm({
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="booking_id" value={bookingId} />
       <h3 className="text-sm font-semibold">{t('companyPage.feedback')}</h3>
+      {finishing && !frozen ? <p className="text-xs text-ink-muted">{t('companyPage.finishHint')}</p> : null}
       {frozen ? <Alert tone="ok">{t('companyPage.feedbackFrozen')}</Alert> : null}
 
       {ratingLabels.map((label) => (
@@ -256,12 +280,12 @@ function FeedbackForm({
         <Textarea id={`overall-${bookingId}`} name="overall" rows={2} defaultValue={initial?.overall} disabled={frozen} />
       </div>
 
-      {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
+      {error ? <Alert tone="danger">{error}</Alert> : null}
       {state.ok ? <Alert tone="ok">{t('companyPage.feedbackSavedNote')}</Alert> : null}
 
       {!frozen ? (
         <Button type="submit" disabled={pending}>
-          {t('companyPage.saveFeedback')}
+          {finishing ? t('companyPage.saveAndFinish') : t('companyPage.saveFeedback')}
         </Button>
       ) : null}
     </form>

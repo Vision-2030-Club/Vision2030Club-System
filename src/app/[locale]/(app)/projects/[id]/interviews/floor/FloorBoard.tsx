@@ -141,6 +141,9 @@ export function FloorBoard({
                       ) : null}
                     </span>
                     <Badge tone={STAGE_TONES[stage]}>{t(`stage.${stage}`)}</Badge>
+                    {stage === 'done' && row.has_feedback === false ? (
+                      <Badge tone="warn">{t('floor.noFeedback')}</Badge>
+                    ) : null}
 
                     {canAct ? (
                       <span className="flex flex-wrap gap-1">

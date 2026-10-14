@@ -779,7 +779,11 @@
       "registrationsSheet": "Registrations Google Sheet",
       "registrationsSheetHint": "Every application, from the public form and the Register tab, is added as a row with every answer on the form, the companies in order, which of them accepted or rejected the student, and what the student booked. The column of a question the form does not ask is hidden. Accepted, Rejected and Booked update themselves after HR decisions and bookings. A student who applies again with the same email gets a second row marked “Updated” until the next update folds it away. Sync now rewrites the sheet from the system, one row per student, which also fills in any row Google missed. Uses the Google account connected under Admin → Google, like the Live Google Sheet. The sheet holds personal data: it is shared with nobody by default, so share it with named people only. The CV links open only for signed-in HR and managers.",
       "registrationsSheetNone": "Not created yet — it appears with the first application, or press Sync now.",
-      "registrationsSheetSync": "Sync now"
+      "registrationsSheetSync": "Sync now",
+      "companyFinishes": "Who finishes an interview",
+      "companyFinishesOn": "The company, by saving its feedback (recommended)",
+      "companyFinishesOff": "Organizers only; companies just write feedback",
+      "companyFinishesHint": "With the company: the interviewer page shows “Interview done” on each student, which opens the feedback form, and saving it marks the interview done. That is the only stage a company can move. Organizers can still mark an interview finished by hand; the Floor then shows “No feedback yet” on it."
     },
     "companies": {
       "new": "New company",
@@ -941,7 +945,8 @@
       "byCompany": "By company",
       "byRoom": "By room",
       "noRoomsThatDay": "No rooms on this day. Set the event days in Settings, or assign a company to a room.",
-      "unassigned": "No company yet"
+      "unassigned": "No company yet",
+      "noFeedback": "No feedback yet"
     },
     "bookings": {
       "find": "Find a student",
@@ -1074,7 +1079,9 @@
       "missing_answer": "Answer this question: {question}.",
       "no_match": "No one has been added with that phone number. Check the number, or contact the club.",
       "stage_changed": "The student’s status changed before this edit arrived, so the newer status was kept.",
-      "not_your_session": "This time is not on the day you were given. Pick a time from your own day."
+      "not_your_session": "This time is not on the day you were given. Pick a time from your own day.",
+      "marked_no_show": "This student is marked as not shown. Ask the room’s organizer to change that first.",
+      "empty_feedback": "Give at least one rating or a comment."
     },
     "student": {
       "hello": "Hello, {name}.",
@@ -1118,7 +1125,11 @@
       "improvements": "To improve",
       "overall": "Overall note",
       "feedbackSavedNote": "Saved.",
-      "saveFeedback": "Save feedback"
+      "saveFeedback": "Save feedback",
+      "interviewDone": "Interview done",
+      "finishHint": "Saving this feedback marks the interview done.",
+      "saveAndFinish": "Save feedback and finish",
+      "noShowNote": "The organizer marked this student as not shown. If they are here, ask the room’s organizer to change it."
     },
     "tv": {
       "nowCalling": "Now calling",

@@ -410,6 +410,20 @@ export function toFloorRow(row: DayRow): FloorRow {
   };
 }
 
+/**
+ * Marks each finished interview with whether the company has written its
+ * feedback, so the floor can show "No feedback yet" on one an organizer
+ * finished by hand (0015: a company's own "Interview done" always carries
+ * feedback). One query, only for the finished rows.
+ */
+export async function withFeedbackFlags(db: SupabaseClient, rows: FloorRow[]): Promise<FloorRow[]> {
+  const done = rows.filter((r) => r.booking_id && r.stage === 'done').map((r) => r.booking_id as string);
+  if (done.length === 0) return rows;
+  const { data } = await db.from('feedback').select('booking_id').in('booking_id', done);
+  const has = new Set(((data ?? []) as { booking_id: string }[]).map((f) => f.booking_id));
+  return rows.map((r) => (r.booking_id && r.stage === 'done' ? { ...r, has_feedback: has.has(r.booking_id) } : r));
+}
+
 /** What the TV needs from a day: only the held slots, with the names on them. */
 export function toBoardBookings(rows: DayRow[]): BoardBooking[] {
   return rows
