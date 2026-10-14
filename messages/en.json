@@ -644,7 +644,8 @@
       "log": "Log",
       "messages": "Messages",
       "rooms": "Rooms",
-      "projectDetails": "Project details"
+      "projectDetails": "Project details",
+      "reception": "Reception"
     },
     "status": {
       "draft": "Draft",
@@ -654,7 +655,8 @@
     "role": {
       "manager": "Manager",
       "hr": "HR",
-      "organizer": "Organizer"
+      "organizer": "Organizer",
+      "reception": "Reception"
     },
     "gate": {
       "open": "Open",
@@ -847,7 +849,9 @@
       "hr": "HR people",
       "hrHint": "Chosen by HR’s Directors. They review applicants and decide per company.",
       "automatic": "Always in",
-      "automaticHint": "The project’s managers, the Presidency and the Super Admin manage everything here without being listed. HR’s Directors decide without being listed."
+      "automaticHint": "The project’s managers, the Presidency and the Super Admin manage everything here without being listed. HR’s Directors decide without being listed.",
+      "reception": "Reception",
+      "receptionHint": "Chosen by the project’s managers or HR’s Directors. They check students in at the door and cannot change anything else."
     },
     "applicants": {
       "searchPlaceholder": "Name, email or phone",
@@ -1210,6 +1214,27 @@
         "endBeforeStart": "The end time must be after the start time.",
         "badSlot": "Pick a row length from the list."
       }
+    },
+    "reception": {
+      "search": "Phone number or name",
+      "results": "Found",
+      "late": "Late, not checked in",
+      "soon": "Due in the next {minutes} minutes",
+      "waitingList": "Checked in, waiting",
+      "waiting": "Waiting",
+      "expected": "Expected",
+      "checkIn": "Check in",
+      "undo": "Undo check-in",
+      "nobody": "Nobody.",
+      "inMinutes": "in {minutes} min",
+      "lateBy": "{minutes} min late",
+      "now": "now",
+      "refreshes": "Refreshes every 10 seconds.",
+      "notToday": "This is not today. Check-in normally happens on the day itself.",
+      "allOfDay": "Everyone on this day",
+      "today": "today",
+      "noDays": "No company has interview times yet.",
+      "refused": "That did not go through. Try again."
     }
   },
   "outreach": {

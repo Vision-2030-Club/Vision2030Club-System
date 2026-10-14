@@ -958,8 +958,8 @@ export async function setSlotClosedAction(
 
 // -----------------------------------------------------------------------------
 // People — the roster lives in the CLUB database, written as the user, so its
-// policies (0062) decide: organizers by whoever manages the project, HR
-// people by whoever manages members.
+// policies (0062, 0069) decide: organizers by whoever manages the project, HR
+// people by whoever manages members, receptionists by either.
 // -----------------------------------------------------------------------------
 
 export async function addPersonAction(
@@ -970,7 +970,7 @@ export async function addPersonAction(
   if ('error' in g) return fail(g.error);
 
   const role = requiredText(formData, 'role');
-  if (role !== 'organizer' && role !== 'hr') return fail('Unknown role.');
+  if (role !== 'organizer' && role !== 'hr' && role !== 'reception') return fail('Unknown role.');
 
   const me = await getMyMember();
   const supabase = await createClient();
@@ -1080,6 +1080,51 @@ export async function stageAction(input: {
     p_to: input.to,
     p_actor: access.actor,
     p_as_manager: can.manage(access.role),
+  });
+  if (error) return fromPostgrest(error);
+
+  kickSheetsSync(access.edition.id);
+  revalidate(input.locale, input.projectId);
+  return ok();
+}
+
+/**
+ * The Reception tab's only move: the student is in the building (scheduled →
+ * arrived), or that was a mistake (arrived → scheduled). Nothing else, so the
+ * door can never change what happens inside a room. `p_expected` (0011)
+ * makes a stale screen harmless: if the student was moved on in the meantime,
+ * the database refuses instead of pulling them back.
+ */
+export async function checkInAction(input: {
+  projectId: string;
+  locale: string;
+  bookingId: string;
+  undo?: boolean;
+}): Promise<ActionResult> {
+  let access: InterviewAccess & { edition: NonNullable<InterviewAccess['edition']> };
+  try {
+    access = await requireInterviewAccess(input.projectId, can.reception);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Not allowed.');
+  }
+
+  const db = createInterviewsClient();
+  // Only this project's edition: a booking id from another edition is not
+  // this desk's to touch.
+  const { data: booking } = await db
+    .from('bookings')
+    .select('id')
+    .eq('id', input.bookingId)
+    .eq('edition_id', access.edition.id)
+    .maybeSingle();
+  if (!booking) return fail('No such booking.', 'not_found');
+
+  const { error } = await db.rpc('advance_stage', {
+    p_booking: input.bookingId,
+    p_to: input.undo ? 'scheduled' : 'arrived',
+    p_actor: access.actor,
+    p_as_manager: false,
+    p_expected: input.undo ? 'arrived' : 'scheduled',
   });
   if (error) return fromPostgrest(error);
 

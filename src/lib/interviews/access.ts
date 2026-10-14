@@ -20,10 +20,13 @@ import type { Edition, EditionSettings } from '@/lib/interviews/types';
  *              company; reads everything else.
  *   organizer  chosen by the project's managers. Moves students through the
  *              stages on the day.
+ *   reception  chosen by the project's managers or HR's Directors (0069).
+ *              Checks students in at the door (the Reception tab) and
+ *              nothing else.
  *   member     Outreach only (0065): on the project, works its targets.
  *   viewer     Outreach only: may see the project's KPI, reads the numbers.
  */
-export type ComponentRole = 'manager' | 'hr' | 'organizer' | 'member' | 'viewer';
+export type ComponentRole = 'manager' | 'hr' | 'organizer' | 'reception' | 'member' | 'viewer';
 
 export type ComponentAccess = {
   project_id: string;
@@ -103,6 +106,8 @@ export const can = {
   manage: (role: ComponentRole) => role === 'manager',
   decide: (role: ComponentRole) => role === 'manager' || role === 'hr',
   stage: (role: ComponentRole) => role === 'manager' || role === 'organizer',
+  /** The Reception tab: checking a student in, and undoing it. */
+  reception: (role: ComponentRole) => role === 'manager' || role === 'hr' || role === 'reception',
   /** Adding HR people is HR's own power; the club database re-checks it. */
   roster: (role: ComponentRole) => role === 'manager' || role === 'hr',
 };

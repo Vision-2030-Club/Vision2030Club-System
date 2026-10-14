@@ -4,11 +4,12 @@ import { loadDayRows, toFloorRow } from '@/lib/interviews/queries';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 
 /**
- * What the floor board polls every twelve seconds. Signed in: the club
- * session cookie identifies the person and `getInterviewAccess` decides
- * whether they may see this project's day at all. One company's day
- * (`company`, the board by company), one room's (`room`, an organizer's own
- * rooms), or every slot of the day when neither is given.
+ * What the floor board polls every twelve seconds, and the Reception tab
+ * every ten. Signed in: the club session cookie identifies the person and
+ * `getInterviewAccess` decides whether they may see this project's day at
+ * all. One company's day (`company`, the board by company), one room's
+ * (`room`, an organizer's own rooms), or every slot of the day when neither
+ * is given (reception).
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
