@@ -76,9 +76,10 @@ export type DayRow = SlotStatus & {
 };
 
 /**
- * Every slot of a day (optionally one company's), with whoever holds it.
- * Read by the floor board, the interviewer page, the TV and the schedule —
- * all of which poll, so this is one indexed query plus two small lookups.
+ * Every slot of a day (optionally one company's, or one room's), with
+ * whoever holds it. Read by the floor board, the interviewer page, the TV and
+ * the schedule — all of which poll, so this is one indexed query plus two
+ * small lookups.
  */
 export async function loadDayRows(
   db: SupabaseClient,
@@ -86,6 +87,7 @@ export async function loadDayRows(
   day: string,
   zone: string,
   companyId?: string,
+  roomId?: string,
 ): Promise<DayRow[]> {
   const { from, to } = dayBounds(day, zone);
   let query = db
@@ -96,6 +98,7 @@ export async function loadDayRows(
     .lt('starts_at', to)
     .order('starts_at');
   if (companyId) query = query.eq('company_id', companyId);
+  if (roomId) query = query.eq('room_id', roomId);
 
   const [{ data: rows }, companies, rooms] = await Promise.all([
     query,
@@ -398,6 +401,7 @@ export function toFloorRow(row: DayRow): FloorRow {
     company_id: row.company_id,
     company_name_en: row.company_name_en,
     company_name_ar: row.company_name_ar,
+    room_id: row.room_id,
     room_name: row.room_name,
     starts_at: row.starts_at,
     ends_at: row.ends_at,

@@ -6,15 +6,18 @@ import { createInterviewsClient } from '@/lib/supabase/interviews';
 /**
  * What the floor board polls every twelve seconds. Signed in: the club
  * session cookie identifies the person and `getInterviewAccess` decides
- * whether they may see this project's day at all.
+ * whether they may see this project's day at all. One company's day
+ * (`company`, the board by company), one room's (`room`, an organizer's own
+ * rooms), or every slot of the day when neither is given.
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const project = params.get('project') ?? '';
-  const company = params.get('company') ?? '';
+  const company = params.get('company') || undefined;
+  const room = params.get('room') || undefined;
   const day = params.get('day') ?? '';
 
-  if (!project || !company || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+  if (!project || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   }
 
@@ -27,6 +30,7 @@ export async function GET(request: NextRequest) {
     day,
     access.edition.time_zone,
     company,
+    room,
   );
 
   return NextResponse.json(

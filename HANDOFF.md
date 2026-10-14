@@ -1469,6 +1469,10 @@ Google refusing a request; expect to fix something on the first real sync.
 
 ### Status edits in the sheets come back into the app (2026-10-05)
 
+**Off by default since 2026-10-14** (see "One organizer per room" below):
+everything in this section now happens only while Settings → Live Google
+Sheet → *Status typed in the Google Sheets* is set to two-way.
+
 The club wants to work from either side: the app or the sheets. So the
 **Status** column of the floor sheet's day tabs and of every company sheet now
 goes both ways. Nothing else does. Students, times and phone numbers are the
@@ -1749,6 +1753,43 @@ access to the component still gets the project page.
   back into the component.
 - Any new link meant for the project page itself needs `?details=1`, or it
   lands in the component.
+
+### One organizer per room, and read-only sheets (2026-10-14)
+
+So that only one person moves the students of a room. No migration.
+
+- **Giving rooms out.** Each room card on the Rooms tab shows its
+  organizer, and managers change it (*Change organizer*): one organizer on
+  every day, and, for a room used on several days, someone different on a
+  particular day. An organizer can hold several rooms. The choices are the
+  People tab's organizers. Kept in the edition's settings as
+  `room_organizers` (`src/lib/interviews/roomOrganizers.ts`): the key
+  `<room id>` is every day, `<room id>:<YYYY-MM-DD>` overrides one day.
+  Saved by reading the settings fresh and writing the whole map back, as
+  `session_links` are; two managers saving the same second could still
+  undo one another.
+- **What it changes.** A room with an organizer is theirs: `stageAction`
+  refuses anyone else (hint `not_your_room`), except managers, who may act
+  anywhere. A room with nobody is open to every organizer, as before, so
+  nothing locks until a manager gives rooms out. Someone taken off the
+  organizer list keeps their rooms (shown as "No longer an organizer")
+  until a manager changes them, so the room stays locked rather than
+  silently opening. `stageAction` also now refuses a booking from another
+  edition.
+- **The Floor tab.** An organizer with rooms that day opens on **My rooms**:
+  one board per room, every company in it, with the buttons (the floor
+  route takes `room=`). *By company* still works for everyone; a row in a
+  room another organizer runs shows "<name>'s room" and no buttons. *By
+  room* shows each room's organizer.
+- **The sheets are read-only by default.** A Status typed in the floor
+  sheet or a company's sheet would get round both this rule and the
+  company-finishes-the-interview rule, so `applySheetEdits` (sheetPull.ts)
+  now applies nothing unless the edition's `sheet_status_edits` is `true`
+  (Settings → Live Google Sheet → *Status typed in the Google Sheets*).
+  While off, an edit counts as ignored, which makes the every-minute pull
+  start a sync that writes the app's value back over it, usually within a
+  minute. *Pull from Sheet* is hidden while off. Two-way is one setting
+  away and behaves exactly as it did on 2026-10-05.
 
 ### Things easy to break
 

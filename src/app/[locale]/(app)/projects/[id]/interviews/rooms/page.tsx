@@ -9,8 +9,9 @@ import { formatDate, formatTime, localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { companySheets, sheetKey } from '@/lib/interviews/companySheets';
 import { siteUrl } from '@/lib/interviews/email';
-import { floorLayout, roomDays, type RoomDays } from '@/lib/interviews/floorLayout';
+import { daysBetween, floorLayout, layoutDays, roomDays, type RoomDays } from '@/lib/interviews/floorLayout';
 import { sessionLinks } from '@/lib/interviews/roomLinks';
+import { entriesOf, loadOrganizers, roomOrganizers } from '@/lib/interviews/roomOrganizers';
 import { loadCompanies, loadRooms, loadSessionAcceptances, loadSessions } from '@/lib/interviews/queries';
 import { pages } from '@/lib/interviews/sheetFormat';
 import { PRAYER_BREAKS, SLOT_MINUTES } from '@/lib/interviews/slotRules';
@@ -22,6 +23,7 @@ import {
   createSessionAction,
   createSessionLinkAction,
   deleteSessionAction,
+  setRoomOrganizersAction,
   syncCompanySheetAction,
   upsertRoomAction,
 } from '../actions';
@@ -49,6 +51,11 @@ import { AcceptedPhones } from './AcceptedPhones';
  * A room is never deleted, only retired (`is_active`): its history stays,
  * and it can be brought back. An assignment with students booked in it
  * cannot be removed until they are moved or cancelled (delete_session).
+ *
+ * A room can be given to one organizer, on every day or on particular days
+ * (`room_organizers`, roomOrganizers.ts): only they (and the managers) move
+ * its students on the floor. A room given to nobody is open to every
+ * organizer.
  */
 export default async function InterviewsRoomsPage({
   params,
@@ -70,7 +77,7 @@ export default async function InterviewsRoomsPage({
 
   const db = createInterviewsClient();
   type SlotRow = { session_id: string; booking_id: string | null; is_closed: boolean };
-  const [rooms, companies, sessions, acceptances, slotRows] = await Promise.all([
+  const [rooms, companies, sessions, acceptances, slotRows, organizers] = await Promise.all([
     loadRooms(db, edition.id),
     loadCompanies(db, edition.id),
     loadSessions(db, edition.id),
@@ -78,6 +85,7 @@ export default async function InterviewsRoomsPage({
     pages<SlotRow>((from, to) =>
       db.from('slot_status').select('session_id, booking_id, is_closed').eq('edition_id', edition.id).order('id').range(from, to),
     ),
+    loadOrganizers(id),
   ]);
 
   const counts = new Map<string, { booked: number; total: number }>();
@@ -101,6 +109,12 @@ export default async function InterviewsRoomsPage({
   // day, else the edition's latest day with one, else today.
   const fallbackDay =
     floorLayout(settings)?.from_day ?? (sessions.length ? sessions[sessions.length - 1].day : toDateInput(new Date()));
+  const owners = roomOrganizers(settings);
+  const organizerName = (memberId: string) => {
+    const o = organizers.find((x) => x.id === memberId);
+    return o ? localized(o, 'name', locale) : t('floor.formerOrganizer');
+  };
+  const eventDays = layoutDays(floorLayout(settings));
 
   return (
     <div className="space-y-4">
@@ -141,6 +155,19 @@ export default async function InterviewsRoomsPage({
                     </div>
                   ) : null}
                 </div>
+
+                <RoomOrganizer
+                  locale={locale}
+                  projectId={id}
+                  room={room}
+                  days={[...new Set([...(own ? daysBetween(own.from_day, own.to_day) : eventDays), ...assigned.map((s) => s.day)])].sort()}
+                  entries={entriesOf(owners, room.id)}
+                  organizers={organizers.map((o) => ({ id: o.id, name: localized(o, 'name', locale) }))}
+                  nameOf={organizerName}
+                  manage={manage}
+                  t={t}
+                  saveLabel={tCommon('save')}
+                />
 
                 <div className="mt-4 border-t border-line pt-3">
                   <h3 className="mb-2 text-sm font-semibold">{t('roomsTab.assignments')}</h3>
@@ -350,6 +377,106 @@ type T = Awaited<ReturnType<typeof getTranslations<'interviews'>>>;
 function daysLabel(days: RoomDays, locale: string): string {
   const from = formatDate(`${days.from_day}T12:00:00Z`, locale);
   return days.to_day === days.from_day ? from : `${from} – ${formatDate(`${days.to_day}T12:00:00Z`, locale)}`;
+}
+
+/**
+ * Who runs the room on the floor: one organizer on every day, and anyone
+ * different on particular days. Managers change it; HR reads it.
+ */
+function RoomOrganizer({
+  locale,
+  projectId,
+  room,
+  days,
+  entries,
+  organizers,
+  nameOf,
+  manage,
+  t,
+  saveLabel,
+}: {
+  locale: string;
+  projectId: string;
+  room: Room;
+  days: string[];
+  entries: { all: string | null; days: Record<string, string> };
+  organizers: { id: string; name: string }[];
+  nameOf: (memberId: string) => string;
+  manage: boolean;
+  t: T;
+  saveLabel: string;
+}) {
+  const dayLabel = (day: string) => formatDate(`${day}T12:00:00Z`, locale);
+  const overrides = Object.entries(entries.days).sort(([a], [b]) => a.localeCompare(b));
+  // A member no longer on the organizer list still shows, so the manager sees why the room is locked.
+  const options = (current: string | null | undefined) => [
+    ...organizers,
+    ...(current && !organizers.some((o) => o.id === current) ? [{ id: current, name: nameOf(current) }] : []),
+  ];
+
+  return (
+    <div className="mt-3 space-y-1 text-sm">
+      <p>
+        <span className="text-ink-muted">{t('floor.organizer')}: </span>
+        <span className="font-medium">{entries.all ? nameOf(entries.all) : t('floor.anyOrganizer')}</span>
+      </p>
+      {overrides.map(([day, memberId]) => (
+        <p key={day} className="text-xs text-ink-muted">
+          <span className="ltr-nums">{dayLabel(day)}</span>: {nameOf(memberId)}
+        </p>
+      ))}
+      {manage ? (
+        <Disclosure label={t('roomsTab.organizerEdit')} title={`${t('floor.organizer')} · ${room.name}`}>
+          {organizers.length === 0 ? (
+            <p className="text-sm text-ink-muted">
+              {t('roomsTab.organizerNone')}{' '}
+              <Link href={`/projects/${projectId}/interviews/people`} className="text-brand-600 hover:underline">
+                {t('tabs.people')}
+              </Link>
+            </p>
+          ) : (
+            <ActionForm action={setRoomOrganizersAction} submitLabel={saveLabel}>
+              <input type="hidden" name="locale" value={locale} />
+              <input type="hidden" name="project_id" value={projectId} />
+              <input type="hidden" name="room_id" value={room.id} />
+              <p className="text-xs text-ink-muted">{t('roomsTab.organizerHint')}</p>
+              <div>
+                <Label htmlFor={`${room.id}-organizer`}>{t('roomsTab.organizerEveryDay')}</Label>
+                <Select id={`${room.id}-organizer`} name="all_days" defaultValue={entries.all ?? ''}>
+                  <option value="">{t('floor.anyOrganizer')}</option>
+                  {options(entries.all).map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              {days.length > 1 ? (
+                <fieldset className="space-y-2">
+                  <legend className="mb-1 text-sm font-medium">{t('roomsTab.organizerOnDays')}</legend>
+                  {days.map((day) => (
+                    <div key={day} className="grid grid-cols-2 items-center gap-2">
+                      <label htmlFor={`${room.id}-organizer-${day}`} className="ltr-nums text-sm">
+                        {dayLabel(day)}
+                      </label>
+                      <Select id={`${room.id}-organizer-${day}`} name={`day_${day}`} defaultValue={entries.days[day] ?? ''}>
+                        <option value="">{t('roomsTab.organizerSameEveryDay')}</option>
+                        {options(entries.days[day]).map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  ))}
+                </fieldset>
+              ) : null}
+            </ActionForm>
+          )}
+        </Disclosure>
+      ) : null}
+    </div>
+  );
 }
 
 /** Add a room (no `room`) or edit one: its name, where it is, and the days it is in use. */
