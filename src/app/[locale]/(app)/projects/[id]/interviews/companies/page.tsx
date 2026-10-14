@@ -48,7 +48,7 @@ export default async function InterviewsCompaniesPage({
 
   const t = await getTranslations('interviews');
   const tCommon = await getTranslations('common');
-  if (role === 'organizer') return <EmptyState>{tCommon('notPermitted')}</EmptyState>;
+  if (!can.decide(role)) return <EmptyState>{tCommon('notPermitted')}</EmptyState>;
   const manage = can.manage(role);
 
   const db = createInterviewsClient();
