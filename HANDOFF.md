@@ -1469,6 +1469,10 @@ Google refusing a request; expect to fix something on the first real sync.
 
 ### Status edits in the sheets come back into the app (2026-10-05)
 
+**Off by default since 2026-10-14** (see "One organizer per room" below):
+everything in this section now happens only while Settings → Live Google
+Sheet → *Status typed in the Google Sheets* is set to two-way.
+
 The club wants to work from either side: the app or the sheets. So the
 **Status** column of the floor sheet's day tabs and of every company sheet now
 goes both ways. Nothing else does. Students, times and phone numbers are the
@@ -1787,6 +1791,81 @@ People at the door who check students in and do nothing else.
   migrations 0001–0069 and stand-ins for Supabase's auth and storage
   schemas (19 checks: who may add and remove, what each person is answered,
   organizer outranking reception).
+
+### One organizer per room, and read-only sheets (2026-10-14)
+
+So that only one person moves the students of a room. No migration.
+
+- **Giving rooms out.** Each room card on the Rooms tab shows its
+  organizer, and managers change it (*Change organizer*): one organizer on
+  every day, and, for a room used on several days, someone different on a
+  particular day. An organizer can hold several rooms. The choices are the
+  People tab's organizers. Kept in the edition's settings as
+  `room_organizers` (`src/lib/interviews/roomOrganizers.ts`): the key
+  `<room id>` is every day, `<room id>:<YYYY-MM-DD>` overrides one day.
+  Saved by reading the settings fresh and writing the whole map back, as
+  `session_links` are; two managers saving the same second could still
+  undo one another.
+- **What it changes.** A room with an organizer is theirs: `stageAction`
+  refuses anyone else (hint `not_your_room`), except managers, who may act
+  anywhere. A room with nobody is open to every organizer, as before, so
+  nothing locks until a manager gives rooms out. Someone taken off the
+  organizer list keeps their rooms (shown as "No longer an organizer")
+  until a manager changes them, so the room stays locked rather than
+  silently opening. `stageAction` also now refuses a booking from another
+  edition.
+- **The Floor tab.** An organizer with rooms that day opens on **My rooms**:
+  one board per room, every company in it, with the buttons (the floor
+  route takes `room=`). *By company* still works for everyone; a row in a
+  room another organizer runs shows "<name>'s room" and no buttons. *By
+  room* shows each room's organizer.
+- **The sheets are read-only by default.** A Status typed in the floor
+  sheet or a company's sheet would get round both this rule and the
+  company-finishes-the-interview rule, so `applySheetEdits` (sheetPull.ts)
+  now applies nothing unless the edition's `sheet_status_edits` is `true`
+  (Settings → Live Google Sheet → *Status typed in the Google Sheets*).
+  While off, an edit counts as ignored, which makes the every-minute pull
+  start a sync that writes the app's value back over it, usually within a
+  minute. *Pull from Sheet* is hidden while off. Two-way is one setting
+  away and behaves exactly as it did on 2026-10-05.
+
+### The company finishes an interview with its feedback (0015, 2026-10-14)
+
+The club decided that the only stage a company moves is "done", and only
+together with its feedback.
+
+- **The interviewer page** (`/interviews/c/<token>`) shows **Interview done**
+  on each student who is not finished or marked as not shown. It opens the
+  student's details and the feedback form; the button reads *Save feedback
+  and finish*, and saving does both in one transaction:
+  `finish_interview(token, booking, payload)` in
+  `supabase/interviews/migrations/0015_company_finishes_interview.sql`. It
+  saves the feedback exactly as `submit_feedback` does, marks the booking
+  done (from scheduled, arrived or in interview, so a company is never
+  stuck because nobody pressed "In interview"), and refuses a no-show
+  (`marked_no_show`), an empty form (`empty_feedback`: at least one rating
+  or one comment) and released feedback (`feedback_sent`). A finished
+  interview's feedback stays editable until it is released, as before.
+- **Organizers keep their Finished button.** The Floor marks a finished
+  interview with no feedback as **No feedback yet** (`withFeedbackFlags`
+  in `queries.ts`), so the club can chase the company.
+- **A switch.** Settings → Feedback → *Who finishes an interview*
+  (`company_finishes`, `src/lib/interviews/companyFinish.ts`). On unless
+  set to off; off puts the page back to feedback only, saved through
+  `submit_feedback`, with organizers marking interviews done.
+- **The PIN now guards the action too.** The page was behind the PIN, but
+  `feedbackAction` only checked the link, so anyone holding a link could post
+  feedback without the PIN. It now checks the PIN cookie first.
+- **Applying 0015.** The person who applied 0005–0014 applies it the same
+  way (`npm run db:push -- --target interviews`, or paste it into the SQL
+  editor; it can run twice), then `npm run db:interviews`, which now has
+  three finish checks. Until then the action falls back to the two old
+  calls in a row (`submit_feedback`, then `advance_stage` to done as the
+  company), with the empty-form check done in TypeScript. Checked before
+  merging on a local Postgres 16 with 0001–0015 applied: 18 checks (every
+  refusal, each starting stage, editing after finishing, the audit log
+  naming the company, immediate release queuing the email, an organizer
+  undoing a finish).
 
 ### Walk-ins (0016, 2026-10-14)
 

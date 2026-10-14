@@ -34,6 +34,12 @@ export type EditionSettings = {
   room_days?: Record<string, { from_day: string; to_day: string }>;
   /** Each company's own Google Sheet, by company id; read through companySheets (companySheets.ts). */
   company_sheets?: Record<string, { id: string; url: string }>;
+  /** Whether the company's feedback finishes an interview; read through companyFinishes (companyFinish.ts). On unless false. */
+  company_finishes?: boolean;
+  /** Which organizer runs which room, by room id or room id:day; read through roomOrganizers (roomOrganizers.ts). */
+  room_organizers?: Record<string, string>;
+  /** Whether a Status typed in a Google Sheet changes the app (sheetPull.ts). Off unless set to true. */
+  sheet_status_edits?: boolean;
   /** Walk-ins (0016); read through walkinSettings (walkins.ts). */
   walkins_open?: boolean;
   walkin_token?: string;
@@ -300,6 +306,7 @@ export type FloorRow = {
   company_id: string;
   company_name_en: string;
   company_name_ar: string;
+  room_id: string;
   room_name: string;
   starts_at: string;
   ends_at: string;
@@ -309,4 +316,6 @@ export type FloorRow = {
   stage: Stage | null;
   arrived_at: string | null;
   stage_changed_at: string | null;
+  /** Whether a finished interview has the company's feedback; set by the floor only (withFeedbackFlags). */
+  has_feedback?: boolean;
 };

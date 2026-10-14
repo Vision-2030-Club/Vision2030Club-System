@@ -76,9 +76,10 @@ export type DayRow = SlotStatus & {
 };
 
 /**
- * Every slot of a day (optionally one company's), with whoever holds it.
- * Read by the floor board, the interviewer page, the TV and the schedule —
- * all of which poll, so this is one indexed query plus two small lookups.
+ * Every slot of a day (optionally one company's, or one room's), with
+ * whoever holds it. Read by the floor board, the interviewer page, the TV and
+ * the schedule — all of which poll, so this is one indexed query plus two
+ * small lookups.
  */
 export async function loadDayRows(
   db: SupabaseClient,
@@ -86,6 +87,7 @@ export async function loadDayRows(
   day: string,
   zone: string,
   companyId?: string,
+  roomId?: string,
 ): Promise<DayRow[]> {
   const { from, to } = dayBounds(day, zone);
   let query = db
@@ -96,6 +98,7 @@ export async function loadDayRows(
     .lt('starts_at', to)
     .order('starts_at');
   if (companyId) query = query.eq('company_id', companyId);
+  if (roomId) query = query.eq('room_id', roomId);
 
   const [{ data: rows }, companies, rooms] = await Promise.all([
     query,
@@ -398,6 +401,7 @@ export function toFloorRow(row: DayRow): FloorRow {
     company_id: row.company_id,
     company_name_en: row.company_name_en,
     company_name_ar: row.company_name_ar,
+    room_id: row.room_id,
     room_name: row.room_name,
     starts_at: row.starts_at,
     ends_at: row.ends_at,
@@ -408,6 +412,20 @@ export function toFloorRow(row: DayRow): FloorRow {
     arrived_at: row.arrived_at,
     stage_changed_at: row.stage_changed_at,
   };
+}
+
+/**
+ * Marks each finished interview with whether the company has written its
+ * feedback, so the floor can show "No feedback yet" on one an organizer
+ * finished by hand (0015: a company's own "Interview done" always carries
+ * feedback). One query, only for the finished rows.
+ */
+export async function withFeedbackFlags(db: SupabaseClient, rows: FloorRow[]): Promise<FloorRow[]> {
+  const done = rows.filter((r) => r.booking_id && r.stage === 'done').map((r) => r.booking_id as string);
+  if (done.length === 0) return rows;
+  const { data } = await db.from('feedback').select('booking_id').in('booking_id', done);
+  const has = new Set(((data ?? []) as { booking_id: string }[]).map((f) => f.booking_id));
+  return rows.map((r) => (r.booking_id && r.stage === 'done' ? { ...r, has_feedback: has.has(r.booking_id) } : r));
 }
 
 /** What the TV needs from a day: only the held slots, with the names on them. */

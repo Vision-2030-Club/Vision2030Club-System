@@ -5,6 +5,7 @@ import { Link } from '@/i18n/navigation';
 import { Card, cx } from '@/components/ui';
 import { formatDate, localized } from '@/lib/format';
 import { loadDayRows, loadFeedbackFor, loadSessions, sessionDays, toFloorRow } from '@/lib/interviews/queries';
+import { companyFinishes } from '@/lib/interviews/companyFinish';
 import { isToken } from '@/lib/interviews/tokens';
 import type { Application, Company, Edition, EditionSettings } from '@/lib/interviews/types';
 import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/interviews';
@@ -16,7 +17,9 @@ import { pinCookieName, pinCookieValue } from '@/lib/interviews/pin';
 /**
  * The interviewer's page: their company's schedule for a day, who has
  * arrived, who is next, each student's background and CV, and the feedback
- * form. The link is the key; a PIN, if the club set one, is the second lock.
+ * form. "Interview done" opens that form, and saving it is what marks the
+ * interview done (0015; companyFinish.ts). The link is the key; a PIN, if the
+ * club set one, is the second lock.
  */
 export default async function CompanyPage({
   params,
@@ -144,6 +147,7 @@ export default async function CompanyPage({
         feedback={feedbackState}
         initialOpen={open && rows.some((r) => r.booking_id === open) ? open : null}
         ratingLabels={(settings?.rating_labels ?? []).map((l) => ({ key: l.key, label: locale === 'ar' ? l.ar : l.en }))}
+        finishes={companyFinishes(settings)}
       />
     </div>
   );

@@ -31,6 +31,7 @@ export function FloorBoard({
   pollUrl,
   canAct,
   isManager,
+  lockedRooms = {},
 }: {
   locale: string;
   projectId: string;
@@ -38,6 +39,8 @@ export function FloorBoard({
   pollUrl: string;
   canAct: boolean;
   isManager: boolean;
+  /** Rooms another organizer runs that day, with their name: no buttons there (roomOrganizers.ts). */
+  lockedRooms?: Record<string, string>;
 }) {
   const t = useTranslations('interviews');
   const [rows, setRows] = useState(initialRows);
@@ -141,8 +144,15 @@ export function FloorBoard({
                       ) : null}
                     </span>
                     <Badge tone={STAGE_TONES[stage]}>{t(`stage.${stage}`)}</Badge>
+                    {stage === 'done' && row.has_feedback === false ? (
+                      <Badge tone="warn">{t('floor.noFeedback')}</Badge>
+                    ) : null}
 
-                    {canAct ? (
+                    {canAct && row.room_id in lockedRooms ? (
+                      <span className="text-xs text-ink-muted">
+                        {t('floor.roomOf', { name: lockedRooms[row.room_id] })}
+                      </span>
+                    ) : canAct ? (
                       <span className="flex flex-wrap gap-1">
                         {ORGANIZER_MOVES[stage].map((to) => {
                           const forward = FORWARD_MOVES.has(`${stage}>${to}`);
