@@ -14,6 +14,7 @@ import {
   toFloorRow,
   withFeedbackFlags,
 } from '@/lib/interviews/queries';
+import { loadOrganizers, organizerOf, roomOrganizers, roomsRunBy } from '@/lib/interviews/roomOrganizers';
 import { STAGE_TONES } from '@/lib/interviews/ui';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { toDateInput } from '@/lib/time';
@@ -21,18 +22,22 @@ import { AutoRefresh } from './AutoRefresh';
 import { FloorBoard } from './FloorBoard';
 
 /**
- * The organizer's screen, two ways:
+ * The organizer's screen, three ways:
  *
- *   - By company (the default): one company, one day, every booking in time
- *     order, and the buttons that move a student on. The list re-checks
- *     itself every twelve seconds (FloorBoard), which is how a hundred people
- *     can watch the same day without anything being pushed.
+ *   - My rooms (an organizer's default when they run a room that day): each
+ *     room given to them on the Rooms tab (roomOrganizers.ts), every company
+ *     in it, with the buttons that move a student on.
+ *   - By company (everyone else's default): one company, one day, every
+ *     booking in time order, and the buttons. The list re-checks itself every
+ *     twelve seconds (FloorBoard), which is how a hundred people can watch
+ *     the same day without anything being pushed. A row in a room another
+ *     organizer runs shows whose it is and no buttons; the server refuses
+ *     the move anyway (stageAction).
  *   - By room: every room of the day side by side, each with its whole time
- *     grid — on an event day of the edition's floor layout (Settings →
- *     Event days and hours) or a day a room is in use (its own days, Rooms
- *     tab; floorPlan in floorLayout.ts) that includes rooms no company is
- *     assigned to yet, as empty rows. Read only; the stage buttons stay on
- *     the company view.
+ *     grid and its organizer — on an event day of the edition's floor layout
+ *     (Settings → Event days and hours) or a day a room is in use (its own
+ *     days, Rooms tab; floorPlan in floorLayout.ts) that includes rooms no
+ *     company is assigned to yet, as empty rows. Read only.
  */
 export default async function InterviewsFloorPage({
   params,
@@ -47,17 +52,17 @@ export default async function InterviewsFloorPage({
 
   const access = await getInterviewAccess(id);
   if (!access?.edition) notFound();
-  const { edition, settings, role } = access;
-  const byRoom = view === 'rooms';
+  const { edition, settings, role, actor } = access;
 
   const t = await getTranslations('interviews');
   const tCommon = await getTranslations('common');
   const db = createInterviewsClient();
 
-  const [companies, sessions, rooms] = await Promise.all([
+  const [companies, sessions, rooms, organizers] = await Promise.all([
     loadCompanies(db, edition.id),
     loadSessions(db, edition.id),
     loadRooms(db, edition.id),
+    loadOrganizers(id),
   ]);
 
   const plan = floorPlan(settings, rooms);
@@ -65,6 +70,33 @@ export default async function InterviewsFloorPage({
   const today = toDateInput(new Date());
   const selectedDay =
     day && days.includes(day) ? day : days.includes(today) ? today : (days[0] ?? today);
+
+  // Who runs which room that day (Rooms tab), and which rooms are mine.
+  const owners = roomOrganizers(settings);
+  const nameOf = new Map(organizers.map((o) => [o.id, localized(o, 'name', locale)]));
+  const roomIdsThatDay = [
+    ...new Set([...sessions.filter((s) => s.day === selectedDay).map((s) => s.room_id), ...plan.roomsOn(selectedDay)]),
+  ];
+  const ownerName = (roomId: string) => {
+    const owner = organizerOf(owners, roomId, selectedDay);
+    return owner ? (nameOf.get(owner) ?? t('floor.formerOrganizer')) : null;
+  };
+  const myRooms = rooms
+    .filter((r) => roomsRunBy(owners, actor.id, selectedDay, roomIdsThatDay).includes(r.id))
+    .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+  // Rooms whose buttons this person must not see: another organizer's. A
+  // manager may act anywhere.
+  const lockedRooms = can.manage(role)
+    ? []
+    : roomIdsThatDay.filter((roomId) => {
+        const owner = organizerOf(owners, roomId, selectedDay);
+        return owner !== null && owner !== actor.id;
+      });
+  const lockedOwners = Object.fromEntries(lockedRooms.map((roomId) => [roomId, ownerName(roomId) ?? '']));
+
+  const current: 'mine' | 'company' | 'rooms' =
+    view === 'rooms' ? 'rooms' : view === 'company' ? 'company' : view === 'mine' || myRooms.length ? 'mine' : 'company';
+  const byRoom = current === 'rooms';
 
   // Only companies with a session that day are worth picking.
   const dayCompanies = companies.filter((c) =>
@@ -75,9 +107,12 @@ export default async function InterviewsFloorPage({
 
   const base = `/projects/${id}/interviews/floor`;
   const views = (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       {[
-        { key: 'company', label: t('floor.byCompany'), href: `${base}?day=${selectedDay}` },
+        ...(myRooms.length || current === 'mine'
+          ? [{ key: 'mine', label: t('floor.myRooms'), href: `${base}?view=mine&day=${selectedDay}` }]
+          : []),
+        { key: 'company', label: t('floor.byCompany'), href: `${base}?view=company&day=${selectedDay}` },
         { key: 'rooms', label: t('floor.byRoom'), href: `${base}?view=rooms&day=${selectedDay}` },
       ].map((v) => (
         <Link
@@ -85,7 +120,7 @@ export default async function InterviewsFloorPage({
           href={v.href}
           className={cx(
             'rounded-lg border px-3 py-1.5 text-sm',
-            (v.key === 'rooms') === byRoom
+            v.key === current
               ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700'
               : 'border-line text-ink-muted hover:bg-surface-muted',
           )}
@@ -142,6 +177,9 @@ export default async function InterviewsFloorPage({
               <Card key={room.id}>
                 <h2 className="font-semibold">{room.name}</h2>
                 {room.note ? <p className="text-xs text-ink-muted">{room.note}</p> : null}
+                <p className="text-xs text-ink-muted">
+                  {t('floor.organizer')}: {ownerName(room.id) ?? t('floor.anyOrganizer')}
+                </p>
                 <ul className="mt-3 divide-y divide-line text-sm">
                   {roomDay(
                     rows.filter((r) => r.room_id === room.id),
@@ -182,6 +220,55 @@ export default async function InterviewsFloorPage({
     );
   }
 
+  if (current === 'mine') {
+    const boards = await Promise.all(
+      myRooms.map(async (room) => ({
+        room,
+        rows: await withFeedbackFlags(
+          db,
+          (await loadDayRows(db, edition.id, selectedDay, edition.time_zone, undefined, room.id)).map(toFloorRow),
+        ),
+      })),
+    );
+    return (
+      <div className="space-y-4">
+        {views}
+        <Card>
+          <form className="grid gap-3 sm:grid-cols-3">
+            <input type="hidden" name="view" value="mine" />
+            {dayPicker}
+            <div className="flex items-end">
+              <Button type="submit" variant="secondary">
+                {tCommon('open')}
+              </Button>
+            </div>
+          </form>
+        </Card>
+        {boards.length === 0 ? (
+          <EmptyState>{t('floor.noRoomsOfMine')}</EmptyState>
+        ) : (
+          boards.map(({ room, rows }) => (
+            <section key={room.id} className="space-y-2">
+              <h2 className="font-semibold">
+                {room.name}
+                {room.note ? <span className="ms-2 text-xs font-normal text-ink-muted">{room.note}</span> : null}
+              </h2>
+              <FloorBoard
+                key={`${room.id}-${selectedDay}`}
+                locale={locale}
+                projectId={id}
+                initialRows={rows}
+                pollUrl={`/api/interviews/floor?project=${id}&room=${room.id}&day=${selectedDay}`}
+                canAct={can.stage(role)}
+                isManager={can.manage(role)}
+              />
+            </section>
+          ))
+        )}
+      </div>
+    );
+  }
+
   const rows = selectedCompany
     ? await withFeedbackFlags(
         db,
@@ -194,6 +281,7 @@ export default async function InterviewsFloorPage({
       {views}
       <Card>
         <form className="grid gap-3 sm:grid-cols-3">
+          <input type="hidden" name="view" value="company" />
           {dayPicker}
           <div>
             <Label htmlFor="company">{t('company')}</Label>
@@ -225,6 +313,7 @@ export default async function InterviewsFloorPage({
           pollUrl={`/api/interviews/floor?project=${id}&company=${selectedCompany}&day=${selectedDay}`}
           canAct={can.stage(role)}
           isManager={can.manage(role)}
+          lockedRooms={lockedOwners}
         />
       )}
     </div>

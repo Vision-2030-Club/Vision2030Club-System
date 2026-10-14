@@ -36,6 +36,10 @@ export type EditionSettings = {
   company_sheets?: Record<string, { id: string; url: string }>;
   /** Whether the company's feedback finishes an interview; read through companyFinishes (companyFinish.ts). On unless false. */
   company_finishes?: boolean;
+  /** Which organizer runs which room, by room id or room id:day; read through roomOrganizers (roomOrganizers.ts). */
+  room_organizers?: Record<string, string>;
+  /** Whether a Status typed in a Google Sheet changes the app (sheetPull.ts). Off unless set to true. */
+  sheet_status_edits?: boolean;
 };
 
 export type Edition = {
@@ -266,6 +270,7 @@ export type FloorRow = {
   company_id: string;
   company_name_en: string;
   company_name_ar: string;
+  room_id: string;
   room_name: string;
   starts_at: string;
   ends_at: string;

@@ -1469,6 +1469,10 @@ Google refusing a request; expect to fix something on the first real sync.
 
 ### Status edits in the sheets come back into the app (2026-10-05)
 
+**Off by default since 2026-10-14** (see "One organizer per room" below):
+everything in this section now happens only while Settings → Live Google
+Sheet → *Status typed in the Google Sheets* is set to two-way.
+
 The club wants to work from either side: the app or the sheets. So the
 **Status** column of the floor sheet's day tabs and of every company sheet now
 goes both ways. Nothing else does. Students, times and phone numbers are the
@@ -1749,6 +1753,81 @@ access to the component still gets the project page.
   back into the component.
 - Any new link meant for the project page itself needs `?details=1`, or it
   lands in the component.
+
+### Reception (0069, 2026-10-14)
+
+People at the door who check students in and do nothing else.
+
+- **Who.** A third list on the People tab, next to organizers and HR
+  people: receptionists, added or removed by the project's managers OR by
+  HR's Directors (members.manage at scope all). The rule is club-side:
+  `supabase/migrations/0069_interviews_reception.sql` widens
+  `project_component_people.role` to `reception`, adds it to the write
+  policy, and teaches `my_component_access()` to answer `reception`. The
+  strongest role still wins (manager > hr > organizer > reception), so a
+  person on both the organizer and reception lists acts as an organizer.
+- **What they may do** (`can.reception` in `src/lib/interviews/access.ts`:
+  receptionists, HR and managers). The **Reception** tab
+  (`/projects/<id>/interviews/reception`): every company's students for one
+  day (today by default), a search by phone (any spelling, or the last few
+  digits) or name, and **Check in** / **Undo check-in**. With nothing typed
+  it lists who is late and not checked in, who is due in the next 45
+  minutes, and who is checked in and waiting. It polls
+  `/api/interviews/floor` (whose `company` is now optional) every ten
+  seconds. Receptionists also see Overview, Schedule and a read-only Floor;
+  Companies and Rooms now require `can.decide` (they used to be "anyone but
+  an organizer", which would have let a receptionist in).
+- **One move only.** `checkInAction` calls `advance_stage` for
+  scheduled → arrived or arrived → scheduled, never anything else, and
+  passes `p_expected` (0011), so a stale screen cannot pull back a student
+  who has moved on: the database refuses with `stage_changed`. It also
+  checks the booking belongs to this project's edition.
+- **Applying 0069.** A person with access to the CLUB project applies it
+  (`npm run db:push`, or paste it into the SQL editor; it can run twice),
+  then runs `npm run db:components`, which now includes ten reception
+  checks. Until then nothing breaks: the Reception tab works for managers
+  and HR, and adding a receptionist is refused by the database's check
+  constraint. Verified before merging on a local Postgres 16 with club
+  migrations 0001–0069 and stand-ins for Supabase's auth and storage
+  schemas (19 checks: who may add and remove, what each person is answered,
+  organizer outranking reception).
+
+### One organizer per room, and read-only sheets (2026-10-14)
+
+So that only one person moves the students of a room. No migration.
+
+- **Giving rooms out.** Each room card on the Rooms tab shows its
+  organizer, and managers change it (*Change organizer*): one organizer on
+  every day, and, for a room used on several days, someone different on a
+  particular day. An organizer can hold several rooms. The choices are the
+  People tab's organizers. Kept in the edition's settings as
+  `room_organizers` (`src/lib/interviews/roomOrganizers.ts`): the key
+  `<room id>` is every day, `<room id>:<YYYY-MM-DD>` overrides one day.
+  Saved by reading the settings fresh and writing the whole map back, as
+  `session_links` are; two managers saving the same second could still
+  undo one another.
+- **What it changes.** A room with an organizer is theirs: `stageAction`
+  refuses anyone else (hint `not_your_room`), except managers, who may act
+  anywhere. A room with nobody is open to every organizer, as before, so
+  nothing locks until a manager gives rooms out. Someone taken off the
+  organizer list keeps their rooms (shown as "No longer an organizer")
+  until a manager changes them, so the room stays locked rather than
+  silently opening. `stageAction` also now refuses a booking from another
+  edition.
+- **The Floor tab.** An organizer with rooms that day opens on **My rooms**:
+  one board per room, every company in it, with the buttons (the floor
+  route takes `room=`). *By company* still works for everyone; a row in a
+  room another organizer runs shows "<name>'s room" and no buttons. *By
+  room* shows each room's organizer.
+- **The sheets are read-only by default.** A Status typed in the floor
+  sheet or a company's sheet would get round both this rule and the
+  company-finishes-the-interview rule, so `applySheetEdits` (sheetPull.ts)
+  now applies nothing unless the edition's `sheet_status_edits` is `true`
+  (Settings → Live Google Sheet → *Status typed in the Google Sheets*).
+  While off, an edit counts as ignored, which makes the every-minute pull
+  start a sync that writes the app's value back over it, usually within a
+  minute. *Pull from Sheet* is hidden while off. Two-way is one setting
+  away and behaves exactly as it did on 2026-10-05.
 
 ### The company finishes an interview with its feedback (0015, 2026-10-14)
 

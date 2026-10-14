@@ -16,6 +16,7 @@ import {
   releaseFeedbackAction,
   rotateTvTokenAction,
   setCompanyFinishesAction,
+  setSheetStatusEditsAction,
   syncFloorSheetAction,
   syncRegistrationSheetAction,
   updateEditionAction,
@@ -63,6 +64,7 @@ export default async function InterviewsSettingsPage({
   const whenInput = (iso: string | null) => (iso ? toDateTimeInput(new Date(iso)) : '');
   const tvUrl = edition.tv_token ? `${siteUrl()}/${locale}/interviews/tv/${edition.tv_token}` : null;
   const layout = floorLayout(settings);
+  const sheetEdits = settings.sheet_status_edits === true;
   const labelRows = [...settings.rating_labels, ...Array(6).fill(null)].slice(0, 6);
 
   return (
@@ -248,18 +250,35 @@ export default async function InterviewsSettingsPage({
               <input type="hidden" name="locale" value={locale} />
               <input type="hidden" name="project_id" value={id} />
             </ActionForm>
-            <ActionForm
-              action={pullFloorSheetAction}
-              submitLabel={t('settings.floorSheetPull')}
-              successText={t('settings.floorSheetPulled')}
-              variant="secondary"
-              className="space-y-0"
-            >
+            {sheetEdits ? (
+              <ActionForm
+                action={pullFloorSheetAction}
+                submitLabel={t('settings.floorSheetPull')}
+                successText={t('settings.floorSheetPulled')}
+                variant="secondary"
+                className="space-y-0"
+              >
+                <input type="hidden" name="locale" value={locale} />
+                <input type="hidden" name="project_id" value={id} />
+              </ActionForm>
+            ) : null}
+          </div>
+          {sheetEdits ? <p className="mt-2 text-xs text-ink-muted">{t('settings.floorSheetPullHint')}</p> : null}
+
+          <div className="mt-4 border-t border-line pt-3">
+            <ActionForm action={setSheetStatusEditsAction} submitLabel={tCommon('save')}>
               <input type="hidden" name="locale" value={locale} />
               <input type="hidden" name="project_id" value={id} />
+              <div>
+                <Label htmlFor="sheet_status_edits">{t('settings.sheetEdits')}</Label>
+                <Select id="sheet_status_edits" name="sheet_status_edits" defaultValue={sheetEdits ? 'on' : 'off'}>
+                  <option value="off">{t('settings.sheetEditsOff')}</option>
+                  <option value="on">{t('settings.sheetEditsOn')}</option>
+                </Select>
+              </div>
+              <p className="text-xs text-ink-muted">{t('settings.sheetEditsHint')}</p>
             </ActionForm>
           </div>
-          <p className="mt-2 text-xs text-ink-muted">{t('settings.floorSheetPullHint')}</p>
         </Card>
 
         <Card>

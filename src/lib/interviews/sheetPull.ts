@@ -9,6 +9,12 @@ import { createInterviewsClient } from '@/lib/supabase/interviews';
  *
  * How it stays safe:
  *
+ *   - It is OFF unless a manager turns it on (`sheet_status_edits`,
+ *     Settings → Google Sheets; since 2026-10-14). While off, a Status typed
+ *     in a sheet is counted as ignored and the next sync writes the app's
+ *     value back over it, so the sheets are read-only views and the rules of
+ *     the floor (one organizer per room, the company's feedback finishing an
+ *     interview) cannot be bypassed from a sheet.
  *   - Every booked row carries, in a hidden column, the booking id and the
  *     stage the system wrote there ("base", `<booking id>|<stage>`). A Status
  *     that differs from what that base shows is an edit; one that matches is
@@ -92,6 +98,12 @@ export function addResults(a: PullResult, b: PullResult): PullResult {
   return { applied: a.applied + b.applied, conflicts: a.conflicts + b.conflicts, ignored: a.ignored + b.ignored };
 }
 
+/** Whether a Status typed in this edition's sheets changes the app. Off unless a manager turned it on. */
+export async function sheetStatusEdits(editionId: string): Promise<boolean> {
+  const { data } = await createInterviewsClient().rpc('edition_settings', { p_edition: editionId });
+  return (data as { sheet_status_edits?: unknown } | null)?.sheet_status_edits === true;
+}
+
 export async function applySheetEdits(edits: SheetEdit[], rules: PullRules): Promise<PullResult> {
   const result = emptyResult();
   if (edits.length === 0) return result;
@@ -100,12 +112,25 @@ export async function applySheetEdits(edits: SheetEdit[], rules: PullRules): Pro
   const ids = [...new Set(edits.map((e) => e.bookingId))];
   const { data: bookingRows } = await db
     .from('bookings')
-    .select('id, stage, company_id, slot_id')
+    .select('id, stage, company_id, slot_id, edition_id')
     .in('id', ids)
     .is('cancelled_at', null);
   const bookings = new Map(
-    ((bookingRows ?? []) as { id: string; stage: Stage; company_id: string; slot_id: string }[]).map((b) => [b.id, b]),
+    ((bookingRows ?? []) as { id: string; stage: Stage; company_id: string; slot_id: string; edition_id: string }[]).map(
+      (b) => [b.id, b],
+    ),
   );
+
+  // Read-only unless the edition says otherwise (Settings → Google Sheets):
+  // a Status typed in a sheet would get round the rule that only a room's
+  // organizer moves its students, and that only the company's feedback
+  // finishes an interview. Counted as ignored, the edit is simply written
+  // over by the next sync, which the every-minute pull starts at once.
+  const editionId = [...bookings.values()][0]?.edition_id;
+  if (editionId && !(await sheetStatusEdits(editionId))) {
+    result.ignored = edits.length;
+    return result;
+  }
   const slotIds = [...new Set([...bookings.values()].map((b) => b.slot_id))];
   const { data: slotRows } = slotIds.length
     ? await db.from('slots').select('id, room_id').in('id', slotIds)

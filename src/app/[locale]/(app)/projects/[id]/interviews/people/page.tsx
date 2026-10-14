@@ -11,15 +11,16 @@ import { addPersonAction, removePersonAction } from '../actions';
 
 type PersonRow = {
   member_id: string;
-  role: 'organizer' | 'hr';
+  role: 'organizer' | 'hr' | 'reception';
   members: { id: string; name_en: string; name_ar: string } | null;
 };
 
 /**
  * Who else may enter. This page reads and writes the CLUB database only:
  * organizers are the project's to choose (its managers), HR people are HR's
- * (whoever holds members.manage). The policies in 0062 are the rule; the
- * forms below are offered to the people they will accept.
+ * (whoever holds members.manage), receptionists either's (0069). The
+ * policies in 0062 and 0069 are the rule; the forms below are offered to the
+ * people they will accept.
  */
 export default async function InterviewsPeoplePage({
   params,
@@ -61,12 +62,14 @@ export default async function InterviewsPeoplePage({
   const rows = (people ?? []) as unknown as PersonRow[];
   const organizers = rows.filter((r) => r.role === 'organizer');
   const hrPeople = rows.filter((r) => r.role === 'hr');
+  const receptionists = rows.filter((r) => r.role === 'reception');
   const canAddOrganizers = can.manage(role);
   const canAddHr = membersScope === 'all';
+  const canAddReception = can.manage(role) || membersScope === 'all';
 
   const roster = (
     list: PersonRow[],
-    roleKey: 'organizer' | 'hr',
+    roleKey: PersonRow['role'],
     canEdit: boolean,
   ) => (
     <>
@@ -125,7 +128,13 @@ export default async function InterviewsPeoplePage({
         {roster(hrPeople, 'hr', canAddHr)}
       </Card>
 
-      <Card className="lg:col-span-2">
+      <Card>
+        <h2 className="mb-1 font-semibold">{t('people.reception')}</h2>
+        <p className="mb-3 text-xs text-ink-muted">{t('people.receptionHint')}</p>
+        {roster(receptionists, 'reception', canAddReception)}
+      </Card>
+
+      <Card>
         <h2 className="mb-1 font-semibold">{t('people.automatic')}</h2>
         <p className="text-sm text-ink-muted">{t('people.automaticHint')}</p>
       </Card>
