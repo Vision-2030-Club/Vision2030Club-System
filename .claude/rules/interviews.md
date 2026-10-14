@@ -20,7 +20,9 @@ short:
   generates them.
 - Two flows exist side by side and both must keep working until the club
   decides: the apply form → HR selection → personal link by email, and the
-  room link → phone number → HR's accepted list. Do not remove either.
+  room link → phone number → HR's accepted list. Do not remove either. A
+  third way in, walk-ins (0016: the walk-in link → the reception desk
+  confirms a free time today), must keep working too.
 - A phone number is compared normalised (`app.normalise_phone` in SQL,
   `normalisePhone` in the app); never compare raw strings. The candidate
   link finds a student by phone alone, including one who applied with an
@@ -40,3 +42,11 @@ short:
   in SQL, not in the page. Do not re-implement or bypass them in
   TypeScript; `slotRules.ts` only mirrors the slot rules for display. A
   past time can be booked on purpose (0012).
+- Who moves a booking's stage is decided per role (the club's decisions of
+  2026-10-14): reception only checks in and undoes it (`checkInAction`);
+  an organizer only in a room they run, or one nobody runs
+  (`room_organizers`, enforced in `stageAction`); a company only to done,
+  and only by saving its feedback (`finish_interview`, 0015); managers
+  anywhere. The Google Sheets' Status column is read-only unless
+  `sheet_status_edits` is on. Do not add another path that moves a stage
+  around these.
