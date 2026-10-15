@@ -102,6 +102,8 @@ export type ImportReport = {
   project_links: number;
   /** Super Admins whose role the file tried to change (0070). Absent before 0070. */
   kept_roles?: number;
+  /** Earlier Project Manager links the file's managers replaced (0071). Absent before 0071. */
+  managers_removed?: number;
   errors: { row: number; field: string; reason: string; value: string | null }[];
 };
 
