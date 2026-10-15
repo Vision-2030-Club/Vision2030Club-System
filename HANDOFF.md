@@ -1777,6 +1777,10 @@ access to the component still gets the project page.
 - The Mock Interviews back button now goes to the dashboard for everyone. It
   used to take managers to the project page, which would now loop straight
   back into the component.
+- The sidebar's project buttons are the projects the `projects` policy
+  returns **plus** every project in `my_component_access()`. Organizers and
+  receptionists are listed on the component, not the project, so without
+  that second half they had no button and no way in (fixed 2026-10-15).
 - Any new link meant for the project page itself needs `?details=1`, or it
   lands in the component.
 

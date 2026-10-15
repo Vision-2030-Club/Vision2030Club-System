@@ -101,13 +101,31 @@ export default async function AppLayout({
     completed: 2,
     cancelled: 3,
   };
-  const projectItems: NavItem[] = (
-    (projectRows ?? []) as { id: string; name_en: string; name_ar: string; status: string }[]
-  )
-    .slice()
+  type ProjectRow = { id: string; name_en: string; name_ar: string; status: string | null };
+  const visibleProjects = (projectRows ?? []) as ProjectRow[];
+  /*
+   * An organizer or receptionist is listed on the component, not on the
+   * project, so the `projects` policy hides the project from them and they
+   * had no button to get in. Their component access is the club saying they
+   * may enter, so their project joins the menu. Its status is not readable to
+   * them; it sorts with the live work, which is when they are chosen.
+   */
+  const visibleIds = new Set(visibleProjects.map((project) => project.id));
+  const componentOnlyProjects: ProjectRow[] = [];
+  for (const component of components) {
+    if (visibleIds.has(component.project_id)) continue;
+    visibleIds.add(component.project_id);
+    componentOnlyProjects.push({
+      id: component.project_id,
+      name_en: component.name_en,
+      name_ar: component.name_ar,
+      status: null,
+    });
+  }
+  const projectItems: NavItem[] = [...visibleProjects, ...componentOnlyProjects]
     .sort(
       (a, b) =>
-        (PROJECT_ORDER[a.status] ?? 9) - (PROJECT_ORDER[b.status] ?? 9) ||
+        (PROJECT_ORDER[a.status ?? 'active'] ?? 9) - (PROJECT_ORDER[b.status ?? 'active'] ?? 9) ||
         a.name_en.localeCompare(b.name_en),
     )
     .map((project) => ({
