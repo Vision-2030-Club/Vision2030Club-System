@@ -3,10 +3,13 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { ActionForm } from '@/components/ActionForm';
 import { ConfirmForm } from '@/components/ConfirmForm';
 import { Card, EmptyState, Input, Label, Select, Textarea } from '@/components/ui';
-import { formatDateTime, toDateTimeInput } from '@/lib/format';
+import { formatDateTime, localized, toDateTimeInput } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { companyFinishes } from '@/lib/interviews/companyFinish';
 import { siteUrl } from '@/lib/interviews/email';
+import { loadCompanies } from '@/lib/interviews/queries';
+import { walkinSettings, walkinUrl } from '@/lib/interviews/walkins';
+import { qrDataUrls } from '@/lib/links';
 import { DEFAULT_HOURS, floorLayout, LAYOUT_SLOT_LENGTHS } from '@/lib/interviews/floorLayout';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { CopyField } from '../CopyField';
@@ -15,12 +18,14 @@ import {
   pullFloorSheetAction,
   releaseFeedbackAction,
   rotateTvTokenAction,
+  rotateWalkinLinkAction,
   setCompanyFinishesAction,
   setSheetStatusEditsAction,
   syncFloorSheetAction,
   syncRegistrationSheetAction,
   updateEditionAction,
   updateFloorLayoutAction,
+  updateWalkinsAction,
 } from '../actions';
 
 export default async function InterviewsSettingsPage({
@@ -43,7 +48,9 @@ export default async function InterviewsSettingsPage({
   }
 
   const db = createInterviewsClient();
-  const [{ count: held }, { data: lastExport }] = await Promise.all([
+  const walkins = walkinSettings(settings);
+  const walkinLink = walkins.token ? walkinUrl(locale, walkins.token) : null;
+  const [{ count: held }, { data: lastExport }, companies, walkinQr] = await Promise.all([
     db
       .from('feedback')
       .select('id', { count: 'exact', head: true })
@@ -56,7 +63,10 @@ export default async function InterviewsSettingsPage({
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    loadCompanies(db, edition.id),
+    walkinLink ? qrDataUrls(walkinLink) : Promise.resolve(null),
   ]);
+  const offCompanies = new Set(walkins.offCompanies);
 
   // The floor sheet's link: the settings first (a replacement for a deleted
   // file is saved there), else 0006's column where it exists (floorSheet.ts).
@@ -208,6 +218,64 @@ export default async function InterviewsSettingsPage({
             </div>
             <p className="text-xs text-ink-muted">{t('layout.clearHint')}</p>
           </ActionForm>
+        </Card>
+
+        <Card>
+          <h2 className="mb-1 font-semibold">{t('walkinSettings.title')}</h2>
+          <p className="mb-3 text-xs text-ink-muted">{t('walkinSettings.hint')}</p>
+          <ActionForm action={updateWalkinsAction} submitLabel={tCommon('save')}>
+            <input type="hidden" name="locale" value={locale} />
+            <input type="hidden" name="project_id" value={id} />
+            <div>
+              <Label htmlFor="walkins_open">{t('walkinSettings.status')}</Label>
+              <Select id="walkins_open" name="walkins_open" defaultValue={walkins.open ? 'on' : 'off'}>
+                <option value="off">{t('walkinSettings.closed')}</option>
+                <option value="on">{t('walkinSettings.open')}</option>
+              </Select>
+            </div>
+            <fieldset>
+              <legend className="mb-1 text-sm font-medium">{t('walkinSettings.companies')}</legend>
+              <div className="space-y-1">
+                {companies
+                  .filter((c) => !c.is_hidden)
+                  .map((c) => (
+                    <label key={c.id} className="flex items-center gap-2 text-sm">
+                      <input type="hidden" name="listed_company" value={c.id} />
+                      <input type="checkbox" name="walkin_company" value={c.id} defaultChecked={!offCompanies.has(c.id)} />
+                      {localized(c, 'name', locale)}
+                    </label>
+                  ))}
+              </div>
+            </fieldset>
+          </ActionForm>
+          {walkinLink && walkinQr ? (
+            <div className="mt-4 space-y-3 border-t border-line pt-3">
+              <CopyField label={t('walkinSettings.link')} value={walkinLink} />
+              {/* A data URL made on the server: nothing for next/image to optimise. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={walkinQr.svg} alt={t('walkinSettings.qrAlt')} width={160} height={160} className="size-40 rounded-lg border border-line" />
+              <div className="flex flex-wrap gap-2 text-sm">
+                <a
+                  href={walkinQr.png}
+                  download="walk-in-qr.png"
+                  className="rounded-lg border border-line bg-surface px-3 py-1.5 text-ink hover:bg-surface-muted"
+                >
+                  {t('walkinSettings.downloadQr')}
+                </a>
+              </div>
+              <ConfirmForm
+                action={rotateWalkinLinkAction}
+                trigger={t('walkinSettings.newLink')}
+                title={t('walkinSettings.newLinkTitle')}
+                body={t('walkinSettings.newLinkBody')}
+                confirmLabel={t('walkinSettings.newLink')}
+                variant="secondary"
+              >
+                <input type="hidden" name="locale" value={locale} />
+                <input type="hidden" name="project_id" value={id} />
+              </ConfirmForm>
+            </div>
+          ) : null}
         </Card>
 
         <Card>

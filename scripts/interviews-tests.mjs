@@ -85,12 +85,16 @@ async function restAs(key, path, init = {}) {
 }
 
 let editionId = null;
+let walkinEditionId = null;
 
 async function cleanUp() {
-  if (!editionId) return;
-  await db.query(`delete from audit_log where edition_id = $1`, [editionId]);
-  await db.query(`delete from editions where id = $1`, [editionId]);
+  for (const id of [editionId, walkinEditionId]) {
+    if (!id) continue;
+    await db.query(`delete from audit_log where edition_id = $1`, [id]);
+    await db.query(`delete from editions where id = $1`, [id]);
+  }
   editionId = null;
+  walkinEditionId = null;
 }
 
 async function run() {
@@ -276,9 +280,53 @@ async function run() {
   check('edition_snapshot carries every table', snap.s.applications.length === 2 && snap.s.bookings.length >= 3 && snap.s.audit_log.length > 10);
 }
 
+/**
+ * 0016: walk-ins, on an edition of their own whose clock reads about 10:00
+ * now (an Etc/GMT zone), so "a free time later today" exists whenever the
+ * suite runs. Skipped until 0016 is applied.
+ */
+async function runWalkins() {
+  if (!(await one(`select to_regprocedure('public.submit_walkin(text, jsonb, text)') as f`)).f) {
+    console.log('  skip  walk-ins (0016 is not applied)');
+    return;
+  }
+  const n = (((new Date().getUTCHours() - 10) % 24) + 24) % 24;
+  const zone = n <= 12 ? `Etc/GMT+${n}` : `Etc/GMT-${24 - n}`;
+  const edition = await one(`select * from create_edition($1::jsonb, $2::jsonb)`, [
+    J({ name_en: `walkin ${STAMP}`, name_ar: 'اختبار', public_slug: `walkin-${STAMP}`, tv_token: tok(), time_zone: zone }),
+    ACTOR,
+  ]);
+  walkinEditionId = edition.id;
+  const linkToken = tok();
+  await one(`select update_edition($1, $2::jsonb, $3::jsonb)`, [walkinEditionId, J({ status: 'active', settings: { walkin_token: linkToken } }), ACTOR]);
+  const day = (await one(`select app_today::text as d from (select (now() at time zone $1)::date as app_today) x`, [zone])).d;
+  const room = await one(`select * from upsert_room($1, null, $2::jsonb, $3::jsonb)`, [walkinEditionId, J({ name: 'Walk Room' }), ACTOR]);
+  const company = await one(`select * from upsert_company($1, null, $2::jsonb, $3::jsonb)`, [walkinEditionId, J({ name_en: 'Gamma', name_ar: 'جاما', access_token: tok() }), ACTOR]);
+  await one(`select create_session($1, $2::jsonb, $3::jsonb)`, [walkinEditionId, J({ company_id: company.id, room_id: room.id, day, start_time: '08:00', end_time: '20:00', slot_minutes: 20 }), ACTOR]);
+  const form = { name: 'Walker', email: `walker-${STAMP}@example.test`, cv_path: 'w/1.pdf', company_id: company.id };
+
+  check('walk-ins closed are refused', /closed right now/.test((await refused(`select submit_walkin($1, $2::jsonb, $3)`, [linkToken, J(form), tok()])) ?? ''));
+  await one(`select update_edition($1, $2::jsonb, $3::jsonb)`, [walkinEditionId, J({ settings: { walkins_open: true } }), ACTOR]);
+  const sent = await one(`select submit_walkin($1, $2::jsonb, $3) as r`, [linkToken, J(form), tok()]);
+  check('a walk-in is queued', Boolean(sent.r.id) && Number(sent.r.seq) > 0);
+  check('one waiting request per email', /already have a request/.test((await refused(`select submit_walkin($1, $2::jsonb, $3)`, [linkToken, J(form), tok()])) ?? ''));
+  const past = await one(`select id from slots where company_id = $1 and starts_at < now() order by starts_at limit 1`, [company.id]);
+  check('reception cannot give a time that has started', /already passed/.test((await refused(`select confirm_walkin($1, $2, $3, $4::jsonb)`, [sent.r.id, past.id, tok(), ACTOR])) ?? ''));
+  const free = await one(`select slot_id from walkin_slots($1) order by starts_at limit 1`, [walkinEditionId]);
+  const confirmed = await one(`select * from confirm_walkin($1, $2, $3, $4::jsonb)`, [sent.r.id, free.slot_id, tok(), ACTOR]);
+  const booked = await one(`select stage, cancelled_at from bookings where id = $1`, [confirmed.booking_id]);
+  check('confirming books the time and checks the student in', confirmed.status === 'confirmed' && booked.stage === 'arrived');
+  const reopened = await one(`select * from reopen_walkin($1, $2::jsonb)`, [sent.r.id, ACTOR]);
+  const cancelled = await one(`select cancelled_at from bookings where id = $1`, [confirmed.booking_id]);
+  check('undo cancels the booking and the request waits again', reopened.status === 'pending' && cancelled.cancelled_at !== null);
+  const rejected = await one(`select * from reject_walkin($1, 'No time', $2::jsonb)`, [sent.r.id, ACTOR]);
+  check('a request can be turned down with a note', rejected.status === 'rejected' && rejected.decision_note === 'No time');
+}
+
 await db.connect();
 try {
   await run();
+  await runWalkins();
 } catch (error) {
   console.error('\nThe suite stopped early:', error.message);
   results.push({ name: 'suite completed', passed: false });

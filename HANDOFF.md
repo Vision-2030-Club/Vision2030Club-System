@@ -1867,6 +1867,64 @@ together with its feedback.
   naming the company, immediate release queuing the email, an organizer
   undoing a finish).
 
+### Walk-ins (0016, 2026-10-14)
+
+A student who turns up on the day without an interview registers through the
+walk-in link, and the reception desk gives them a time. Stacked on the
+Reception tab (0069).
+
+- **The link.** Settings → Walk-ins: open or closed, which companies take
+  walk-ins (all ticked by default), the link with its QR code (download the
+  PNG and print it for the venue), and *New link*, which makes every printed
+  code stop working at once. Kept in the edition's settings: `walkins_open`,
+  `walkin_token`, `walkins_off_companies` (`src/lib/interviews/walkins.ts`).
+  Opening walk-ins the first time makes the token.
+- **The form** (`/interviews/w/<token>`): the apply form's questions (the
+  same `apply_fields`), the CV, and ONE company, picked on the company cards.
+  Only today's companies are shown, and only one with a free time later
+  today can be picked; the others are greyed out. "Free" is the database's
+  `walkin_slots(edition)`: today on the edition's clock, not started, not
+  closed, not held, of a visible company that takes walk-ins. Sending it
+  uploads the CV and calls `submit_walkin`, which checks all of that again,
+  refuses a second waiting request for the same email (`walkin_pending`)
+  and an email that already has an interview with that company
+  (`walkin_already_booked`), and queues a row in `walkin_requests`. The
+  student lands on `/interviews/walkin/<request token>`: their number to
+  show at the desk, refreshing every ten seconds until reception answers,
+  then the company, room and time, or the reason given.
+- **The desk.** The Reception tab shows the waiting requests above the
+  check-in board (while walk-ins are open or any request exists): number,
+  name, phone, email, the company, and what the student already has by the
+  same email (the companies they chose online with HR's decision, and any
+  interviews). *Confirm and check in* takes one of the company's free times
+  today: `confirm_walkin` does it all in one transaction: the student's
+  own application (or a phone-only one from HR's list, matched by phone, or
+  a new one); nothing on file is overwritten, only blanks are filled; an
+  acceptance for the company (note "Walk-in"), overriding an online
+  rejection, as the club decided; the booking; and checked in. It refuses a
+  time that has started (`slot_past`), is closed, is taken (`slot_taken`),
+  overlaps the student's other interview, or is another company's or day's.
+  *Turn down* takes an optional reason the student sees. Today's answered
+  requests are listed underneath with *Undo* (`reopen_walkin`): the booking
+  is cancelled (never deleted) unless the interview has started, and the
+  request waits again.
+- **Not done.** No acceptance email is queued for a walk-in (they are at the
+  desk); the booking confirmation is, as for any booking. A turned-down
+  request keeps its CV in the bucket, like every other CV. The link is the
+  only gate, so a link that leaks off-site should be replaced with *New
+  link*.
+- **Applying 0016.** **Applied to the live project on 2026-10-15** through the SQL editor, so `schema_migrations` does not record it and the next `db:push` runs it again, which is harmless. After 0015, the same way (`npm run db:push -- --target
+  interviews`, or the SQL editor; it can run twice), then `npm run
+  db:interviews`, which now has seven walk-in checks on an edition of its own.
+  Until it is applied, the Reception tab shows no walk-in queue and the
+  form says walk-ins are not available. 0016 also redefines
+  `edition_snapshot` so the club's export carries `walkin_requests` and
+  0014's `session_acceptances`, which it had been missing. Checked before
+  merging on a local Postgres 16 with 0001–0016 applied: 49 checks (every
+  refusal of the form and the desk, a new student, an online applicant HR
+  had rejected, a phone-only applicant, undo and confirm again, the
+  export), and the suite's own walk-in checks.
+
 ### Things easy to break
 
 - **Every shareable link starts with `siteUrl()`** (`src/lib/interviews/email.ts`):
