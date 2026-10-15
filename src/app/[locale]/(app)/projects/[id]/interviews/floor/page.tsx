@@ -5,7 +5,15 @@ import { Badge, Button, Card, EmptyState, Label, Select, cx } from '@/components
 import { formatDate, formatTime, localized } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { floorPlan, roomDay } from '@/lib/interviews/floorLayout';
-import { loadCompanies, loadDayRows, loadRooms, loadSessions, sessionDays, toFloorRow } from '@/lib/interviews/queries';
+import {
+  loadCompanies,
+  loadDayRows,
+  loadRooms,
+  loadSessions,
+  sessionDays,
+  toFloorRow,
+  withFeedbackFlags,
+} from '@/lib/interviews/queries';
 import { loadOrganizers, organizerOf, roomOrganizers, roomsRunBy } from '@/lib/interviews/roomOrganizers';
 import { STAGE_TONES } from '@/lib/interviews/ui';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
@@ -216,7 +224,10 @@ export default async function InterviewsFloorPage({
     const boards = await Promise.all(
       myRooms.map(async (room) => ({
         room,
-        rows: (await loadDayRows(db, edition.id, selectedDay, edition.time_zone, undefined, room.id)).map(toFloorRow),
+        rows: await withFeedbackFlags(
+          db,
+          (await loadDayRows(db, edition.id, selectedDay, edition.time_zone, undefined, room.id)).map(toFloorRow),
+        ),
       })),
     );
     return (
@@ -259,7 +270,10 @@ export default async function InterviewsFloorPage({
   }
 
   const rows = selectedCompany
-    ? (await loadDayRows(db, edition.id, selectedDay, edition.time_zone, selectedCompany)).map(toFloorRow)
+    ? await withFeedbackFlags(
+        db,
+        (await loadDayRows(db, edition.id, selectedDay, edition.time_zone, selectedCompany)).map(toFloorRow),
+      )
     : [];
 
   return (

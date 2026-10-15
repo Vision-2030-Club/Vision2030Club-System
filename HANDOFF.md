@@ -1829,6 +1829,44 @@ So that only one person moves the students of a room. No migration.
   minute. *Pull from Sheet* is hidden while off. Two-way is one setting
   away and behaves exactly as it did on 2026-10-05.
 
+### The company finishes an interview with its feedback (0015, 2026-10-14)
+
+The club decided that the only stage a company moves is "done", and only
+together with its feedback.
+
+- **The interviewer page** (`/interviews/c/<token>`) shows **Interview done**
+  on each student who is not finished or marked as not shown. It opens the
+  student's details and the feedback form; the button reads *Save feedback
+  and finish*, and saving does both in one transaction:
+  `finish_interview(token, booking, payload)` in
+  `supabase/interviews/migrations/0015_company_finishes_interview.sql`. It
+  saves the feedback exactly as `submit_feedback` does, marks the booking
+  done (from scheduled, arrived or in interview, so a company is never
+  stuck because nobody pressed "In interview"), and refuses a no-show
+  (`marked_no_show`), an empty form (`empty_feedback`: at least one rating
+  or one comment) and released feedback (`feedback_sent`). A finished
+  interview's feedback stays editable until it is released, as before.
+- **Organizers keep their Finished button.** The Floor marks a finished
+  interview with no feedback as **No feedback yet** (`withFeedbackFlags`
+  in `queries.ts`), so the club can chase the company.
+- **A switch.** Settings → Feedback → *Who finishes an interview*
+  (`company_finishes`, `src/lib/interviews/companyFinish.ts`). On unless
+  set to off; off puts the page back to feedback only, saved through
+  `submit_feedback`, with organizers marking interviews done.
+- **The PIN now guards the action too.** The page was behind the PIN, but
+  `feedbackAction` only checked the link, so anyone holding a link could post
+  feedback without the PIN. It now checks the PIN cookie first.
+- **Applying 0015.** **Applied to the live project on 2026-10-15** through the SQL editor, so `schema_migrations` does not record it and the next `db:push` runs it again, which is harmless. The person who applied 0005–0014 applies it the same
+  way (`npm run db:push -- --target interviews`, or paste it into the SQL
+  editor; it can run twice), then `npm run db:interviews`, which now has
+  three finish checks. Until then the action falls back to the two old
+  calls in a row (`submit_feedback`, then `advance_stage` to done as the
+  company), with the empty-form check done in TypeScript. Checked before
+  merging on a local Postgres 16 with 0001–0015 applied: 18 checks (every
+  refusal, each starting stage, editing after finishing, the audit log
+  naming the company, immediate release queuing the email, an organizer
+  undoing a finish).
+
 ### Things easy to break
 
 - **Every shareable link starts with `siteUrl()`** (`src/lib/interviews/email.ts`):

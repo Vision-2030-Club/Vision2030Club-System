@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getInterviewAccess } from '@/lib/interviews/access';
-import { loadDayRows, toFloorRow } from '@/lib/interviews/queries';
+import { loadDayRows, toFloorRow, withFeedbackFlags } from '@/lib/interviews/queries';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 
 /**
@@ -25,17 +25,11 @@ export async function GET(request: NextRequest) {
   const access = await getInterviewAccess(project);
   if (!access?.edition) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const rows = await loadDayRows(
-    createInterviewsClient(),
-    access.edition.id,
-    day,
-    access.edition.time_zone,
-    company,
-    room,
-  );
+  const db = createInterviewsClient();
+  const rows = await loadDayRows(db, access.edition.id, day, access.edition.time_zone, company, room);
 
   return NextResponse.json(
-    { rows: rows.map(toFloorRow) },
+    { rows: await withFeedbackFlags(db, rows.map(toFloorRow)) },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }
