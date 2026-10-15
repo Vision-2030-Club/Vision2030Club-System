@@ -100,6 +100,8 @@ export type ImportReport = {
   created: number;
   updated: number;
   project_links: number;
+  /** Super Admins whose role the file tried to change (0070). Absent before 0070. */
+  kept_roles?: number;
   errors: { row: number; field: string; reason: string; value: string | null }[];
 };
 

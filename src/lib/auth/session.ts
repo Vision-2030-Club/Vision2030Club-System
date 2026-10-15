@@ -16,7 +16,8 @@ export type MyMember = {
   name_en: string;
   name_ar: string;
   status: 'active' | 'inactive' | 'alumni';
-  student_id: string;
+  /** Optional since 0070 — the 1448H import has none for new members. */
+  student_id: string | null;
   /** Path inside the private `avatars` bucket, not a URL — see src/lib/avatars.ts. */
   avatar_path: string | null;
   team_id: string;

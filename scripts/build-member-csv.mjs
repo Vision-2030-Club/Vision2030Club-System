@@ -1,35 +1,38 @@
 /**
- * Turns `Database club.xlsx` into a CSV the admin import screen accepts.
+ * Turns the club's membership spreadsheet into a CSV the admin import screen
+ * accepts.
  *
- *   node scripts/build-member-csv.mjs
+ *   node scripts/build-member-csv.mjs ["path/to/sheet.xlsx"]
  *
- * Reads the spreadsheet directly — an .xlsx is a zip of XML, so this needs no
- * new dependency. Writes `members-import.csv` and prints a pre-flight report.
+ * Defaults to `Database club.xlsx` in the repo root (gitignored, like every
+ * .xlsx). Written for the first-semester 1448H sheet: name in Arabic and
+ * English, phone, email, team, role, project(s). Columns are found by their
+ * Arabic header, not their letter, so a reordered sheet still reads.
  *
- * Read the report before importing. `import_members` is ALL OR NOTHING: one
- * bad row rejects the whole file, so it is much cheaper to see the problems
- * listed here than to paste 100 rows and be told "row 63".
+ * Student ID and national ID are deliberately NOT written, even if a sheet has
+ * them — the club no longer collects them this way. `import_members` (0070)
+ * matches people on phone, then email, and keeps any IDs already stored.
+ *
+ * Writes `members-import.csv` and prints a pre-flight report. Read it before
+ * importing: `import_members` is ALL OR NOTHING, so one bad row rejects the
+ * whole file, and it is much cheaper to see the problems listed here.
  *
  * Fix problems in the SPREADSHEET and re-run, not in the CSV — the CSV is
- * generated and will be overwritten.
- *
- * `--skip-invalid` writes the CSV anyway, leaving out the rows that cannot be
- * imported and naming each one. Use it to get everybody else in today; the
- * skipped people still need adding once their data is fixed.
+ * generated and will be overwritten. `--skip-invalid` writes the CSV anyway,
+ * leaving out the rows that cannot be imported and naming each one.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
-import { inflateRawSync } from 'node:zlib';
+import { writeFileSync } from 'node:fs';
+import { openWorkbook } from './lib/xlsx.mjs';
 
-const XLSX = 'Database club.xlsx';
+const XLSX = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'Database club.xlsx';
 const OUT = 'members-import.csv';
 const SKIP_INVALID = process.argv.includes('--skip-invalid');
 
 /*
  * The club's spreadsheet names and the system's names are not the same, and
- * `import_members` matches Arabic byte-exactly — `مدير مشروع` in the sheet is
- * `مدير المشروع` in the system, and one row spells `ادارة النادي` without its
- * hamza. So we emit the English key instead, which the importer matches
- * case-insensitively, and none of that can bite.
+ * `import_members` matches Arabic byte-exactly — so we emit the English key,
+ * which the importer matches case-insensitively, and spelling variants in the
+ * sheet (a missing hamza, ي for ى) cannot bite.
  */
 const TEAMS = {
   'إدارة النادي': 'CLUB_MGMT',
@@ -38,11 +41,12 @@ const TEAMS = {
   'فريق العلاقات العامة': 'PR',
   'فريق التطوير': 'DEVELOPMENT',
   'فريق الادارة المالية': 'FINANCE',
+  'فريق الإدارة المالية': 'FINANCE',
   'فريق المحتوى': 'CONTENT',
   'فريق التصميم': 'DESIGN',
   // No Photography team exists; coverage work sits with Media.
   'فريق التصوير': 'MEDIA',
-  // The Technical team was deleted deliberately; these five belong to IT.
+  // The Technical team was deleted deliberately; these people belong to IT.
   'الفريق التقني': 'IT',
 };
 
@@ -51,7 +55,11 @@ const ROLES = {
   'قائد فريق': 'team_director',
   'مدير مشروع': 'project_manager',
   'نائب الرئيس': 'vice_president',
+  'نائب رئيس': 'vice_president',
   'الرئيس': 'president',
+  // The club confirmed (Oct 2026) these are ordinary members in the system.
+  'مدير فريق': 'member',
+  'مدير الفريق': 'member',
 };
 
 /** Sheet project names differ from the system's; match on the English name. */
@@ -61,210 +69,169 @@ const PROJECTS = {
   'افترض': 'Mockup Interviews',
   'سين': 'Seen',
   'خطى المملكة': 'Kingdom Steps',
+  'خطي المملكة': 'Kingdom Steps',
   'قروش': 'Shark Tank',
 };
 
-/*
- * The live Super Admin is IN this spreadsheet, as row 131, listed as
- * `قائد فريق` of the Technical team. `import_members` matches on student ID
- * and overwrites the role — so importing that row as written would demote the
- * club's only Super Admin, and nobody could restore it from inside the app.
- *
- * Keyed by student ID so it survives the row moving.
- */
-const KEEP_ROLE = {
-  '445106843': { role: 'super_admin', team: 'IT' },
-};
+/** Header text → field. Anything not listed (#, IDs, notes) is ignored. */
+const HEADERS = [
+  [/العربي/, 'name_ar'],
+  [/الانجليزي|الإنجليزي/, 'name_en'],
+  [/الجوال|الهاتف/, 'phone'],
+  [/البريد/, 'email'],
+  [/الفريق/, 'team'],
+  [/دورك|الدور/, 'role'],
+  [/المشروع/, 'projects'],
+];
 
-// ---------------------------------------------------------------------------
-// Minimal .xlsx reader: a zip of XML parts, no external library.
-// ---------------------------------------------------------------------------
-
-function readZip(path) {
-  const buf = readFileSync(path);
-  const files = {};
-
-  /*
-   * Read the CENTRAL DIRECTORY rather than the local file headers. A zip entry
-   * written in streaming mode carries zero sizes in its local header and puts
-   * the real ones in a trailing data descriptor — the central directory always
-   * has them, so this reads every part rather than silently skipping some.
-   */
-  let eocd = -1;
-  for (let i = buf.length - 22; i >= 0; i -= 1) {
-    if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
-  }
-  if (eocd === -1) throw new Error(`${path} is not a readable zip`);
-
-  const count = buf.readUInt16LE(eocd + 10);
-  let p = buf.readUInt32LE(eocd + 16);
-
-  for (let n = 0; n < count; n += 1) {
-    if (buf.readUInt32LE(p) !== 0x02014b50) break;
-    const method = buf.readUInt16LE(p + 10);
-    const compressed = buf.readUInt32LE(p + 20);
-    const nameLen = buf.readUInt16LE(p + 28);
-    const extraLen = buf.readUInt16LE(p + 30);
-    const commentLen = buf.readUInt16LE(p + 32);
-    const localOffset = buf.readUInt32LE(p + 42);
-    const name = buf.subarray(p + 46, p + 46 + nameLen).toString('utf8');
-
-    // The local header repeats the name/extra with its own lengths.
-    const lNameLen = buf.readUInt16LE(localOffset + 26);
-    const lExtraLen = buf.readUInt16LE(localOffset + 28);
-    const start = localOffset + 30 + lNameLen + lExtraLen;
-    const raw = buf.subarray(start, start + compressed);
-
-    try {
-      files[name] = method === 0 ? raw.toString('utf8') : inflateRawSync(raw).toString('utf8');
-    } catch { /* binary part we do not need */ }
-
-    p += 46 + nameLen + extraLen + commentLen;
-  }
-  return files;
-}
-
-const parts = readZip(XLSX);
-
-const shared = [];
-for (const si of (parts['xl/sharedStrings.xml'] ?? '').match(/<si>[\s\S]*?<\/si>/g) ?? []) {
-  shared.push([...si.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map((m) => m[1]).join(''));
-}
-
-const decode = (s) =>
-  s
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&');
-
-const rows = new Map();
-for (const [, rnum, body] of (parts['xl/worksheets/sheet1.xml'] ?? '').matchAll(
-  /<row[^>]*r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g,
-)) {
-  const cells = {};
-  for (const [, ref, attrs, inner] of body.matchAll(/<c r="([A-Z]+)\d+"([^>]*)>([\s\S]*?)<\/c>/g)) {
-    const v = inner.match(/<v>([\s\S]*?)<\/v>/);
-    const t = inner.match(/<t[^>]*>([\s\S]*?)<\/t>/);
-    let value = '';
-    if (attrs.includes('t="s"') && v) value = shared[Number(v[1])] ?? '';
-    else if (t) value = t[1];
-    else if (v) value = v[1];
-    cells[ref] = decode(value).trim();
-  }
-  rows.set(Number(rnum), cells);
+/** Same rules as `app.normalize_phone` (0022), so this report agrees with the database. */
+function normalizePhone(raw) {
+  const v = String(raw ?? '').replace(/[^0-9+]/g, '');
+  if (v === '') return '';
+  if (/^\+9665[0-9]{8}$/.test(v)) return v;
+  if (/^009665[0-9]{8}$/.test(v)) return `+${v.slice(2)}`;
+  if (/^9665[0-9]{8}$/.test(v)) return `+${v}`;
+  if (/^05[0-9]{8}$/.test(v)) return `+966${v.slice(1)}`;
+  if (/^5[0-9]{8}$/.test(v)) return `+966${v}`;
+  return v;
 }
 
 // ---------------------------------------------------------------------------
 // Read the members out
 // ---------------------------------------------------------------------------
 
-const STUDENT = /^4[0-9]{8}$/;
-const NATIONAL = /^[12][0-9]{9}$/;
+const workbook = openWorkbook(XLSX);
+const sheet = workbook.sheetNames[0];
+const rows = workbook.rows(sheet);
+
+const headerRow = rows.find((r) => Object.values(r.cells).some((v) => /البريد/.test(v)));
+if (!headerRow) {
+  console.error(`No header row with an email column (البريد) in "${sheet}" of ${XLSX}.`);
+  process.exit(1);
+}
+
+const columns = {};
+for (const [col, text] of Object.entries(headerRow.cells)) {
+  const match = HEADERS.find(([re]) => re.test(text));
+  if (match && !columns[match[1]]) columns[match[1]] = col;
+}
+for (const field of ['name_ar', 'name_en', 'phone', 'email', 'team', 'role']) {
+  if (!columns[field]) {
+    console.error(`No column for ${field} in the header row of ${XLSX}.`);
+    process.exit(1);
+  }
+}
 
 const members = [];
 
-for (const [rnum, c] of [...rows.entries()].sort((a, b) => a[0] - b[0])) {
-  if (rnum < 4) continue; // title + header
-  if (!c.E || !c.E.includes('@')) continue; // filler row (just a number in A)
+for (const { row: rnum, cells } of rows) {
+  if (rnum <= headerRow.row) continue;
+  const get = (field) => (columns[field] ? cells[columns[field]] ?? '' : '').trim();
+  if (!get('email').includes('@')) continue; // filler row (just a number in #)
 
-  /*
-   * The sheet has TWO layouts. The club-management block carries a project in
-   * H and the student ID in I; every other block has the student ID in H and
-   * nothing in I. So the student ID column is whichever one looks like one.
-   */
-  const idInI = STUDENT.test(c.I ?? '');
-  const studentId = idInI ? c.I : (c.H ?? '');
-  const rawProject = idInI ? (c.H ?? '') : '';
+  const rawProjects = get('projects')
+    .split(/[,،]/)
+    .map((p) => p.trim())
+    .filter((p) => p && p !== '-');
 
-  const team = TEAMS[c.F ?? ''];
-  const role = ROLES[c.G ?? ''];
-  const project = PROJECTS[rawProject] ?? '';
+  members.push({
+    rows: [rnum],
+    email: get('email'),
+    name_en: get('name_en').replace(/\s+/g, ' '),
+    name_ar: get('name_ar').replace(/\s+/g, ' '),
+    phone: normalizePhone(get('phone')),
+    team: TEAMS[get('team')],
+    role: ROLES[get('role')],
+    projects: [...new Set(rawProjects.map((p) => PROJECTS[p] ?? `?${p}`))],
+    _rawPhone: get('phone'),
+    _rawTeam: get('team'),
+    _rawRole: get('role'),
+  });
+}
 
-  const row = {
-    row: rnum,
-    email: c.E ?? '',
-    name_en: c.C ?? '',
-    name_ar: c.B ?? '',
-    student_id: studentId,
-    national_id: c.M ?? '',
-    team,
-    role,
-    phone: c.D ?? '',
-    college: c.J ?? '',
-    academic_level: c.K ?? '',
-    graduation_term: c.L ?? '',
-    projects: project,
-    _rawTeam: c.F ?? '',
-    _rawRole: c.G ?? '',
-    _rawProject: rawProject,
-  };
+// ---------------------------------------------------------------------------
+// The same person listed twice: merge when the rows agree, otherwise report.
+// ---------------------------------------------------------------------------
 
-  const override = KEEP_ROLE[studentId];
-  if (override) {
-    row.role = override.role;
-    row.team = override.team;
-    row._overridden = true;
+const merged = [];
+const mergeNotes = [];
+const problems = [];
+
+for (const m of members) {
+  const twin = merged.find(
+    (x) => x.email.toLowerCase() === m.email.toLowerCase() || (m.phone && x.phone === m.phone),
+  );
+  if (!twin) {
+    merged.push(m);
+    continue;
   }
-
-  members.push(row);
+  const same =
+    twin.email.toLowerCase() === m.email.toLowerCase() &&
+    twin.phone === m.phone &&
+    twin.team === m.team &&
+    twin.role === m.role;
+  if (same) {
+    twin.rows.push(...m.rows);
+    twin.projects = [...new Set([...twin.projects, ...m.projects])];
+    mergeNotes.push(`rows ${twin.rows.join(' & ')} are the same person — merged, projects combined`);
+  } else {
+    problems.push(
+      `row ${m.rows[0]} shares an email or phone with row ${twin.rows[0]} but the team, role or contact details differ — keep one row`,
+    );
+    m._invalid = true;
+    merged.push(m);
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Pre-flight report — the importer is all-or-nothing, so look before you leap
 // ---------------------------------------------------------------------------
 
-const problems = [];
-const seenEmail = new Map();
-const seenStudent = new Map();
-
-for (const m of members) {
-  const at = `row ${m.row} (${m.name_en || m.name_ar || m.email})`;
+for (const m of merged) {
+  const at = `row ${m.rows[0]}`;
   const before = problems.length;
   if (!m.name_en) problems.push(`${at}: no English name`);
   if (!m.name_ar) problems.push(`${at}: no Arabic name`);
-  if (!STUDENT.test(m.student_id)) problems.push(`${at}: student id "${m.student_id}" is not 9 digits starting with 4`);
-  if (!NATIONAL.test(m.national_id)) problems.push(`${at}: national id "${m.national_id}" is not 10 digits starting with 1 or 2`);
+  if (/[؀-ۿ]/.test(m.name_en)) problems.push(`${at}: the English name has Arabic letters in it`);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m.email)) problems.push(`${at}: email is not a valid address`);
+  if (!/^\+9665[0-9]{8}$/.test(m.phone)) {
+    problems.push(`${at}: phone "${m._rawPhone.replace(/\d/g, '9')}" is not a Saudi mobile (05XXXXXXXX) — phone is the match key`);
+  }
   if (!m.team) problems.push(`${at}: team "${m._rawTeam}" has no mapping — add it to TEAMS in this script`);
   if (!m.role) problems.push(`${at}: role "${m._rawRole}" has no mapping — add it to ROLES in this script`);
-  if (m._rawProject && m._rawProject !== '-' && !m.projects) {
-    problems.push(`${at}: project "${m._rawProject}" has no mapping — add it to PROJECTS or create the project`);
+  for (const p of m.projects.filter((x) => x.startsWith('?'))) {
+    problems.push(`${at}: project "${p.slice(1)}" has no mapping — add it to PROJECTS or create the project`);
   }
-
-  const e = m.email.toLowerCase();
-  if (seenEmail.has(e)) problems.push(`${at}: email ${m.email} already used on row ${seenEmail.get(e)}`);
-  else seenEmail.set(e, m.row);
-
-  if (seenStudent.has(m.student_id)) problems.push(`${at}: student id ${m.student_id} already used on row ${seenStudent.get(m.student_id)}`);
-  else seenStudent.set(m.student_id, m.row);
-
-  m._invalid = problems.length > before;
+  if (!m._invalid) m._invalid = problems.length > before;
 }
 
-const tally = (key) => {
+const tally = (pick) => {
   const counts = new Map();
-  for (const m of members) counts.set(m[key] || '(unmapped)', (counts.get(m[key] || '(unmapped)') ?? 0) + 1);
+  for (const m of merged) {
+    for (const k of [pick(m)].flat()) counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
   return [...counts.entries()].sort((a, b) => b[1] - a[1]);
 };
 
-console.log(`\nRead ${members.length} members from ${XLSX}\n`);
+console.log(`\nRead ${members.length} rows, ${merged.length} people, from "${sheet}" in ${XLSX}\n`);
 console.log('Teams:');
-for (const [k, n] of tally('team')) console.log(`   ${String(n).padStart(4)}  ${k}`);
+for (const [k, n] of tally((m) => m.team ?? '(unmapped)')) console.log(`   ${String(n).padStart(4)}  ${k}`);
 console.log('\nRoles:');
-for (const [k, n] of tally('role')) console.log(`   ${String(n).padStart(4)}  ${k}`);
+for (const [k, n] of tally((m) => m.role ?? '(unmapped)')) console.log(`   ${String(n).padStart(4)}  ${k}`);
 console.log('\nProjects:');
-for (const [k, n] of tally('projects')) {
-  console.log(`   ${String(n).padStart(4)}  ${k === '(unmapped)' ? '(no project)' : k}`);
+for (const [k, n] of tally((m) => (m.projects.length ? m.projects : ['(no project)']))) {
+  console.log(`   ${String(n).padStart(4)}  ${k}`);
 }
 
-for (const m of members.filter((x) => x._overridden)) {
-  console.log(
-    `\n! Row ${m.row} (${m.name_en}) is the live Super Admin.\n` +
-      `  The sheet says ${m._rawRole} / ${m._rawTeam}; emitting role=${m.role} team=${m.team}\n` +
-      `  so the import does not demote the only admin account.`,
-  );
+if (mergeNotes.length > 0) {
+  console.log('\nDuplicates:');
+  for (const note of mergeNotes) console.log(`   ${note}`);
 }
+
+console.log(
+  '\nNote: the import never changes the role of a current Super Admin (0070), so the\n' +
+    "Super Admin's own row can say anything without demoting them.",
+);
 
 if (problems.length > 0) {
   console.log(`\n${problems.length} problem(s) — the importer rejects the WHOLE file if any remain:\n`);
@@ -277,12 +244,12 @@ if (problems.length > 0) {
   }
 }
 
-const invalid = members.filter((m) => m._invalid);
-const usable = members.filter((m) => !m._invalid);
+const invalid = merged.filter((m) => m._invalid);
+const usable = merged.filter((m) => !m._invalid);
 
 if (invalid.length > 0) {
   console.log(`\nSkipping ${invalid.length} row(s); everybody else is written:`);
-  for (const m of invalid) console.log(`   row ${m.row}  ${m.name_en || m.name_ar}  <${m.email}>`);
+  for (const m of invalid) console.log(`   row ${m.rows[0]}`);
   console.log('\nThese people are NOT in the CSV. Fix the spreadsheet and re-run to add them,');
   console.log('or add them by hand on the members page.');
 }
@@ -291,14 +258,10 @@ if (invalid.length > 0) {
 // Write it
 // ---------------------------------------------------------------------------
 
-const COLUMNS = [
-  'email', 'name_en', 'name_ar', 'student_id', 'national_id',
-  'team', 'role', 'phone', 'college', 'academic_level',
-  'graduation_term', 'projects',
-];
+const COLUMNS = ['email', 'name_en', 'name_ar', 'phone', 'team', 'role', 'projects'];
 
 const cell = (v) => {
-  const s = String(v ?? '');
+  const s = Array.isArray(v) ? v.join(', ') : String(v ?? '');
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
@@ -311,4 +274,4 @@ const csv = [
 writeFileSync(OUT, '﻿' + csv + '\n', 'utf8');
 
 console.log(`\nWrote ${OUT} — ${usable.length} member(s), ${COLUMNS.length} columns.`);
-console.log('Import it at /ar/admin/import as Super Admin.');
+console.log('Import it at /ar/admin/import as Super Admin, after migration 0070 is applied.');

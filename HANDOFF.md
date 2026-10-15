@@ -89,42 +89,60 @@ Design advice deliberately NOT taken, because it would break this app:
 
 ## The member list — imported
 
-**This has been done.** 98 active members are in the live database. What
-follows is how to do it again, and the traps that bit the first time.
+The first import (98 members, from `Database club.xlsx`) is done. The club's
+**first-semester 1448H sheet** (173 people: the same 98 plus 76 new, one listed
+twice) replaces it as the source, and is imported in place — once 0070 is
+applied. What follows is how to do it, and the traps that bit the first time.
 
-`node scripts/build-member-csv.mjs` turns `Database club.xlsx` into
-`members-import.csv`. It reads the spreadsheet directly (an .xlsx is a zip of
-XML — no dependency) and prints a pre-flight report before writing anything,
-because `import_members` is all-or-nothing and one bad row rejects all hundred.
+`node scripts/build-member-csv.mjs "path/to/sheet.xlsx"` (default
+`Database club.xlsx`) turns the sheet into `members-import.csv`. It reads the
+spreadsheet directly (an .xlsx is a zip of XML — no dependency), finds columns
+by their Arabic header rather than their letter, and prints a pre-flight
+report before writing anything, because `import_members` is all-or-nothing
+and one bad row rejects the whole file. Then import the CSV at
+`/ar/admin/import` as Super Admin.
 
-Four things that spreadsheet does which the script handles, and which will
-catch out anyone editing it:
+**No student ID or national ID any more.** The 1448H sheet has neither and the
+club does not want them collected through it. 0070 makes `members.student_id`
+optional (still unique and format-checked when present) and the importer
+matches people on **phone** (normalised as in 0022), falling back to **email**
+when the phone matches nobody, so somebody who changed their number is updated,
+not duplicated. The builder never writes either ID column. The IDs stored for
+the first 98 are kept; nothing deletes them. A blank college, level or
+graduation term in a file keeps what is stored instead of wiping it.
 
-1. **Two column layouts.** The club-management block has a project in column H
-   and the student ID in I; every other block has the student ID in H. The
-   script decides by which column looks like a student ID.
-2. **The Arabic does not match the seeds.** `مدير مشروع` vs `مدير المشروع`,
-   and one row missing its hamza in `ادارة النادي`. `import_members` matches
-   Arabic byte-exactly, so the CSV emits English keys instead. (0047 renamed
-   the roles to `قائد فريق` and `مدير مشروع`, so the sheet's Arabic now
-   matches for those two — but the CSV still emits keys, which is safer.)
-3. **The Super Admin is in the file** (row 131, student ID `445106843`) as
-   `قائد فريق`. The importer matches on student ID and overwrites role, so
-   importing it as written would demote the club's only admin with no way back
-   from inside the app. `KEEP_ROLE` in the script pins that row to
-   `super_admin`. **Always re-check that the admin still holds `super_admin`
+Things the sheet does which the script or the importer handles, and which will
+catch out anyone editing them:
+
+1. **The Arabic does not match the seeds.** Missing hamzas (`ادارة النادي`),
+   `نائب رئيس` beside `نائب الرئيس`, `خطي المملكة` beside `خطى المملكة`, and
+   `import_members` matches Arabic byte-exactly — so the CSV emits English
+   keys. `مدير فريق` / `مدير الفريق` import as **Member**, by the club's
+   decision (Oct 2026). Column I (an HR name per member, no header) is ignored
+   on purpose; it belongs to a process outside this system.
+2. **The same person twice.** Rows that share an email or phone and agree on
+   team and role are merged and their projects combined; rows that disagree
+   are reported.
+3. **The Super Admin is in the file** as an ordinary `قائد فريق`. The importer
+   overwrites roles, so importing it as written would demote the club's only
+   admin with no way back from inside the app. Since 0070 `import_members`
+   itself never changes the role of a current Super Admin (and says so after
+   the import). **Still re-check that the admin holds `super_admin`
    immediately after an import.**
 4. **Being in a project is not running it.** `import_members` originally wrote
    only `project_members`, but authority comes from `project_managers` — which
    is what `app.is_project_manager` reads and what the `own_projects` scope
-   resolves through. So the first import left all 19 Project Managers as
-   ordinary members of the projects they run, unable to assign work or act on
-   requests. 0047 fixes the importer and backfills. If you ever add a path that
-   makes somebody a Project Manager, write both rows.
+   resolves through. 0047 fixes the importer and backfills. If you ever add a
+   path that makes somebody a Project Manager, write both rows.
+5. **The import only adds.** Members missing from the file stay as they are,
+   and project links are never removed. Roles DO follow the file, so a role
+   changed in the app since the sheet was written is overwritten — compare the
+   pre-flight role counts with the app before importing.
 
 `--skip-invalid` writes the CSV without rows that cannot import, naming each.
-**One member is still missing: Nawaf Zaid Alzaid** (row 42), whose national ID
-is `-`. Fix the spreadsheet and re-run to add him.
+`db:load-club` still expects the old CSV with student IDs and refuses the new
+one in its validation step, before writing anything; do not use it for the
+1448H sheet.
 
 ### A dry run is available and worth doing
 

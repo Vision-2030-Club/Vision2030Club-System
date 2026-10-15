@@ -344,9 +344,7 @@ export default async function MemberPage({
               {member.email}
             </dd>
             <dt className="text-ink-muted">{t('studentId')}</dt>
-            <dd>
-              <Numeric>{member.student_id}</Numeric>
-            </dd>
+            <dd>{member.student_id ? <Numeric>{member.student_id}</Numeric> : '—'}</dd>
             <dt className="text-ink-muted">{t('phone')}</dt>
             <dd>{member.phone ? <Numeric>{member.phone}</Numeric> : '—'}</dd>
             <dt className="text-ink-muted">{t('college')}</dt>
