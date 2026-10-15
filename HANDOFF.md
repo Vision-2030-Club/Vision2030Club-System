@@ -1913,7 +1913,7 @@ Reception tab (0069).
   request keeps its CV in the bucket, like every other CV. The link is the
   only gate, so a link that leaks off-site should be replaced with *New
   link*.
-- **Applying 0016.** After 0015, the same way (`npm run db:push -- --target
+- **Applying 0016.** **Applied to the live project on 2026-10-15** through the SQL editor, so `schema_migrations` does not record it and the next `db:push` runs it again, which is harmless. After 0015, the same way (`npm run db:push -- --target
   interviews`, or the SQL editor; it can run twice), then `npm run
   db:interviews`, which now has seven walk-in checks on an edition of its own.
   Until it is applied, the Reception tab shows no walk-in queue and the
