@@ -1,11 +1,11 @@
 /**
- * Verification of the project-component rules (migration 0062).
+ * Verification of the project-component rules (migrations 0062 and 0069).
  *
  *   npm run db:components
  *
  * Talks to the CLUB database over the REST API as signed-in people, the way
  * the other suites do, and proves who may attach a component, who may add
- * organizers and HR people, and what `my_component_access()` answers for
+ * organizers, HR people and receptionists, and what `my_component_access()` answers for
  * each. Seeds its own people (`comptest-`) and its own project, and deletes
  * them again; nothing it touches is anyone else's.
  */
@@ -202,6 +202,18 @@ async function run({ people, projectId }) {
   check('an HR Director removes an HR person', allowed(await remove(huda.token, alice.id, 'hr')));
   check('back to organizer once the hr row is gone', (await roleOf(alice.token)) === 'organizer');
   check('an organizer cannot remove another organizer', refused(await remove(alice.token, alice.id, 'organizer')));
+
+  // 0069: receptionists, chosen by the project's managers or HR's Directors.
+  check('a Guest adding themself as receptionist is refused', refused(await addPerson(gina.token, gina.id, 'reception')));
+  check('a Director of another team adding a receptionist is refused', refused(await addPerson(dana.token, dana.id, 'reception')));
+  check('the PM adds a receptionist', allowed(await addPerson(pm.token, dana.id, 'reception')));
+  check('the receptionist has reception access', (await roleOf(dana.token)) === 'reception');
+  check('a receptionist cannot remove themself', refused(await remove(dana.token, dana.id, 'reception')));
+  check('an HR Director removes a receptionist the PM added', allowed(await remove(huda.token, dana.id, 'reception')));
+  check('an HR Director adds a receptionist', allowed(await addPerson(huda.token, dana.id, 'reception')));
+  check('organizer outranks reception for the same person', allowed(await addPerson(pm.token, dana.id, 'organizer')) && (await roleOf(dana.token)) === 'organizer');
+  check('the PM removes a receptionist HR added', allowed(await remove(pm.token, dana.id, 'reception')) && allowed(await remove(pm.token, dana.id, 'organizer')));
+  check('nobody is reception once removed', (await roleOf(dana.token)) === null);
 
   const detach = (token) =>
     rest(token, `project_components?project_id=eq.${projectId}`, { method: 'DELETE' });

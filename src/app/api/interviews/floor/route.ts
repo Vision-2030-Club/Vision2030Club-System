@@ -4,17 +4,19 @@ import { loadDayRows, toFloorRow } from '@/lib/interviews/queries';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 
 /**
- * What the floor board polls every twelve seconds. Signed in: the club
- * session cookie identifies the person and `getInterviewAccess` decides
- * whether they may see this project's day at all.
+ * What the floor board polls every twelve seconds, and the Reception tab
+ * every ten. Signed in: the club session cookie identifies the person and
+ * `getInterviewAccess` decides whether they may see this project's day at
+ * all. One company's day when `company` is given (the floor board), every
+ * company's when it is left out (reception).
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const project = params.get('project') ?? '';
-  const company = params.get('company') ?? '';
+  const company = params.get('company') || undefined;
   const day = params.get('day') ?? '';
 
-  if (!project || !company || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+  if (!project || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   }
 

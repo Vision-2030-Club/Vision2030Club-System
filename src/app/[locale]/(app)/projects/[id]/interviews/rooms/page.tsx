@@ -64,7 +64,7 @@ export default async function InterviewsRoomsPage({
 
   const t = await getTranslations('interviews');
   const tCommon = await getTranslations('common');
-  if (role === 'organizer') return <EmptyState>{tCommon('notPermitted')}</EmptyState>;
+  if (!can.decide(role)) return <EmptyState>{tCommon('notPermitted')}</EmptyState>;
   const manage = can.manage(role);
   const decide = can.decide(role);
 
