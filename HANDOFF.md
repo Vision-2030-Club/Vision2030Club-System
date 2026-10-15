@@ -134,8 +134,16 @@ catch out anyone editing them:
    is what `app.is_project_manager` reads and what the `own_projects` scope
    resolves through. 0047 fixes the importer and backfills. If you ever add a
    path that makes somebody a Project Manager, write both rows.
-5. **The import only adds.** Members missing from the file stay as they are,
-   and project links are never removed. Roles DO follow the file, so a role
+5. **The file decides who manages a project.** Since 0071, for every project
+   the file names at least one Project Manager against, that project's
+   managers become exactly the file's. Anyone else loses the manager link but
+   stays a project member. Before 0071 the import only added managers, so
+   the 1448H sheet (four per project, some new) pushed projects past the limit
+   of four and the whole import failed. Note that the 0005 limit trigger is
+   BEFORE INSERT and runs before `ON CONFLICT DO NOTHING`, so re-inserting an
+   existing manager counts too. Never re-insert one into a full project.
+6. **Otherwise the import only adds.** Members missing from the file stay as
+   they are, and project membership is never removed. Roles DO follow the file, so a role
    changed in the app since the sheet was written is overwritten — compare the
    pre-flight role counts with the app before importing.
 

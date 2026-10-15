@@ -111,6 +111,10 @@ export function ImportForm({ locale }: { locale: string }) {
 
       {report?.ok && report.kept_roles ? <Alert tone="ok">{t('importKeptRoles')}</Alert> : null}
 
+      {report?.ok && report.managers_removed ? (
+        <Alert tone="ok">{t('importManagersReplaced', { count: report.managers_removed })}</Alert>
+      ) : null}
+
       {report && !report.ok ? (
         <div className="space-y-2">
           <Alert tone="danger">{t('importFailed')}</Alert>

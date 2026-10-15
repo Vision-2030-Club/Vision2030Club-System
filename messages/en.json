@@ -439,6 +439,7 @@
     "importRun": "Validate and import",
     "importResult": "Created {created}, updated {updated}, project links {links}.",
     "importKeptRoles": "The Super Admin's role was kept as it is; the file's role for them was ignored.",
+    "importManagersReplaced": "{count} earlier Project Manager assignments were replaced by the managers named in the file. Those people remain members of their projects.",
     "importFailed": "Nothing was imported. Fix these problems and try again:",
     "importRow": "Row {row}",
     "downloadTemplate": "Download a template",
