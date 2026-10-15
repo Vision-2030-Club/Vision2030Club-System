@@ -36,6 +36,7 @@ import { choosesFullCompany, fullCompanyIds } from '@/lib/interviews/fullCompani
 import { normalisePhone } from '@/lib/interviews/phone';
 import { applicationsByPhone } from '@/lib/interviews/queries';
 import { saveSessionLink } from '@/lib/interviews/roomLinks';
+import { organizerOf, roomOrganizers, saveRoomOrganizers } from '@/lib/interviews/roomOrganizers';
 import type { EditionSettings, Stage } from '@/lib/interviews/types';
 import { formatDate, localized } from '@/lib/format';
 import { fromClubWallClock } from '@/lib/time';
@@ -276,6 +277,31 @@ export async function pullFloorSheetAction(
   } catch (error) {
     return fail(error instanceof Error ? error.message : 'Pull failed.');
   }
+}
+
+/**
+ * Settings → Google Sheets: whether a Status typed in the floor sheet or a
+ * company's sheet changes the app (sheetPull.ts). Off by default; while off
+ * the sheets are read-only views and an edit is written over by the next
+ * sync.
+ */
+export async function setSheetStatusEditsAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const db = createInterviewsClient();
+  const { error } = await db.rpc('update_edition', {
+    p_edition: g.access.edition.id,
+    p_patch: { settings: { sheet_status_edits: text(formData, 'sheet_status_edits') === 'on' } },
+    p_actor: g.access.actor,
+  });
+  if (error) return fromPostgrest(error);
+
+  revalidate(g.locale, g.projectId);
+  return ok();
 }
 
 export async function releaseFeedbackAction(
@@ -1021,7 +1047,7 @@ export async function stageAction(input: {
   bookingId: string;
   to: Stage;
 }): Promise<ActionResult> {
-  let access: InterviewAccess;
+  let access: Awaited<ReturnType<typeof requireInterviewAccess>>;
   try {
     access = await requireInterviewAccess(input.projectId, can.stage);
   } catch (error) {
@@ -1029,6 +1055,26 @@ export async function stageAction(input: {
   }
 
   const db = createInterviewsClient();
+  // Only this project's edition, and for an organizer only a room they run
+  // or one nobody runs (roomOrganizers.ts). Managers may act anywhere.
+  const { data: booking } = await db
+    .from('bookings')
+    .select('id, slots(room_id, sessions(day))')
+    .eq('id', input.bookingId)
+    .eq('edition_id', access.edition.id)
+    .maybeSingle();
+  if (!booking) return fail('No such booking.', 'not_found');
+  if (!can.manage(access.role)) {
+    const slot = (booking as unknown as { slots: { room_id: string; sessions: { day: string } | null } | null }).slots;
+    const owner = slot?.sessions
+      ? organizerOf(roomOrganizers(access.settings), slot.room_id, slot.sessions.day)
+      : null;
+    if (owner && owner !== access.actor.id) {
+      const t = await getTranslations({ locale: input.locale, namespace: 'interviews' });
+      return fail(t('errors.not_your_room'), 'not_your_room');
+    }
+  }
+
   const { error } = await db.rpc('advance_stage', {
     p_booking: input.bookingId,
     p_to: input.to,
@@ -1037,7 +1083,7 @@ export async function stageAction(input: {
   });
   if (error) return fromPostgrest(error);
 
-  if (access.edition) kickSheetsSync(access.edition.id);
+  kickSheetsSync(access.edition.id);
   revalidate(input.locale, input.projectId);
   return ok();
 }
@@ -1084,6 +1130,47 @@ export async function checkInAction(input: {
 
   kickSheetsSync(access.edition.id);
   revalidate(input.locale, input.projectId);
+  return ok();
+}
+
+/**
+ * Rooms tab → a room's organizer: who runs it on every day, and anyone
+ * different on particular days (roomOrganizers.ts). Managers only. Each
+ * select is a club member id, or empty for "nobody" (every day) or "the
+ * same as every day" (one day).
+ */
+export async function setRoomOrganizersAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const roomId = requiredText(formData, 'room_id');
+  const days: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith('day_') && typeof value === 'string' && value) days[key.slice('day_'.length)] = value;
+  }
+
+  const db = createInterviewsClient();
+  const { data: room } = await db
+    .from('rooms')
+    .select('id')
+    .eq('id', roomId)
+    .eq('edition_id', g.access.edition.id)
+    .maybeSingle();
+  if (!room) return fail('No such room.', 'not_found');
+
+  const { error } = await saveRoomOrganizers(
+    db,
+    g.access.edition.id,
+    roomId,
+    { all: text(formData, 'all_days'), days },
+    g.access.actor,
+  );
+  if (error) return fail(error);
+
+  revalidate(g.locale, g.projectId);
   return ok();
 }
 
