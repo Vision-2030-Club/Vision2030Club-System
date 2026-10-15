@@ -1782,7 +1782,7 @@ People at the door who check students in and do nothing else.
   passes `p_expected` (0011), so a stale screen cannot pull back a student
   who has moved on: the database refuses with `stage_changed`. It also
   checks the booking belongs to this project's edition.
-- **Applying 0069.** A person with access to the CLUB project applies it
+- **Applying 0069.** **Applied to the live project on 2026-10-15** through the SQL editor, so `schema_migrations` does not record it and the next `db:push` runs it again, which is harmless. A person with access to the CLUB project applies it
   (`npm run db:push`, or paste it into the SQL editor; it can run twice),
   then runs `npm run db:components`, which now includes ten reception
   checks. Until then nothing breaks: the Reception tab works for managers
@@ -1856,7 +1856,7 @@ together with its feedback.
 - **The PIN now guards the action too.** The page was behind the PIN, but
   `feedbackAction` only checked the link, so anyone holding a link could post
   feedback without the PIN. It now checks the PIN cookie first.
-- **Applying 0015.** The person who applied 0005–0014 applies it the same
+- **Applying 0015.** **Applied to the live project on 2026-10-15** through the SQL editor, so `schema_migrations` does not record it and the next `db:push` runs it again, which is harmless. The person who applied 0005–0014 applies it the same
   way (`npm run db:push -- --target interviews`, or paste it into the SQL
   editor; it can run twice), then `npm run db:interviews`, which now has
   three finish checks. Until then the action falls back to the two old
