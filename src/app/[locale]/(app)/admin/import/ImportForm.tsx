@@ -10,11 +10,9 @@ const COLUMNS = [
   'email',
   'name_en',
   'name_ar',
-  'student_id',
-  'national_id',
+  'phone',
   'team',
   'role',
-  'phone',
   'college',
   'academic_level',
   'graduation_term',
@@ -110,6 +108,8 @@ export function ImportForm({ locale }: { locale: string }) {
           })}
         </Alert>
       ) : null}
+
+      {report?.ok && report.kept_roles ? <Alert tone="ok">{t('importKeptRoles')}</Alert> : null}
 
       {report && !report.ok ? (
         <div className="space-y-2">
