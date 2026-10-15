@@ -1350,6 +1350,92 @@ export async function reopenWalkinAction(input: {
   return ok();
 }
 
+/**
+ * The Reception tab's only move: the student is in the building (scheduled →
+ * arrived), or that was a mistake (arrived → scheduled). Nothing else, so the
+ * door can never change what happens inside a room. `p_expected` (0011)
+ * makes a stale screen harmless: if the student was moved on in the meantime,
+ * the database refuses instead of pulling them back.
+ */
+export async function checkInAction(input: {
+  projectId: string;
+  locale: string;
+  bookingId: string;
+  undo?: boolean;
+}): Promise<ActionResult> {
+  let access: InterviewAccess & { edition: NonNullable<InterviewAccess['edition']> };
+  try {
+    access = await requireInterviewAccess(input.projectId, can.reception);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Not allowed.');
+  }
+
+  const db = createInterviewsClient();
+  // Only this project's edition: a booking id from another edition is not
+  // this desk's to touch.
+  const { data: booking } = await db
+    .from('bookings')
+    .select('id')
+    .eq('id', input.bookingId)
+    .eq('edition_id', access.edition.id)
+    .maybeSingle();
+  if (!booking) return fail('No such booking.', 'not_found');
+
+  const { error } = await db.rpc('advance_stage', {
+    p_booking: input.bookingId,
+    p_to: input.undo ? 'scheduled' : 'arrived',
+    p_actor: access.actor,
+    p_as_manager: false,
+    p_expected: input.undo ? 'arrived' : 'scheduled',
+  });
+  if (error) return fromPostgrest(error);
+
+  kickSheetsSync(access.edition.id);
+  revalidate(input.locale, input.projectId);
+  return ok();
+}
+
+/**
+ * Rooms tab → a room's organizer: who runs it on every day, and anyone
+ * different on particular days (roomOrganizers.ts). Managers only. Each
+ * select is a club member id, or empty for "nobody" (every day) or "the
+ * same as every day" (one day).
+ */
+export async function setRoomOrganizersAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const roomId = requiredText(formData, 'room_id');
+  const days: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith('day_') && typeof value === 'string' && value) days[key.slice('day_'.length)] = value;
+  }
+
+  const db = createInterviewsClient();
+  const { data: room } = await db
+    .from('rooms')
+    .select('id')
+    .eq('id', roomId)
+    .eq('edition_id', g.access.edition.id)
+    .maybeSingle();
+  if (!room) return fail('No such room.', 'not_found');
+
+  const { error } = await saveRoomOrganizers(
+    db,
+    g.access.edition.id,
+    roomId,
+    { all: text(formData, 'all_days'), days },
+    g.access.actor,
+  );
+  if (error) return fail(error);
+
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
 // -----------------------------------------------------------------------------
 // Bookings, by a manager on a student's behalf
 // -----------------------------------------------------------------------------
