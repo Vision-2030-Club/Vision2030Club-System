@@ -12,6 +12,7 @@ import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { siteUrl } from '@/lib/interviews/email';
 import { fullCompanyIds } from '@/lib/interviews/fullCompanies';
 import { loadCompanies, loadCounters, loadRooms, loadSessions } from '@/lib/interviews/queries';
+import { keepsBreak, PRAYER_BREAKS } from '@/lib/interviews/slotRules';
 import type { Company, Room } from '@/lib/interviews/types';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { CopyField } from '../CopyField';
@@ -19,6 +20,7 @@ import {
   rotateCompanyTokenAction,
   setCompanyFullAction,
   setCompanyHiddenAction,
+  setCompanyPrayerBreaksAction,
   upsertCompanyAction,
 } from '../actions';
 
@@ -101,6 +103,9 @@ export default async function InterviewsCompaniesPage({
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold">{name}</span>
                       {full ? <Badge tone="warn">{t('register.full')}</Badge> : null}
+                      {PRAYER_BREAKS.filter((b) => !keepsBreak(company, b.key)).map((b) => (
+                        <Badge key={b.key}>{t('companiesTab.noBreak', { name: t(`companiesTab.${b.key}`) })}</Badge>
+                      ))}
                     </div>
                     <p className="text-sm text-ink-muted">
                       {companyRooms.length ? (
@@ -152,6 +157,38 @@ export default async function InterviewsCompaniesPage({
                       <input type="hidden" name="company_id" value={company.id} />
                       <input type="hidden" name="hidden" value="true" />
                     </ConfirmForm>
+                  </div>
+                ) : null}
+
+                {/* The columns arrive with 0017; until then there is nothing to switch. */}
+                {manage && 'asr_break' in company ? (
+                  <div className="mt-4 border-t border-line pt-3">
+                    <Disclosure label={t('companiesTab.prayerBreaks')}>
+                      <ActionForm
+                        action={setCompanyPrayerBreaksAction}
+                        submitLabel={tCommon('save')}
+                        successText={t('companiesTab.breaksSaved')}
+                      >
+                        <input type="hidden" name="locale" value={locale} />
+                        <input type="hidden" name="project_id" value={id} />
+                        <input type="hidden" name="company_id" value={company.id} />
+                        <p className="text-xs text-ink-muted">{t('companiesTab.prayerBreaksHint')}</p>
+                        {PRAYER_BREAKS.map((b) => (
+                          <label key={b.key} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              name={`${b.key}_break`}
+                              defaultChecked={keepsBreak(company, b.key)}
+                              className="accent-brand-600"
+                            />
+                            {t(`companiesTab.${b.key}`)}{' '}
+                            <span dir="ltr" className="ltr-nums text-ink-muted">
+                              {b.from}–{b.to}
+                            </span>
+                          </label>
+                        ))}
+                      </ActionForm>
+                    </Disclosure>
                   </div>
                 ) : null}
 

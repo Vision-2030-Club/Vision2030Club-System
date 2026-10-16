@@ -329,9 +329,12 @@ export default async function InterviewsRoomsPage({
                             </div>
                             <p className="text-xs text-ink-muted">
                               {t('schedule.fixedSlots', { minutes: SLOT_MINUTES })}{' '}
-                              {PRAYER_BREAKS.map(([from, to]) => (
-                                <span key={from} dir="ltr" className="ltr-nums me-2 inline-block">
-                                  {from}–{to}
+                              {PRAYER_BREAKS.map(({ key, from, to }) => (
+                                <span key={key} className="me-2 inline-block">
+                                  {t(`companiesTab.${key}`)}{' '}
+                                  <span dir="ltr" className="ltr-nums">
+                                    {from}–{to}
+                                  </span>
                                 </span>
                               ))}
                             </p>

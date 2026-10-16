@@ -665,6 +665,40 @@ export async function setCompanyFullAction(
 }
 
 /**
+ * Companies tab → Prayer breaks: whether this company's slots skip the Asr
+ * and the Maghrib break (0017). The database saves both and brings the
+ * company's existing sessions in line: slots added inside a break turned off,
+ * free slots closed inside one turned on. Booked interviews inside a break
+ * stay where they are, and the form says how many.
+ */
+export async function setCompanyPrayerBreaksAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+  const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
+  if (g.access.edition.status === 'archived') return fail(t('errors.archived'), 'archived');
+
+  const db = createInterviewsClient();
+  const { data, error } = await db.rpc('set_company_prayer_breaks', {
+    p_edition: g.access.edition.id,
+    p_company: requiredText(formData, 'company_id'),
+    p_asr: text(formData, 'asr_break') === 'on',
+    p_maghrib: text(formData, 'maghrib_break') === 'on',
+    p_actor: g.access.actor,
+  });
+  if (error) return fromPostgrest(error);
+
+  kickSheetsSync(g.access.edition.id);
+  revalidate(g.locale, g.projectId);
+
+  const held = Number((data as { held?: number } | null)?.held ?? 0);
+  if (held > 0) return fail(t('companiesTab.breaksHeld', { count: held }));
+  return ok();
+}
+
+/**
  * Which questions the application form asks (applyFields.ts), from the
  * Applicants tab. Stored as one `apply_fields` object in the edition's
  * settings; update_edition merges it over the rest, so nothing else moves.

@@ -1722,6 +1722,48 @@ Postgres 16, both with 0001–0004 only and with 0001–0012.
   email gets a second application; lookups by phone prefer the one with an
   email.
 
+### Prayer breaks per company: Asr and Maghrib (0017, 2026-10-16)
+
+`supabase/interviews/migrations/0017_company_prayer_breaks.sql`. It can be
+run twice. Some companies asked to keep interviewing through the breaks.
+
+- **Two switches per company**, Companies tab → *Prayer breaks*:
+  `companies.asr_break` and `companies.maghrib_break`, both on by default,
+  so a company nobody touches behaves exactly as under 0012. Cards show a
+  "No Asr break" or "No Maghrib break" badge when one is off.
+- **Making slots** (`create_session`, `extend_session`) skips only the
+  company's own breaks: `app.company_breaks(company, day)` filters
+  `app.prayer_breaks`, which now names each break (`key`). The old
+  four-argument `app.next_slot_start` still skips both and is unused.
+- **Switching changes existing sessions**, in the same transaction
+  (`set_company_prayer_breaks`, `setCompanyPrayerBreaksAction`):
+  - **Off:** it reopens slots an earlier switch closed inside the break, then
+    adds 20-minute slots from the break's start while one fits before the
+    session's next slot. The break is 30 minutes, so only 15:00 (or 17:30) is
+    added and ten minutes stay empty. To get a seamless grid, remove the
+    assignment on the Rooms tab and assign it again.
+  - **On:** it closes the free slots inside the break. Booked ones stay where
+    they are, and the form says how many need moving.
+- **Break times are unchanged** and still live in two places that must
+  change together: `app.prayer_breaks` (a new migration) and
+  `PRAYER_BREAKS` in `src/lib/interviews/slotRules.ts`. The floor grid still
+  leaves both breaks as empty rows, and a no-break company's slots show at
+  their real times beside them (`roomDay`).
+- **Before 0017 is applied** the Companies tab shows no switches (the page
+  checks for the column), and slots are made as under 0012.
+- **Checked** on an empty local Postgres 18 with 0001–0017 applied, using
+  invented data. 15 checks passed:
+  - both breaks over 14:00–19:00, and the 17:00–19:00 cases;
+  - 15:00–15:30 refused with Asr kept;
+  - fills at 15:00 and 17:30, and saving twice changes nothing;
+  - switching back on closes the free slot and holds the booked one;
+  - switching off again reopens the closed slot;
+  - extending keeps the company's rule;
+  - unknown companies and archived editions are refused;
+  - the old function is unchanged.
+
+  Re-running the file applied cleanly.
+
 ### 20-minute slots, prayer breaks, past times bookable (2026-10-07)
 
 `supabase/interviews/migrations/0012_fixed_slots_prayer_breaks.sql`,
