@@ -1169,7 +1169,7 @@
       "name": "Name",
       "phone": "Phone number",
       "cvFile": "CV (PDF, up to 4 MB)",
-      "cvHint": "If the club already has your CV, you can leave this empty.",
+      "cvHint": "Required. It replaces any CV the club already has for you.",
       "submit": "Continue",
       "notAccepted": "You have not been accepted for this company yet. Check back later, or contact the club.",
       "email": "Email",

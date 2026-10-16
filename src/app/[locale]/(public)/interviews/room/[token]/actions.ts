@@ -19,11 +19,14 @@ import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/i
  * assignment's times; otherwise they are told they are not accepted yet. An
  * older per-company link checks acceptance for the company instead.
  *
- * Because a phone number alone opens the booking page, what is typed here
- * never overwrites what is on file: a name or email is filled in only while
- * the application has none (a number HR added that never applied), and a CV
- * replaces the one on file only when the typed email is the application's
- * own. Otherwise a new CV is added only while there is none.
+ * Because a phone number alone opens the booking page, a name or email typed
+ * here is filled in only while the application has none (a number HR added
+ * that never applied). The CV is different (the club's decision,
+ * 2026-10-16): it is required every time, and it always replaces the one on
+ * the application, so the company sees the CV the student brings today. The
+ * old file is kept in storage, not removed: anyone who has a student's number
+ * can replace their CV, and the audit log's `before` holds the old path, so
+ * a replaced CV can be brought back.
  *
  * Those writes go straight to the row with the service role (no 0001–0004
  * function updates them), so the audit log records them as `system`.
@@ -55,12 +58,15 @@ export async function roomLoginAction(
   if (!name) return fail('Enter your name.', 'missing_name');
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail('Enter a valid email address.', 'invalid_email');
   if (!phone) return fail('Enter a phone number.', 'missing_phone');
+  const file = formData.get('cv');
+  const newCv = file instanceof File && file.size > 0 ? file : null;
+  if (!newCv) return fail('Attach your CV as a PDF.', 'missing_cv');
 
   const match = (await applicationsByPhone(db, room.editionId)).get(phone);
   if (!match) return fail('No one has been added with that phone number.', 'no_match');
   const { data: application } = await db
     .from('applications')
-    .select('id, name, email, personal_token, cv_path')
+    .select('id, name, email, personal_token')
     .eq('id', match.id)
     .maybeSingle();
   if (!application) return fail('No one has been added with that phone number.', 'no_match');
@@ -88,22 +94,14 @@ export async function roomLoginAction(
   // application's (one per edition); then it simply stays empty.
   if (!application.name) await db.from('applications').update({ name }).eq('id', application.id);
   if (!application.email) await db.from('applications').update({ email }).eq('id', application.id);
-  const ownsRecord = !application.email || String(application.email).toLowerCase() === email;
 
-  const file = formData.get('cv');
-  const newCv = file instanceof File && file.size > 0 ? file : null;
-  const hasCv = Boolean(application.cv_path);
-  if (newCv && (!hasCv || ownsRecord)) {
-    const uploaded = await uploadCv(db, room.editionId, newCv);
-    if ('error' in uploaded) return fail(uploaded.error, uploaded.error);
-    const { error } = await db.from('applications').update({ cv_path: uploaded.path }).eq('id', application.id);
-    if (error) {
-      await removeCv(db, uploaded.path);
-      return fail(error.message);
-    }
-    await removeCv(db, application.cv_path as string | null);
-  } else if (!hasCv && !newCv) {
-    return fail('Attach your CV as a PDF.', 'missing_cv');
+  // The new CV always replaces the one on file; the old file stays in storage.
+  const uploaded = await uploadCv(db, room.editionId, newCv);
+  if ('error' in uploaded) return fail(uploaded.error, uploaded.error);
+  const { error } = await db.from('applications').update({ cv_path: uploaded.path }).eq('id', application.id);
+  if (error) {
+    await removeCv(db, uploaded.path);
+    return fail(error.message);
   }
 
   return redirect({ href: `/interviews/s/${application.personal_token as string}`, locale });

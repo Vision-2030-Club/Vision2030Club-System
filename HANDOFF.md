@@ -1199,7 +1199,11 @@ for name, phone, email and a CV. Since 0013 (below) the phone alone finds
 the application, and that application must be accepted for the room's
 company; then the student goes to their personal booking page (0002).
 A new CV replaces the one on file, written straight to the row (audited as
-`system`); none is needed if one is there. **Add room** can now attach the room
+`system`). **Since 2026-10-16** the CV is required every time, even when one
+is on file, and always replaces it (the club's decision): the company sees
+the CV the student brings on the day. Since a phone number alone is enough,
+the old file is no longer removed from storage; the audit log's `before`
+row holds its path, so a CV replaced by somebody else can be put back. **Add room** can now attach the room
 to an existing company (the one students chose on the form) instead of
 always creating a new company, which used to leave two companies of the same
 name, one chosen by students and one holding the room. Each room's times are

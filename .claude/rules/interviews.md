@@ -27,8 +27,9 @@ short:
   `normalisePhone` in the app); never compare raw strings. The candidate
   link finds a student by phone alone, including one who applied with an
   email (the club's decision, 2026-10-09). Identity by phone is weak, so it
-  never overwrites what is on file: name and email only while blank, the CV
-  only when the typed email is the application's own.
+  never overwrites a name or email on file (only fills them while blank).
+  The CV is the exception (2026-10-16): required on the candidate link and
+  always replacing the one on file, with the old file kept in storage.
 - Nothing is ever hard-deleted: rooms, companies and bookings are hidden or
   cancelled with a flag, and every change is logged with who made it.
 - Anything written to the floor Google Sheet or a public page carries
