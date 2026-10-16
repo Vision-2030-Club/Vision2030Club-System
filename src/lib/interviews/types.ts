@@ -128,6 +128,9 @@ export type Company = {
   is_hidden: boolean;
   /** 0010's flag, unused: "full" lives in the edition's settings (fullCompanies.ts). */
   is_full?: boolean;
+  /** 0017: whether this company's slots skip each prayer break. Absent before 0017 (both kept). */
+  asr_break?: boolean;
+  maghrib_break?: boolean;
   sort_order: number;
   access_token: string;
   access_pin: string | null;

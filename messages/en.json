@@ -936,7 +936,7 @@
       "day": "Day",
       "from": "From",
       "to": "To",
-      "fixedSlots": "Every slot is {minutes} minutes. None are made during the prayer breaks:",
+      "fixedSlots": "Every slot is {minutes} minutes. None are made during a prayer break the company keeps (each company can turn them off on the Companies tab):",
       "needSetup": "Add a company and a room first.",
       "rooms": "Rooms",
       "retire": "Retire",
@@ -1213,6 +1213,13 @@
       "organizerNone": "There are no organizers yet. Add them on the People tab:"
     },
     "companiesTab": {
+      "prayerBreaks": "Prayer breaks",
+      "prayerBreaksHint": "A ticked break is left empty in this company's rooms. Unticking one adds time slots inside it to the sessions the company already has; ticking it again closes the free ones.",
+      "asr": "Asr",
+      "maghrib": "Maghrib",
+      "noBreak": "No {name} break",
+      "breaksSaved": "Saved. This company's time slots now follow these breaks.",
+      "breaksHeld": "Saved, but {count, plural, one {# booked interview falls} other {# booked interviews fall}} inside a prayer break and stayed in place. Move them on the Bookings tab if needed.",
       "noRoom": "No room yet — assign one on",
       "movedHint": "Companies are now managed on their own tab: add them, edit them, mark them full, and find their links and Google Sheets there."
     },
