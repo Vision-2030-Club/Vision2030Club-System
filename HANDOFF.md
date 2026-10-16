@@ -1733,9 +1733,12 @@ into one SQL file for the Mock Interviews SQL editor:
 
 - **Each company's run of cells in a room on a day is one assignment**
   (`create_session`): 80 in total. The prayer-break rows do not split a run.
-- **The edition's rooms and companies must already exist** with the sheet's
-  exact names. A name matches a company's English or Arabic name; "Room 3f"
-  is Room 3. The script never creates either.
+- **The edition's rooms and companies must already exist.** The script never
+  creates either. It matches a company by its exact English or Arabic name.
+  Twelve sheet spellings differ from the live names and are mapped in
+  `COMPANY_NAMES`; the club confirmed the list on 16 Oct. For example, BSF
+  is Bank Saudi France, Pwc is PWC, and Kirkland is KIRKLAND & ELLIS.
+  "Room 3f" is Room 3.
 - **The club's answers about the sheet's notes are coded in the script.**
   "LAST INTERVIEW @ 6:00PM NO PRAYER BREAK" for BSF, Impact 46, PwC and alan
   means Maghrib only. Those four interview at 17:30, and also at 18:00 when
@@ -1754,12 +1757,16 @@ into one SQL file for the Mock Interviews SQL editor:
     is ignored, as on the Rooms tab;
   - a room name matches anything other than exactly one active room;
   - a room's own days exclude a date it is used;
-  - the edition already has any assignment;
+  - the edition has an assignment that is not exactly a row of the sheet.
+    One that is exactly a row (company, room, day, start and end) is kept as
+    it is, with its bookings; Bahri in Room 1 on 18 Oct was made by hand
+    first;
   - any assignment's times differ from what the script expects (949 times
     in total).
-- **The edition must have no assignments.** For a revised timetable, remove
-  the assignments on the Rooms tab and run a newly generated file, or add
-  the few changes by hand.
+- **A second run stops.** After a run, the Maghrib companies' assignments no
+  longer match their sheet rows. For a revised timetable, remove the changed
+  assignments on the Rooms tab and run a newly generated file, or make the
+  few changes by hand.
 - **Not done by it:** candidate links, HR's accepted lists, room organizers,
   company sheets, and the floor sheet sync. Do these on the Rooms tab and in
   Settings afterwards, as for an assignment made by hand. A candidate link

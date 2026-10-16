@@ -39,8 +39,27 @@ if (!XLSX || !OUT) {
 const EDITION_SLUG = 'mockup-interviews-2026';
 const YEAR = 2026;
 const ROOM_ALIASES = { 'Room 3f': 'Room 3' };
+/**
+ * The sheet's spelling → the company's English name in the edition, where
+ * they differ. Checked against the live company list and confirmed by the
+ * club on 2026-10-16 (BSF is Banque Saudi Fransi).
+ */
+const COMPANY_NAMES = {
+  'Boutique group': 'Boutique Group',
+  BSF: 'Bank Saudi France',
+  Diriyah: 'Diriyah Company',
+  'Eyad Reda': 'Eyad Reda Law firm',
+  'Jayd Capital': 'Jyad Capital',
+  Kirkland: 'KIRKLAND & ELLIS',
+  Mastercard: 'MasterCard',
+  Pwc: 'PWC',
+  Rimthan: 'rimthan',
+  'الهيئة العامة للأوقاف': 'awqaf',
+  'جودة الحياة': 'Quality of Life program',
+  'صندوق التنميه السياحي': 'Tourism Development Fund',
+};
 /** Companies that interview through Maghrib (the sheet's column-P notes). */
-const NO_MAGHRIB = new Set(['BSF', 'Impact 46', 'Pwc', 'alan']);
+const NO_MAGHRIB = new Set(['Bank Saudi France', 'Impact 46', 'PWC', 'alan']);
 const MAGHRIB = ['17:30', '18:00'];
 const ACTOR = { kind: 'system', name: 'Room plan import (5th edition sheet)' };
 
@@ -104,7 +123,9 @@ for (const r of rows) {
   const t = excelTime(a);
   for (const c of COLS) {
     const key = `${day}|${c}`;
-    const company = (r.cells[c] ?? '').trim();
+    // Compared and stored by the edition's name, so a run is never split by spelling.
+    const cell = (r.cells[c] ?? '').trim();
+    const company = COMPANY_NAMES[cell] ?? cell;
     const b = open.get(key);
     if (b && b.company === company) {
       b.rows.push(t);
@@ -114,7 +135,13 @@ for (const r of rows) {
     if (company) {
       const sheetRoom = header[c];
       if (!sheetRoom) problems.push(`row ${r.row}: a company in column ${c}, which has no room heading`);
-      open.set(key, { day, room: ROOM_ALIASES[sheetRoom] ?? sheetRoom, sheetRoom, company, rows: [t] });
+      open.set(key, {
+        day,
+        room: ROOM_ALIASES[sheetRoom] ?? sheetRoom,
+        sheetRoom,
+        company,
+        rows: [t],
+      });
     }
   }
 }
@@ -206,15 +233,17 @@ const file = `-- ===============================================================
 --
 --   ${plan.length} assignments, ${companies.length} companies, ${rooms.length} rooms, days ${days.join(', ')}.
 --   ${sheetSlots} interview times as drawn; ${finalSlots} after the club's decisions:
---   BSF, Impact 46, Pwc and alan interview through Maghrib (17:30, and 18:00
---   when their room is free); everyone keeps Asr; everyone else keeps both.
+--   Bank Saudi France (BSF), Impact 46, PWC and alan interview through Maghrib
+--   (17:30, and 18:00 when their room is free); everyone keeps Asr; everyone
+--   else keeps both.
 --
 -- Step 2 writes everything or nothing. It stops, writing nothing, if: the
 -- edition is not found or archived; 0017 is not applied; a company name does
--- not match exactly one company, or matches a hidden one; a room name does not
--- match exactly one active room; a room's own days (Rooms tab) exclude a day it
--- is used; the edition already has any assignment; or any assignment's times
--- differ from the sheet's after the decisions above.
+-- not match exactly one visible company; a room name does not match exactly
+-- one active room; a room's own days (Rooms tab) exclude a day it is used;
+-- the edition has an assignment that is not exactly a row of the sheet
+-- (identical ones are kept as they are); or any assignment's times differ
+-- from the sheet's after the decisions above.
 -- =============================================================================
 
 
@@ -265,9 +294,20 @@ checks (sort, item, status, detail) as (
          and exists (select 1 from pg_proc where proname = 'set_company_prayer_breaks' and pronamespace = 'public'::regnamespace) then 'OK' else 'STOP' end,
          'per-company prayer breaks'
   union all
-  select 3, 'existing assignments', case when count(*) = 0 then 'OK' else 'STOP' end,
-         count(*) || ' already in this edition' || case when count(*) > 0 then ' — remove them on the Rooms tab first' else '' end
-    from sessions where edition_id = (select id from ed)
+  select 3, 'existing assignments', case when count(*) filter (where not kept) = 0 then 'OK' else 'STOP' end,
+         count(*) filter (where kept) || ' identical to a sheet row (kept as they are), '
+           || count(*) filter (where not kept) || ' not in the sheet'
+           || case when count(*) filter (where not kept) > 0
+                   then ' (' || string_agg(label, ', ') filter (where not kept) || ') — remove those on the Rooms tab first' else '' end
+    from (select r.name || ' ' || se.day as label,
+                 exists (select 1 from plan p
+                           join companies c on c.edition_id = se.edition_id and not c.is_hidden
+                                           and (c.name_en = p.company or c.name_ar = p.company)
+                          where c.id = se.company_id and r.name = p.room and se.day = p.day
+                            and se.starts_at = app.edition_time(se.edition_id, p.day, p.start_time)
+                            and se.ends_at = app.edition_time(se.edition_id, p.day, p.end_time)) as kept
+            from sessions se join rooms r on r.id = se.room_id
+           where se.edition_id = (select id from ed)) s
   union all
   select 10, 'company: ' || company,
          case when matches = 1 then 'OK' else 'STOP' end,
@@ -336,11 +376,6 @@ begin
      or not exists (select 1 from pg_proc where proname = 'set_company_prayer_breaks' and pronamespace = 'public'::regnamespace) then
     raise exception 'Migration 0017 (per-company prayer breaks) is not applied. Apply it first. Nothing was written.';
   end if;
-  if exists (select 1 from sessions where edition_id = e.id) then
-    raise exception 'This edition already has % assignment(s). Remove them on the Rooms tab first. Nothing was written.',
-      (select count(*) from sessions where edition_id = e.id);
-  end if;
-
   -- Names: exactly one visible company (the Rooms tab offers only those),
   -- exactly one active room.
   select string_agg(distinct company, ', ') into v_bad
@@ -373,16 +408,35 @@ begin
     raise exception 'Outside the room''s own days (Rooms tab): %. Nothing was written.', v_bad;
   end if;
 
+  -- An assignment already made by hand that is exactly a row of the plan
+  -- (company, room, day, start and end) is kept as it is, with whatever is
+  -- booked on it; step 5 still checks its times. Any other stops the run.
+  update room_plan rp
+     set session_id = se.id
+    from sessions se
+   where se.edition_id = e.id and se.company_id = rp.company_id and se.room_id = rp.room_id
+     and se.day = rp.day
+     and se.starts_at = app.edition_time(e.id, rp.day, rp.start_time)
+     and se.ends_at = app.edition_time(e.id, rp.day, rp.end_time);
+
+  select string_agg(r.name || ' ' || se.day, ', ') into v_bad
+    from sessions se join rooms r on r.id = se.room_id
+   where se.edition_id = e.id
+     and se.id not in (select session_id from room_plan where session_id is not null);
+  if v_bad is not null then
+    raise exception 'This edition has assignments that are not in the sheet (%). Remove them on the Rooms tab first. Nothing was written.', v_bad;
+  end if;
+
   -- 1. Every company in the plan starts with both breaks, so its sessions
   --    are made exactly on the sheet's grid. Only companies with a break off
-  --    are touched. (No sessions exist yet, so this only sets the switches.)
+  --    are touched.
   for p in select distinct rp.company_id from room_plan rp join companies c on c.id = rp.company_id
             where not (c.asr_break and c.maghrib_break) loop
     perform public.set_company_prayer_breaks(e.id, p.company_id, true, true, v_actor);
   end loop;
 
-  -- 2. The assignments.
-  for p in select * from room_plan order by day, start_time, room loop
+  -- 2. The assignments not already there.
+  for p in select * from room_plan where session_id is null order by day, start_time, room loop
     v_res := public.create_session(e.id, jsonb_build_object(
       'company_id', p.company_id, 'room_id', p.room_id, 'day', p.day,
       'start_time', p.start_time, 'end_time', p.end_time, 'slot_minutes', 20), v_actor);
