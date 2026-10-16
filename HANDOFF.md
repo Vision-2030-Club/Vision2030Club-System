@@ -1722,6 +1722,66 @@ Postgres 16, both with 0001–0004 only and with 0001–0012.
   email gets a second application; lookups by phone prefer the one with an
   email.
 
+### The 5th edition's room plan from the club's timetable (2026-10-16)
+
+The club planned the week as a spreadsheet: the "Rooms" sheet of
+`Confirmed Participants _ 5th edition افترض.xlsx` (gitignored, like every
+.xlsx). It has five days (18–22 Oct), Rooms 1–14, a row every 20 minutes
+from 14:00 to 19:40, and a company in each cell. There are no students in it.
+`node scripts/build-room-plan-sql.mjs "<sheet.xlsx>" room-plan.sql` turns it
+into one SQL file for the Mock Interviews SQL editor:
+
+- **Each company's run of cells in a room on a day is one assignment**
+  (`create_session`): 80 in total. The prayer-break rows do not split a run.
+- **The edition's rooms and companies must already exist** with the sheet's
+  exact names. A name matches a company's English or Arabic name; "Room 3f"
+  is Room 3. The script never creates either.
+- **The club's answers about the sheet's notes are coded in the script.**
+  "LAST INTERVIEW @ 6:00PM NO PRAYER BREAK" for BSF, Impact 46, PwC and alan
+  means Maghrib only. Those four interview at 17:30, and also at 18:00 when
+  their room is free then; BSF on 18 Oct gets 17:30 only, because TTP has
+  Room 3 at 18:00. Everyone keeps Asr, and everyone else keeps both breaks.
+  The script first switches both breaks on for any company in the plan that
+  has one off. It then creates the sessions, then turns Maghrib off for the
+  four. That order keeps their
+  18:00 interview (0017's fill adds 17:30 only).
+- **Step 1 is a read-only preview** that reports every check as OK or STOP.
+  **Step 2 is one transaction.** It refuses, writing nothing, if any of these
+  is true:
+  - the edition is missing or archived;
+  - 0017 is not applied;
+  - a name matches no visible company, or more than one. A hidden namesake
+    is ignored, as on the Rooms tab;
+  - a room name matches anything other than exactly one active room;
+  - a room's own days exclude a date it is used;
+  - the edition already has any assignment;
+  - any assignment's times differ from what the script expects (949 times
+    in total).
+- **The edition must have no assignments.** For a revised timetable, remove
+  the assignments on the Rooms tab and run a newly generated file, or add
+  the few changes by hand.
+- **Not done by it:** candidate links, HR's accepted lists, room organizers,
+  company sheets, and the floor sheet sync. Do these on the Rooms tab and in
+  Settings afterwards, as for an assignment made by hand. A candidate link
+  admits only the phones on its own assignment's list.
+- **Rooms re-added through the form all get `sort_order` 100**, so lists sort
+  them by name: Room 1, Room 10 … Room 14, then Room 2. The floor sheet pairs
+  rooms by row, not by time, so a no-Maghrib room's extra 17:30 row puts it
+  one row out of line with its neighbour. Each row still shows its own time.
+- **Removing the sessions also removed their accepted lists**
+  (`session_acceptances` cascade). The deletes are in `audit_log`
+  (`table_name = 'session_acceptances'`, `action = 'delete'`), so the lists
+  can be rebuilt from there.
+- **Checked** on a local Postgres 18 with 0001–0017 and invented data that
+  uses the sheet's names, plus decoys (a retired "Room 1", and another
+  edition with the same names). The run made 80 assignments and 949 times.
+  These cases each stopped with nothing written:
+  - a wrong name, a duplicate active room, or a hidden company;
+  - room days that exclude a date it is used;
+  - an unknown slug, an archived edition, or 0017 missing;
+  - a second run;
+  - an error forced on the last assignment, which rolled everything back.
+
 ### Prayer breaks per company: Asr and Maghrib (0017, 2026-10-16)
 
 `supabase/interviews/migrations/0017_company_prayer_breaks.sql`. It can be
