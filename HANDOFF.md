@@ -1668,9 +1668,12 @@ room on one day and hours), on the **Rooms tab**, under each assignment:
 
 - **Candidate link**: kept in the edition's settings as `session_links`
   (`{ session id: token }`, `roomLinks.ts`), *Create candidate link* /
-  *New candidate link*. The page names the room and day.
+  *New candidate link*. The page names the room and day. HR (role `hr`)
+  makes and renews it as well as the managers (2026-10-16,
+  `createSessionLinkAction` guarded by `can.decide`), so whoever keeps an
+  assignment's accepted list can hand out its link too.
 - **Accepted phone numbers**: `session_acceptances` (0014) through
-  `accept_for_session` / `unaccept_for_session`. A student on an
+  `accept_for_session` / `unaccept_for_session`, by HR and the managers. A student on an
   assignment's list books **only that assignment's times**: HR decides
   their day by the list they put them on. `book_slot` and `move_booking`
   refuse anything else (`not_your_session`) when the student has any list

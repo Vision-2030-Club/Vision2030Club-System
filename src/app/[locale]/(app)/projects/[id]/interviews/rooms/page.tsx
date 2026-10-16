@@ -46,7 +46,9 @@ import { AcceptedPhones } from './AcceptedPhones';
  * Each assignment carries what belongs to that company on that day: its
  * candidate link (roomLinks.ts), its accepted phone list (0014: a student on
  * it books only this assignment's times, so HR decides their day by the list
- * they are put on), and the company's Google Sheet for this room.
+ * they are put on), and the company's Google Sheet for this room. HR and
+ * the managers both make the candidate link and keep the accepted list; the
+ * sheet is the managers'.
  *
  * A room is never deleted, only retired (`is_active`): its history stays,
  * and it can be brought back. An assignment with students booked in it
@@ -214,18 +216,16 @@ export default async function InterviewsRoomsPage({
                                 {link ? (
                                   <CopyField label={t('companies.candidateLink')} value={`${siteUrl()}/${locale}/interviews/room/${link}`} />
                                 ) : null}
-                                {manage ? (
-                                  <ActionForm
-                                    action={createSessionLinkAction}
-                                    submitLabel={link ? t('roomsTab.newLink') : t('roomsTab.createLink')}
-                                    variant="secondary"
-                                    className="space-y-0"
-                                  >
-                                    <input type="hidden" name="locale" value={locale} />
-                                    <input type="hidden" name="project_id" value={id} />
-                                    <input type="hidden" name="session_id" value={s.id} />
-                                  </ActionForm>
-                                ) : null}
+                                <ActionForm
+                                  action={createSessionLinkAction}
+                                  submitLabel={link ? t('roomsTab.newLink') : t('roomsTab.createLink')}
+                                  variant="secondary"
+                                  className="space-y-0"
+                                >
+                                  <input type="hidden" name="locale" value={locale} />
+                                  <input type="hidden" name="project_id" value={id} />
+                                  <input type="hidden" name="session_id" value={s.id} />
+                                </ActionForm>
                                 <Disclosure
                                   label={`${t('companies.acceptedPhones')} (${acceptances.bySession.get(s.id)?.length ?? 0})`}
                                   title={`${t('companies.acceptedPhones')} · ${companyName.get(s.company_id) ?? ''}`}

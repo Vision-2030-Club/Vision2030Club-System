@@ -810,13 +810,14 @@ export async function registerAction(
 /**
  * An assignment's candidate link (roomLinks.ts): made on the Rooms tab, or
  * made again to replace a link that was passed around; the old one stops
- * working at once.
+ * working at once. HR makes it as well as the managers (2026-10-16): they
+ * hand it out with the accepted phone list they keep for the same assignment.
  */
 export async function createSessionLinkAction(
   _previous: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const g = await guard(formData, can.manage);
+  const g = await guard(formData, can.decide);
   if ('error' in g) return fail(g.error);
 
   const sessionId = requiredText(formData, 'session_id');
