@@ -6,6 +6,7 @@ import { Card, EmptyState, Input, Label, Select, Textarea } from '@/components/u
 import { formatDateTime, localized, toDateTimeInput } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { companyFinishes } from '@/lib/interviews/companyFinish';
+import { commentQuestion, ratingScale } from '@/lib/interviews/feedbackForm';
 import { siteUrl } from '@/lib/interviews/email';
 import { loadCompanies } from '@/lib/interviews/queries';
 import { walkinSettings, walkinUrl } from '@/lib/interviews/walkins';
@@ -76,6 +77,8 @@ export default async function InterviewsSettingsPage({
   const layout = floorLayout(settings);
   const sheetEdits = settings.sheet_status_edits === true;
   const labelRows = [...settings.rating_labels, ...Array(6).fill(null)].slice(0, 6);
+  const scale = ratingScale(settings);
+  const comment = commentQuestion(settings);
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
@@ -176,6 +179,21 @@ export default async function InterviewsSettingsPage({
                   <Input name="rating_ar" placeholder="العربية" defaultValue={label?.ar ?? ''} aria-label={`Arabic ${i + 1}`} />
                 </div>
               ))}
+            </div>
+            <div className="mt-3">
+              <Label htmlFor="rating_scale">{t('settings.ratingScale')}</Label>
+              <Select id="rating_scale" name="rating_scale" defaultValue={String(scale)}>
+                <option value="5">{t('settings.ratingScaleFive')}</option>
+                <option value="3">{t('settings.ratingScaleThree')}</option>
+              </Select>
+            </div>
+            <div className="mt-3">
+              <p className="mb-1 text-sm font-medium">{t('settings.feedbackComment')}</p>
+              <p className="mb-2 text-xs text-ink-muted">{t('settings.feedbackCommentHint')}</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input name="feedback_comment_en" placeholder="English" defaultValue={comment?.en ?? ''} aria-label={t('settings.feedbackComment')} />
+                <Input name="feedback_comment_ar" placeholder="العربية" defaultValue={comment?.ar ?? ''} aria-label={t('settings.feedbackComment')} />
+              </div>
             </div>
           </fieldset>
         </ActionForm>

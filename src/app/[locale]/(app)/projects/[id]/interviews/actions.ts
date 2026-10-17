@@ -101,6 +101,8 @@ export async function updateEditionAction(
       ar: ars[i] ?? '',
     }))
     .filter((label) => label.key && (label.en || label.ar));
+  const commentEn = text(formData, 'feedback_comment_en') ?? '';
+  const commentAr = text(formData, 'feedback_comment_ar') ?? '';
 
   const numberField = (key: string, fallback: number) => {
     const value = Number(text(formData, key) ?? fallback);
@@ -126,6 +128,8 @@ export async function updateEditionAction(
         feedback_email_mode:
           text(formData, 'feedback_email_mode') === 'immediately' ? 'immediately' : 'on_release',
         ...(rating_labels.length ? { rating_labels } : {}),
+        rating_scale: text(formData, 'rating_scale') === '3' ? 3 : 5,
+        feedback_comment: commentEn || commentAr ? { en: commentEn, ar: commentAr } : null,
       },
     },
     p_actor: g.access.actor,

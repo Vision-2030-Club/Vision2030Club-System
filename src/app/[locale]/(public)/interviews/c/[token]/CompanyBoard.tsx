@@ -7,6 +7,7 @@ import { Alert, Badge, Button, Label, Textarea, cx } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
 import type { FloorRow } from '@/lib/interviews/types';
 import { STAGE_TONES } from '@/lib/interviews/ui';
+import { scaleValues, scaleWordKey, type RatingScale } from '@/lib/interviews/feedbackForm';
 import { feedbackAction } from './actions';
 
 const POLL_MS = 12_000;
@@ -56,6 +57,8 @@ export function CompanyBoard({
   ratingLabels,
   initialOpen,
   finishes,
+  scale,
+  commentLabel,
 }: {
   token: string;
   locale: string;
@@ -67,6 +70,10 @@ export function CompanyBoard({
   initialOpen: string | null;
   /** Saving the feedback finishes the interview (companyFinish.ts, 0015). */
   finishes: boolean;
+  /** 1–5 or Excellent / Good / Needs improvement (feedbackForm.ts). */
+  scale: RatingScale;
+  /** One open question in place of the three boxes, or null for the three. */
+  commentLabel: string | null;
 }) {
   const t = useTranslations('interviews');
   const router = useRouter();
@@ -180,6 +187,8 @@ export function CompanyBoard({
                         bookingId={row.booking_id}
                         initial={fb}
                         ratingLabels={ratingLabels}
+                        scale={scale}
+                        commentLabel={commentLabel}
                         finishing={finishes && row.stage !== 'done'}
                       />
                     )}
@@ -220,6 +229,8 @@ function FeedbackForm({
   bookingId,
   initial,
   ratingLabels,
+  scale,
+  commentLabel,
   finishing,
 }: {
   token: string;
@@ -227,6 +238,8 @@ function FeedbackForm({
   bookingId: string;
   initial?: FeedbackState;
   ratingLabels: { key: string; label: string }[];
+  scale: RatingScale;
+  commentLabel: string | null;
   /** Saving marks the interview done (the student is not done yet). */
   finishing: boolean;
 }) {
@@ -248,37 +261,51 @@ function FeedbackForm({
 
       {ratingLabels.map((label) => (
         <fieldset key={label.key} disabled={frozen}>
-          <legend className="mb-1 text-xs font-medium">{label.label}</legend>
-          <div className="flex gap-1">
-            {[1, 2, 3, 4, 5].map((n) => (
+          <legend className="mb-1 text-sm font-medium">{label.label}</legend>
+          <div className="flex flex-wrap gap-1">
+            {scaleValues(scale).map((n) => (
               <label
                 key={n}
                 className={cx(
-                  'flex size-8 cursor-pointer items-center justify-center rounded-lg border text-sm',
+                  'flex cursor-pointer items-center justify-center rounded-lg border text-sm',
+                  scale === 3 ? 'h-9 px-3' : 'size-8',
                   'has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50 has-[:checked]:font-semibold has-[:checked]:text-brand-700',
                   'border-line text-ink-muted',
                 )}
               >
                 <input type="radio" name={`rating_${label.key}`} value={n} defaultChecked={initial?.ratings[label.key] === n} className="sr-only" />
-                {n}
+                {scale === 3 ? t(`feedbackScale.${scaleWordKey(n)}`) : n}
               </label>
             ))}
           </div>
         </fieldset>
       ))}
 
-      <div>
-        <Label htmlFor={`strengths-${bookingId}`}>{t('companyPage.strengths')}</Label>
-        <Textarea id={`strengths-${bookingId}`} name="strengths" rows={2} defaultValue={initial?.strengths} disabled={frozen} />
-      </div>
-      <div>
-        <Label htmlFor={`improvements-${bookingId}`}>{t('companyPage.improvements')}</Label>
-        <Textarea id={`improvements-${bookingId}`} name="improvements" rows={2} defaultValue={initial?.improvements} disabled={frozen} />
-      </div>
-      <div>
-        <Label htmlFor={`overall-${bookingId}`}>{t('companyPage.overall')}</Label>
-        <Textarea id={`overall-${bookingId}`} name="overall" rows={2} defaultValue={initial?.overall} disabled={frozen} />
-      </div>
+      {commentLabel ? (
+        // The one open question: its answer is kept in `improvements`; the
+        // other two boxes are sent as they were so nothing saved is lost.
+        <div>
+          <Label htmlFor={`improvements-${bookingId}`}>{commentLabel}</Label>
+          <Textarea id={`improvements-${bookingId}`} name="improvements" rows={3} defaultValue={initial?.improvements} disabled={frozen} />
+          <input type="hidden" name="strengths" value={initial?.strengths ?? ''} />
+          <input type="hidden" name="overall" value={initial?.overall ?? ''} />
+        </div>
+      ) : (
+        <>
+          <div>
+            <Label htmlFor={`strengths-${bookingId}`}>{t('companyPage.strengths')}</Label>
+            <Textarea id={`strengths-${bookingId}`} name="strengths" rows={2} defaultValue={initial?.strengths} disabled={frozen} />
+          </div>
+          <div>
+            <Label htmlFor={`improvements-${bookingId}`}>{t('companyPage.improvements')}</Label>
+            <Textarea id={`improvements-${bookingId}`} name="improvements" rows={2} defaultValue={initial?.improvements} disabled={frozen} />
+          </div>
+          <div>
+            <Label htmlFor={`overall-${bookingId}`}>{t('companyPage.overall')}</Label>
+            <Textarea id={`overall-${bookingId}`} name="overall" rows={2} defaultValue={initial?.overall} disabled={frozen} />
+          </div>
+        </>
+      )}
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {state.ok ? <Alert tone="ok">{t('companyPage.feedbackSavedNote')}</Alert> : null}

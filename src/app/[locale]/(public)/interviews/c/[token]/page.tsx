@@ -6,6 +6,7 @@ import { Card, cx } from '@/components/ui';
 import { formatDate, localized } from '@/lib/format';
 import { loadDayRows, loadFeedbackFor, loadSessions, sessionDays, toFloorRow } from '@/lib/interviews/queries';
 import { companyFinishes } from '@/lib/interviews/companyFinish';
+import { commentQuestion, ratingScale } from '@/lib/interviews/feedbackForm';
 import { isToken } from '@/lib/interviews/tokens';
 import type { Application, Company, Edition, EditionSettings } from '@/lib/interviews/types';
 import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/interviews';
@@ -148,6 +149,11 @@ export default async function CompanyPage({
         initialOpen={open && rows.some((r) => r.booking_id === open) ? open : null}
         ratingLabels={(settings?.rating_labels ?? []).map((l) => ({ key: l.key, label: locale === 'ar' ? l.ar : l.en }))}
         finishes={companyFinishes(settings)}
+        scale={ratingScale(settings)}
+        commentLabel={(() => {
+          const q = commentQuestion(settings);
+          return q ? (locale === 'ar' ? q.ar : q.en) : null;
+        })()}
       />
     </div>
   );
