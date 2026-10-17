@@ -48,6 +48,7 @@ export function RoomLoginForm({ locale, token }: { locale: string; token: string
           id="cv"
           name="cv"
           type="file"
+          required
           accept="application/pdf,.pdf"
           onChange={(event) => {
             // Refused here, not on the server: a file over Vercel's request
