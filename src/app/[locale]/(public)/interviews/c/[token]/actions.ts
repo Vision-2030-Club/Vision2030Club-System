@@ -9,6 +9,7 @@ import { kickSheetsSync } from '@/lib/interviews/sheetsSync';
 import { isToken } from '@/lib/interviews/tokens';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { pinCookieName, pinCookieValue } from '@/lib/interviews/pin';
+import { ratingScale, scaleValues } from '@/lib/interviews/feedbackForm';
 
 function page(locale: string, token: string) {
   return `/${locale}/interviews/c/${token}`;
@@ -75,11 +76,13 @@ export async function feedbackAction(_previous: ActionResult, formData: FormData
     }
   }
 
+  const { data: settings } = await db.rpc('edition_settings', { p_edition: company.edition_id });
+  const allowed = scaleValues(ratingScale(settings as { rating_scale?: unknown } | null));
   const ratings: Record<string, number> = {};
   for (const [key, value] of formData.entries()) {
     if (key.startsWith('rating_') && typeof value === 'string' && value) {
       const n = Number(value);
-      if (n >= 1 && n <= 5) ratings[key.slice('rating_'.length)] = n;
+      if (allowed.includes(n)) ratings[key.slice('rating_'.length)] = n;
     }
   }
   const args = {
@@ -93,7 +96,6 @@ export async function feedbackAction(_previous: ActionResult, formData: FormData
     },
   };
 
-  const { data: settings } = await db.rpc('edition_settings', { p_edition: company.edition_id });
   const finishes = companyFinishes(settings as { company_finishes?: unknown } | null);
   if (finishes) {
     let { error } = await db.rpc('finish_interview', args);

@@ -755,7 +755,7 @@
       "feedbackOnRelease": "Held until released",
       "feedbackImmediately": "Sent as soon as written",
       "ratingLabels": "Feedback ratings",
-      "ratingLabelsHint": "Up to six 1–5 ratings the interviewer gives. The key never changes once used; the labels can.",
+      "ratingLabelsHint": "Up to six questions the interviewer rates. The key never changes once used; the questions can.",
       "tv": "Waiting-area screen",
       "tvHint": "Open this link on the TV. Anyone holding it sees names being called.",
       "rotateTv": "New TV link",
@@ -791,7 +791,12 @@
       "companyFinishes": "Who finishes an interview",
       "companyFinishesOn": "The company, by saving its feedback (recommended)",
       "companyFinishesOff": "Organizers only; companies just write feedback",
-      "companyFinishesHint": "With the company: the interviewer page shows “Interview done” on each student, which opens the feedback form, and saving it marks the interview done. That is the only stage a company can move. Organizers can still mark an interview finished by hand; the Floor then shows “No feedback yet” on it."
+      "companyFinishesHint": "With the company: the interviewer page shows “Interview done” on each student, which opens the feedback form, and saving it marks the interview done. That is the only stage a company can move. Organizers can still mark an interview finished by hand; the Floor then shows “No feedback yet” on it.",
+      "ratingScale": "How each question is rated",
+      "ratingScaleFive": "1 to 5",
+      "ratingScaleThree": "Excellent / Good / Needs improvement",
+      "feedbackComment": "Open question (optional)",
+      "feedbackCommentHint": "When filled in, the interviewer sees this one question instead of the three boxes (strengths, to improve, overall note). Leave both empty for the three boxes."
     },
     "companies": {
       "new": "New company",
@@ -1142,7 +1147,7 @@
       "feedbackSaved": "Feedback saved",
       "hide": "Hide",
       "details": "Details",
-      "feedback": "Your feedback",
+      "feedback": "Interview evaluation form",
       "feedbackFrozen": "Sent to the student — no longer editable.",
       "strengths": "Strengths",
       "improvements": "To improve",
@@ -1308,6 +1313,11 @@
       "newLink": "New link",
       "newLinkTitle": "Make a new walk-in link?",
       "newLinkBody": "The current link and every printed QR code stop working at once. Requests already sent are kept."
+    },
+    "feedbackScale": {
+      "excellent": "Excellent",
+      "good": "Good",
+      "needsImprovement": "Needs improvement"
     }
   },
   "outreach": {
