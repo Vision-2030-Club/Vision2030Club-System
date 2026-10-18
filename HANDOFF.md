@@ -1933,6 +1933,26 @@ Checked on an empty local Postgres 16 with 0001–0018.
 - **Results**: the *Visitor feedback* tab (HR and managers): how many chose
   each answer per question, and the comments with the student's name.
   The club's export (`edition_snapshot`) includes the table.
+### The feedback form is set on the Settings tab (2026-10-17)
+
+What the interviewer fills in is the edition's settings, no migration
+(`src/lib/interviews/feedbackForm.ts`), on Settings → *Feedback ratings*:
+
+- **The rated questions**: `rating_labels`, as before (key, English,
+  Arabic; up to six). Keep a key once feedback uses it; the text can change.
+- **How each is rated**: `rating_scale`, 5 (1–5, the default, what the
+  April 2026 edition used) or 3 (*Excellent / Good / Needs improvement*,
+  saved as 3 / 2 / 1). `feedback.ratings` keeps plain numbers either way;
+  the company page, the server action and the feedback email read the
+  scale. Changing the scale after feedback was written changes how the old
+  numbers read, so set it before the event.
+- **One open question**: `feedback_comment` ({ en, ar }). When set, the
+  three boxes (strengths, to improve, overall note) become this one
+  question, and its answer is saved in `improvements`; the email prints the
+  question above the answer. Empty → the three boxes.
+
+For October 2026 the club chose four questions on the three-step scale and
+one open question, "النصيحة والتطوير" (the advice to improve).
 
 ### The company finishes an interview with its feedback (0015, 2026-10-14)
 

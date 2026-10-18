@@ -3,7 +3,13 @@ import { after } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { siteUrl } from '@/lib/site';
+import { commentQuestion, ratingScale, scaleWordKey } from '@/lib/interviews/feedbackForm';
 import type { EditionSettings, Feedback, OutboxRow } from '@/lib/interviews/types';
+
+// The three-step scale (feedbackForm.ts) in the feedback email, which is
+// written here rather than through next-intl like every other email line.
+const SCALE_WORDS_EN = { excellent: 'Excellent', good: 'Good', needsImprovement: 'Needs improvement' } as const;
+const SCALE_WORDS_AR = { excellent: 'ممتاز', good: 'جيد', needsImprovement: 'يحتاج إلى تحسين' } as const;
 
 /**
  * Sending what the interviews database queued.
@@ -188,25 +194,41 @@ async function renderFeedback({ db, row, locale }: Ctx): Promise<Rendered | null
   const labels = ((settings as EditionSettings | null)?.rating_labels ?? []);
   const company = locale === 'ar' ? f.companies?.name_ar : f.companies?.name_en;
 
+  const scale = ratingScale(settings as EditionSettings | null);
+  const comment = commentQuestion(settings as EditionSettings | null);
+  const words = locale === 'ar' ? SCALE_WORDS_AR : SCALE_WORDS_EN;
   const ratingLines = labels
     .filter((label) => typeof f.ratings[label.key] === 'number')
-    .map((label) => `${locale === 'ar' ? label.ar : label.en}: ${f.ratings[label.key]}/5`);
+    .map((label) => {
+      const value = f.ratings[label.key];
+      return `${locale === 'ar' ? label.ar : label.en}: ${scale === 3 ? words[scaleWordKey(value)] : `${value}/5`}`;
+    });
+  // With one open question its answer is in `improvements`, shown under the question.
+  const commentLines = comment
+    ? f.improvements
+      ? [locale === 'ar' ? comment.ar : comment.en, f.improvements]
+      : []
+    : null;
 
   const paragraphs = locale === 'ar'
     ? [
         `هذه ملاحظات المُقابِل من ${company ?? ''} على مقابلتك التجريبية.`,
         ...ratingLines,
-        f.strengths ? `نقاط القوة: ${f.strengths}` : '',
-        f.improvements ? `ما يمكن تحسينه: ${f.improvements}` : '',
-        f.overall ? `ملاحظة عامة: ${f.overall}` : '',
+        ...(commentLines ?? [
+          f.strengths ? `نقاط القوة: ${f.strengths}` : '',
+          f.improvements ? `ما يمكن تحسينه: ${f.improvements}` : '',
+          f.overall ? `ملاحظة عامة: ${f.overall}` : '',
+        ]),
         'شكرًا لمشاركتك، ونتمنى لك التوفيق.',
       ]
     : [
         `Here is the interviewer's feedback from ${company ?? ''} on your mock interview.`,
         ...ratingLines,
-        f.strengths ? `Strengths: ${f.strengths}` : '',
-        f.improvements ? `To improve: ${f.improvements}` : '',
-        f.overall ? `Overall: ${f.overall}` : '',
+        ...(commentLines ?? [
+          f.strengths ? `Strengths: ${f.strengths}` : '',
+          f.improvements ? `To improve: ${f.improvements}` : '',
+          f.overall ? `Overall: ${f.overall}` : '',
+        ]),
         'Thank you for taking part, and good luck.',
       ];
 
