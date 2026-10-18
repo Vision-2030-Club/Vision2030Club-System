@@ -1161,7 +1161,11 @@
       "interviewDone": "Interview done",
       "finishHint": "Saving this feedback marks the interview done.",
       "saveAndFinish": "Save feedback and finish",
-      "noShowNote": "The organizer marked this student as not shown. If they are here, ask the room’s organizer to change it."
+      "noShowNote": "The organizer marked this student as not shown. If they are here, ask the room’s organizer to change it.",
+      "chooseRoom": "Your company interviews in more than one room today. Which room are you in?",
+      "chooseRoomHint": "Choose your room to see your students. \"All rooms\" shows both lists.",
+      "allRooms": "All rooms",
+      "yourRoom": "Room: {room}"
     },
     "tv": {
       "nowCalling": "Now calling",

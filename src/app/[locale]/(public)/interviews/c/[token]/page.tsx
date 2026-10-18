@@ -4,7 +4,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { Card, cx } from '@/components/ui';
 import { formatDate, localized } from '@/lib/format';
-import { loadDayRows, loadFeedbackFor, loadSessions, sessionDays, toFloorRow } from '@/lib/interviews/queries';
+import { loadDayRows, loadFeedbackFor, loadRooms, loadSessions, sessionDays, toFloorRow } from '@/lib/interviews/queries';
 import { companyFinishes } from '@/lib/interviews/companyFinish';
 import { commentQuestion, ratingScale } from '@/lib/interviews/feedbackForm';
 import { isToken } from '@/lib/interviews/tokens';
@@ -27,10 +27,10 @@ export default async function CompanyPage({
   searchParams,
 }: {
   params: Promise<{ locale: string; token: string }>;
-  searchParams: Promise<{ day?: string; open?: string }>;
+  searchParams: Promise<{ day?: string; open?: string; room?: string }>;
 }) {
   const { locale, token } = await params;
-  const { day, open } = await searchParams;
+  const { day, open, room } = await searchParams;
   setRequestLocale(locale);
   if (!isToken(token) || !isInterviewsConfigured()) notFound();
 
@@ -71,7 +71,32 @@ export default async function CompanyPage({
   const today = toDateInput(new Date());
   const selectedDay = day && days.includes(day) ? day : days.includes(today) ? today : (days[0] ?? today);
 
-  const rows = (await loadDayRows(db, edition.id, selectedDay, edition.time_zone, company.id)).map(toFloorRow);
+  const dayRows = (await loadDayRows(db, edition.id, selectedDay, edition.time_zone, company.id)).map(toFloorRow);
+
+  // The rooms this company interviews in on the day. With more than one, the
+  // rep picks theirs first (?room=), so nobody fills in feedback for a student
+  // in the other room; "all" shows both. A Feedback link from the room's
+  // Google Sheet (?open=) picks that booking's room by itself.
+  const roomOrder = new Map((await loadRooms(db, edition.id)).map((r, i) => [r.id, { name: r.name, i }]));
+  const dayRooms = [...new Set(sessions.filter((s) => s.day === selectedDay).map((s) => s.room_id))]
+    .filter((id) => roomOrder.has(id))
+    .sort((a, b) => roomOrder.get(a)!.i - roomOrder.get(b)!.i)
+    .map((id) => ({ id, name: roomOrder.get(id)!.name }));
+  const manyRooms = dayRooms.length > 1;
+  const openRoom = open ? dayRows.find((r) => r.booking_id === open)?.room_id : undefined;
+  const chosenRoom = !manyRooms
+    ? 'all'
+    : room === 'all' || dayRooms.some((r) => r.id === room)
+      ? (room as string)
+      : (openRoom ?? null);
+  const rows = chosenRoom && chosenRoom !== 'all' ? dayRows.filter((r) => r.room_id === chosenRoom) : chosenRoom ? dayRows : [];
+  const dayHref = (d: string) => `/interviews/c/${token}?day=${d}`;
+  const roomHref = (r: string) => `/interviews/c/${token}?day=${selectedDay}&room=${r}`;
+  const chip = (active: boolean) =>
+    cx(
+      'rounded-lg border px-3 py-1.5 text-sm',
+      active ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-line text-ink-muted hover:bg-surface-muted',
+    );
   const bookingIds = rows.map((r) => r.booking_id).filter((id): id is string => Boolean(id));
   const applicationIds = rows.map((r) => r.application_id).filter((id): id is string => Boolean(id));
 
@@ -124,37 +149,54 @@ export default async function CompanyPage({
         </div>
         <div className="flex flex-wrap gap-1">
           {days.map((d) => (
-            <Link
-              key={d}
-              href={`/interviews/c/${token}?day=${d}`}
-              className={cx(
-                'rounded-lg border px-3 py-1.5 text-sm',
-                d === selectedDay
-                  ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700'
-                  : 'border-line text-ink-muted hover:bg-surface-muted',
-              )}
-            >
+            <Link key={d} href={dayHref(d)} className={chip(d === selectedDay)}>
               {formatDate(`${d}T12:00:00Z`, locale)}
             </Link>
           ))}
         </div>
       </div>
 
-      <CompanyBoard
-        token={token}
-        locale={locale}
-        rows={rows}
-        profiles={profiles}
-        feedback={feedbackState}
-        initialOpen={open && rows.some((r) => r.booking_id === open) ? open : null}
-        ratingLabels={(settings?.rating_labels ?? []).map((l) => ({ key: l.key, label: locale === 'ar' ? l.ar : l.en }))}
-        finishes={companyFinishes(settings)}
-        scale={ratingScale(settings)}
-        commentLabel={(() => {
-          const q = commentQuestion(settings);
-          return q ? (locale === 'ar' ? q.ar : q.en) : null;
-        })()}
-      />
+      {manyRooms ? (
+        <Card>
+          <p className="mb-2 text-sm font-medium">{t('companyPage.chooseRoom')}</p>
+          <div className="flex flex-wrap gap-2">
+            {dayRooms.map((r) => (
+              <Link key={r.id} href={roomHref(r.id)} className={chip(chosenRoom === r.id)}>
+                {r.name}
+              </Link>
+            ))}
+            <Link href={roomHref('all')} className={chip(chosenRoom === 'all')}>
+              {t('companyPage.allRooms')}
+            </Link>
+          </div>
+          {!chosenRoom ? <p className="mt-2 text-xs text-ink-muted">{t('companyPage.chooseRoomHint')}</p> : null}
+        </Card>
+      ) : dayRooms[0] ? (
+        <p className="text-sm text-ink-muted">{t('companyPage.yourRoom', { room: dayRooms[0].name })}</p>
+      ) : null}
+      {manyRooms && chosenRoom && chosenRoom !== 'all' ? (
+        <p className="text-lg font-semibold text-ink">
+          {t('companyPage.yourRoom', { room: dayRooms.find((r) => r.id === chosenRoom)?.name ?? '' })}
+        </p>
+      ) : null}
+
+      {chosenRoom ? (
+        <CompanyBoard
+          token={token}
+          locale={locale}
+          rows={rows}
+          profiles={profiles}
+          feedback={feedbackState}
+          initialOpen={open && rows.some((r) => r.booking_id === open) ? open : null}
+          ratingLabels={(settings?.rating_labels ?? []).map((l) => ({ key: l.key, label: locale === 'ar' ? l.ar : l.en }))}
+          finishes={companyFinishes(settings)}
+          scale={ratingScale(settings)}
+          commentLabel={(() => {
+            const q = commentQuestion(settings);
+            return q ? (locale === 'ar' ? q.ar : q.en) : null;
+          })()}
+        />
+      ) : null}
     </div>
   );
 }
