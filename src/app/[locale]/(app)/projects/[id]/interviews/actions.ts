@@ -648,13 +648,14 @@ export async function upsertCompanyAction(
  * submit actions refuse it for anyone who had not already chosen it. Kept in
  * the edition's settings as `full_companies` (fullCompanies.ts), so it works
  * without migration 0010. The list is read fresh here, not from the request
- * cache, so two quick toggles do not undo each other.
+ * cache, so two quick toggles do not undo each other. HR marks it as well
+ * as the managers (2026-10-18): they see the bookings fill up.
  */
 export async function setCompanyFullAction(
   _previous: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const g = await guard(formData, can.manage);
+  const g = await guard(formData, can.decide);
   if ('error' in g) return fail(g.error);
   const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
   if (g.access.edition.status === 'archived') return fail(t('errors.archived'), 'archived');

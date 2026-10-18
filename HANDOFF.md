@@ -1690,7 +1690,9 @@ room on one day and hours), on the **Rooms tab**, under each assignment:
 - **Removing an assignment** is refused while anyone is on its list
   (`deleteSessionAction`), so nobody is left accepted with no day.
 - **Companies tab** keeps only the company itself and its interviewer link
-  and PIN.
+  and PIN. HR can mark a company full or open there (2026-10-18,
+  `setCompanyFullAction` guarded by `can.decide`); editing, removing and
+  prayer breaks stay the managers'.
 - **Kept working:** students accepted the old way (per company, no list)
   can still book any time of that company, and per-company links already
   handed out (`room_links`) still open; they are no longer shown or made.
