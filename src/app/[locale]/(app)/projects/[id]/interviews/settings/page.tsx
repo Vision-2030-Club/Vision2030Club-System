@@ -8,6 +8,7 @@ import { can, getInterviewAccess } from '@/lib/interviews/access';
 import { companyFinishes } from '@/lib/interviews/companyFinish';
 import { siteUrl } from '@/lib/interviews/email';
 import { loadCompanies } from '@/lib/interviews/queries';
+import { visitorFeedbackOpen, visitorFeedbackUrl } from '@/lib/interviews/visitorFeedback';
 import { walkinSettings, walkinUrl } from '@/lib/interviews/walkins';
 import { qrDataUrls } from '@/lib/links';
 import { DEFAULT_HOURS, floorLayout, LAYOUT_SLOT_LENGTHS } from '@/lib/interviews/floorLayout';
@@ -25,6 +26,7 @@ import {
   syncRegistrationSheetAction,
   updateEditionAction,
   updateFloorLayoutAction,
+  updateVisitorFeedbackAction,
   updateWalkinsAction,
 } from '../actions';
 
@@ -50,7 +52,9 @@ export default async function InterviewsSettingsPage({
   const db = createInterviewsClient();
   const walkins = walkinSettings(settings);
   const walkinLink = walkins.token ? walkinUrl(locale, walkins.token) : null;
-  const [{ count: held }, { data: lastExport }, companies, walkinQr] = await Promise.all([
+  const visitorOpen = visitorFeedbackOpen(settings);
+  const visitorLink = visitorFeedbackUrl(locale, edition.public_slug);
+  const [{ count: held }, { data: lastExport }, companies, walkinQr, visitorQr] = await Promise.all([
     db
       .from('feedback')
       .select('id', { count: 'exact', head: true })
@@ -65,6 +69,7 @@ export default async function InterviewsSettingsPage({
       .maybeSingle(),
     loadCompanies(db, edition.id),
     walkinLink ? qrDataUrls(walkinLink) : Promise.resolve(null),
+    qrDataUrls(visitorLink),
   ]);
   const offCompanies = new Set(walkins.offCompanies);
 
@@ -276,6 +281,37 @@ export default async function InterviewsSettingsPage({
               </ConfirmForm>
             </div>
           ) : null}
+        </Card>
+
+        <Card>
+          <h2 className="mb-1 font-semibold">{t('visitorFeedback.settingsTitle')}</h2>
+          <p className="mb-3 text-xs text-ink-muted">{t('visitorFeedback.settingsHint')}</p>
+          <ActionForm action={updateVisitorFeedbackAction} submitLabel={tCommon('save')}>
+            <input type="hidden" name="locale" value={locale} />
+            <input type="hidden" name="project_id" value={id} />
+            <div>
+              <Label htmlFor="visitor_feedback_open">{t('walkinSettings.status')}</Label>
+              <Select id="visitor_feedback_open" name="visitor_feedback_open" defaultValue={visitorOpen ? 'on' : 'off'}>
+                <option value="off">{t('walkinSettings.closed')}</option>
+                <option value="on">{t('walkinSettings.open')}</option>
+              </Select>
+            </div>
+          </ActionForm>
+          <div className="mt-4 space-y-3 border-t border-line pt-3">
+            <CopyField label={t('walkinSettings.link')} value={visitorLink} />
+            {/* A data URL made on the server: nothing for next/image to optimise. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={visitorQr.svg} alt={t('visitorFeedback.qrAlt')} width={160} height={160} className="size-40 rounded-lg border border-line" />
+            <div className="flex flex-wrap gap-2 text-sm">
+              <a
+                href={visitorQr.png}
+                download="visitor-feedback-qr.png"
+                className="rounded-lg border border-line bg-surface px-3 py-1.5 text-ink hover:bg-surface-muted"
+              >
+                {t('walkinSettings.downloadQr')}
+              </a>
+            </div>
+          </div>
         </Card>
 
         <Card>
