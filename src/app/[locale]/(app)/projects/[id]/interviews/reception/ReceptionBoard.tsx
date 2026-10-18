@@ -122,8 +122,11 @@ export function ReceptionBoard({
       <span className="ltr-nums w-14 shrink-0 text-base font-semibold">{formatTime(r.starts_at, locale)}</span>
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{r.student_name}</span>
+        <span className="block truncate text-sm font-semibold text-brand-700">
+          {localized({ name_en: r.company_name_en, name_ar: r.company_name_ar }, 'name', locale)}
+        </span>
         <span className="block truncate text-xs text-ink-muted">
-          {localized({ name_en: r.company_name_en, name_ar: r.company_name_ar }, 'name', locale)} · {r.room_name}
+          {r.room_name}
           {r.student_phone ? (
             <>
               {' · '}
