@@ -1908,6 +1908,17 @@ So that only one person moves the students of a room. No migration.
   minute. *Pull from Sheet* is hidden while off. Two-way is one setting
   away and behaves exactly as it did on 2026-10-05.
 
+### The TV screen (2026-10-18)
+
+`interviews/tv/[token]/TvBoard.tsx`. Each student being called is a card:
+name, a large room badge, the company. The board measures itself
+(ResizeObserver) and picks the number of columns that makes the cards
+largest (`fitGrid`), so a vertical screen gets one or two columns and a wide
+one more; every card on screen uses the one name size the longest name
+needs (`fitName`), on one line or two. Up next is smaller cards of the same
+kind. Checked in a headless browser at 1920×1080 and 1080×1920 with 1, 4, 9
+and 14 people called.
+
 ### Visitor feedback (0018, 2026-10-18)
 
 `supabase/interviews/migrations/0018_visitor_feedback.sql`, **not yet
