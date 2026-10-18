@@ -1977,6 +1977,12 @@ together with its feedback.
   student in the other room. A Feedback link from a room's Google Sheet
   (`?open=<booking>`) picks that booking's room by itself. With one room
   that day, the page just names it.
+- **Deleting a no-show** (2026-10-18): on the Floor, a student marked
+  *No show* gets **Delete booking** (pressed twice to confirm).
+  `removeNoShowAction` cancels it with `staff_cancel_booking`, so it is
+  logged and the slot is free again; only from no_show, for the same people
+  and rooms as the stage buttons. The Floor and Reception show each
+  student's company in the brand colour.
 - **Organizers keep their Finished button.** The Floor marks a finished
   interview with no feedback as **No feedback yet** (`withFeedbackFlags`
   in `queries.ts`), so the club can chase the company.

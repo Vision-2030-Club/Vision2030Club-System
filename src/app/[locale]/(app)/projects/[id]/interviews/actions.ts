@@ -1229,6 +1229,55 @@ export async function stageAction(input: {
 }
 
 /**
+ * Floor → a student marked "No show" → Delete booking: cancels it
+ * (staff_cancel_booking, so it is logged and the slot is free again for a
+ * walk-in or another booking). Only from no_show, so a stage button can never
+ * become a delete by mistake; the same people and rooms as stageAction.
+ */
+export async function removeNoShowAction(input: {
+  projectId: string;
+  locale: string;
+  bookingId: string;
+}): Promise<ActionResult> {
+  let access: Awaited<ReturnType<typeof requireInterviewAccess>>;
+  try {
+    access = await requireInterviewAccess(input.projectId, can.stage);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Not allowed.');
+  }
+
+  const db = createInterviewsClient();
+  const { data: booking } = await db
+    .from('bookings')
+    .select('id, stage, cancelled_at, slots(room_id, sessions(day))')
+    .eq('id', input.bookingId)
+    .eq('edition_id', access.edition.id)
+    .maybeSingle();
+  if (!booking || booking.cancelled_at) return fail('No such booking.', 'not_found');
+  const t = await getTranslations({ locale: input.locale, namespace: 'interviews' });
+  if (booking.stage !== 'no_show') return fail(t('errors.not_no_show'), 'not_no_show');
+  if (!can.manage(access.role)) {
+    const slot = (booking as unknown as { slots: { room_id: string; sessions: { day: string } | null } | null }).slots;
+    const owner = slot?.sessions
+      ? organizerOf(roomOrganizers(access.settings), slot.room_id, slot.sessions.day)
+      : null;
+    if (owner && owner !== access.actor.id) return fail(t('errors.not_your_room'), 'not_your_room');
+  }
+
+  const { error } = await db.rpc('staff_cancel_booking', {
+    p_booking: input.bookingId,
+    p_reason: 'No show: removed on the floor',
+    p_actor: access.actor,
+  });
+  if (error) return fromPostgrest(error);
+
+  kickEmailDelivery();
+  kickSheetsSync(access.edition.id);
+  revalidate(input.locale, input.projectId);
+  return ok();
+}
+
+/**
  * The Reception tab's only move: the student is in the building (scheduled →
  * arrived), or that was a mistake (arrived → scheduled). Nothing else, so the
  * door can never change what happens inside a room. `p_expected` (0011)

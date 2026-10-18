@@ -968,7 +968,10 @@
       "formerOrganizer": "No longer an organizer",
       "roomOf": "{name}’s room",
       "noRoomsOfMine": "No room is yours on this day. A manager gives rooms to organizers on the Rooms tab.",
-      "noFeedback": "No feedback yet"
+      "noFeedback": "No feedback yet",
+      "delete": "Delete booking",
+      "deleteConfirm": "Yes, delete",
+      "deleteKeep": "Keep"
     },
     "bookings": {
       "find": "Find a student",
@@ -1113,7 +1116,8 @@
       "not_today": "A walk-in is given a time today.",
       "visitor_feedback_closed": "Visitor feedback is not open right now.",
       "not_checked_in": "This phone number does not belong to anyone who checked in at the event. Use the number you registered with.",
-      "bad_answers": "Answer every question."
+      "bad_answers": "Answer every question.",
+      "not_no_show": "Only a student marked as no-show can be deleted here."
     },
     "student": {
       "hello": "Hello, {name}.",
