@@ -647,7 +647,8 @@
       "messages": "Messages",
       "rooms": "Rooms",
       "projectDetails": "Project details",
-      "reception": "Reception"
+      "reception": "Reception",
+      "visitorFeedback": "Visitor feedback"
     },
     "status": {
       "draft": "Draft",
@@ -1109,7 +1110,10 @@
       "walkin_already_booked": "You already have an interview with this company. Go to the reception desk.",
       "walkin_pending": "There is already a request waiting at the reception desk for this email.",
       "walkin_not_pending": "This request was already answered.",
-      "not_today": "A walk-in is given a time today."
+      "not_today": "A walk-in is given a time today.",
+      "visitor_feedback_closed": "Visitor feedback is not open right now.",
+      "not_checked_in": "This phone number does not belong to anyone who checked in at the event. Use the number you registered with.",
+      "bad_answers": "Answer every question."
     },
     "student": {
       "hello": "Hello, {name}.",
@@ -1313,6 +1317,37 @@
       "newLink": "New link",
       "newLinkTitle": "Make a new walk-in link?",
       "newLinkBody": "The current link and every printed QR code stop working at once. Requests already sent are kept."
+    },
+    "visitorFeedback": {
+      "title": "Visitor feedback",
+      "intro": "Thank you for coming. Enter the phone number you registered with and tell us how the event went.",
+      "closed": "Visitor feedback is not open right now.",
+      "phone": "Phone number",
+      "phoneHint": "The number you registered with at the event.",
+      "q": {
+        "event_quality": "How satisfied are you with the quality of the event?",
+        "club_goals": "How clear are the club's goals?",
+        "activities": "How do you rate your engagement with the activities?",
+        "team": "How satisfied are you with the organising team?"
+      },
+      "scale": {
+        "4": "Excellent",
+        "3": "Good",
+        "2": "Acceptable",
+        "1": "Not good"
+      },
+      "comment": "Comments, if any",
+      "submit": "Send",
+      "thanks": "Thank you! Your feedback was received.",
+      "replaced": "Thank you! Your earlier answer was replaced with this one.",
+      "settingsTitle": "Visitor feedback",
+      "settingsHint": "A public link for students who checked in to rate the event. Only someone who checked in can answer, by their phone number, once (sending again replaces their answer). Results are on the Visitor feedback tab.",
+      "qrAlt": "QR code for the visitor feedback link",
+      "resultsTitle": "Visitor feedback",
+      "responses": "{count, plural, =0 {No answers yet} one {# answer} other {# answers}}",
+      "comments": "Comments",
+      "noComments": "No comments yet.",
+      "needs0018": "Visitor feedback needs database migration 0018 to be applied first."
     },
     "feedbackScale": {
       "excellent": "Excellent",

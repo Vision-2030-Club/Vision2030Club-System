@@ -14,6 +14,8 @@ export type EditionSettings = {
   tv_call_minutes: number;
   feedback_email_mode: 'on_release' | 'immediately';
   rating_labels: RatingLabel[];
+  /** The visitor feedback link is open (0018); read through visitorFeedbackOpen (visitorFeedback.ts). */
+  visitor_feedback_open?: boolean;
   /** 5 (1–5, the default) or 3 (Excellent / Good / Needs improvement); read through ratingScale (feedbackForm.ts). */
   rating_scale?: number;
   /** One open question replacing the three feedback boxes; read through commentQuestion (feedbackForm.ts). */

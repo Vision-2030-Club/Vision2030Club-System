@@ -369,6 +369,26 @@ export async function updateWalkinsAction(
   return ok();
 }
 
+/** Settings → Visitor feedback (0018): the public link is open or closed. */
+export async function updateVisitorFeedbackAction(
+  _previous: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const g = await guard(formData, can.manage);
+  if ('error' in g) return fail(g.error);
+
+  const db = createInterviewsClient();
+  const { error } = await db.rpc('update_edition', {
+    p_edition: g.access.edition.id,
+    p_patch: { settings: { visitor_feedback_open: text(formData, 'visitor_feedback_open') === 'on' } },
+    p_actor: g.access.actor,
+  });
+  if (error) return fromPostgrest(error);
+
+  revalidate(g.locale, g.projectId);
+  return ok();
+}
+
 /** Settings → Walk-ins → New link: the old link and its QR code stop working at once. */
 export async function rotateWalkinLinkAction(
   _previous: ActionResult,

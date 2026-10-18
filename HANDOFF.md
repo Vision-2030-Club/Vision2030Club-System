@@ -1908,6 +1908,31 @@ So that only one person moves the students of a room. No migration.
   minute. *Pull from Sheet* is hidden while off. Two-way is one setting
   away and behaves exactly as it did on 2026-10-05.
 
+### Visitor feedback (0018, 2026-10-18)
+
+`supabase/interviews/migrations/0018_visitor_feedback.sql`, **not yet
+applied**: the project lead applies it in the Interviews database's SQL
+editor (after 0017). Until then the link answers "Not available right now"
+and the tab says the migration is missing; nothing else is affected.
+Checked on an empty local Postgres 16 with 0001–0018.
+
+- **The link**: `/interviews/visit/<public slug>`, the edition's slug like
+  the apply form's, so it never changes. Settings → *Visitor feedback*
+  switches it on or off (`visitor_feedback_open`, off by default) and shows
+  the link and a QR code.
+- **Who may answer**: the phone number (normalised) must belong to a
+  student with a booking, not cancelled, at arrived, in interview or done,
+  i.e. someone reception checked in, interviewed or not.
+  `submit_visitor_feedback` checks it; the page only says so nicely.
+- **The questions** are fixed in the catalogs (`interviews.visitorFeedback.q`)
+  and `VISITOR_QUESTIONS` (`src/lib/interviews/visitorFeedback.ts`); the
+  database checks the same four keys, each 4 Excellent / 3 Good /
+  2 Acceptable / 1 Not good, all required. The comment is optional.
+- **One answer per student** (`visitor_feedback`, unique per edition and
+  application): sending again replaces it; the audit log keeps the old one.
+- **Results**: the *Visitor feedback* tab (HR and managers): how many chose
+  each answer per question, and the comments with the student's name.
+  The club's export (`edition_snapshot`) includes the table.
 ### The feedback form is set on the Settings tab (2026-10-17)
 
 What the interviewer fills in is the edition's settings, no migration

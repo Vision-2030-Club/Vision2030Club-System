@@ -22,7 +22,9 @@ short:
   decides: the apply form → HR selection → personal link by email, and the
   room link → phone number → HR's accepted list. Do not remove either. A
   third way in, walk-ins (0016: the walk-in link → the reception desk
-  confirms a free time today), must keep working too.
+  confirms a free time today), must keep working too. Visitor feedback
+  (0018, `/interviews/visit/<slug>`) is answered only by the phone of a
+  student who checked in.
 - A phone number is compared normalised (`app.normalise_phone` in SQL,
   `normalisePhone` in the app); never compare raw strings. The candidate
   link finds a student by phone alone, including one who applied with an

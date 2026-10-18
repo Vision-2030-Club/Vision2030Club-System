@@ -159,6 +159,7 @@ export default async function AppLayout({
         { href: `${base}/reception`, label: tInterviews('tabs.reception'), icon: 'attendance', show: can.reception(role) },
         { href: `${base}/schedule`, label: tInterviews('tabs.schedule'), icon: 'calendar', show: true },
         { href: `${base}/floor`, label: tInterviews('tabs.floor'), icon: 'stage', show: true },
+        { href: `${base}/visitor-feedback`, label: tInterviews('tabs.visitorFeedback'), icon: 'kpi', show: can.decide(role) },
         { href: `${base}/bookings`, label: tInterviews('tabs.bookings'), icon: 'tasks', show: can.manage(role) },
         { href: `${base}/people`, label: tInterviews('tabs.people'), icon: 'teams', show: can.roster(role) },
         { href: `${base}/settings`, label: tInterviews('tabs.settings'), icon: 'admin', show: can.manage(role) },
