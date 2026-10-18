@@ -193,7 +193,7 @@ export default async function InterviewsFloorPage({
                     ) : (
                       <li key={entry.slot.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
                         <span className="ltr-nums w-16 shrink-0 font-medium">{formatTime(entry.slot.starts_at, locale)}</span>
-                        <span className="w-24 shrink-0 truncate text-xs text-ink-muted">
+                        <span className="w-24 shrink-0 truncate text-xs font-semibold text-brand-700">
                           {localized({ name_en: entry.slot.company_name_en, name_ar: entry.slot.company_name_ar }, 'name', locale)}
                         </span>
                         {entry.slot.booking_id ? (

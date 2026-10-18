@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Alert, Badge, Button, Input, cx } from '@/components/ui';
+import { localized } from '@/lib/format';
 import type { FloorRow, Stage } from '@/lib/interviews/types';
 import { FORWARD_MOVES, ORGANIZER_MOVES, STAGE_TONES } from '@/lib/interviews/ui';
-import { stageAction } from '../actions';
+import { removeNoShowAction, stageAction } from '../actions';
 
 const POLL_MS = 12_000;
 const ALL_STAGES: Stage[] = ['scheduled', 'arrived', 'in_interview', 'done', 'no_show'];
@@ -48,6 +49,8 @@ export function FloorBoard({
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date().getTime());
   const [pending, startTransition] = useTransition();
+  /** The no-show whose Delete was pressed once and waits for the confirming press. */
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -78,6 +81,18 @@ export function FloorBoard({
     startTransition(async () => {
       const result = await stageAction({ projectId, locale, bookingId, to });
       if (!result.ok) setError(result.error ?? 'Refused');
+      await refresh();
+    });
+  };
+
+  const remove = (bookingId: string) => {
+    setError(null);
+    setConfirming(null);
+    startTransition(async () => {
+      const result = await removeNoShowAction({ projectId, locale, bookingId });
+      if (!result.ok) {
+        setError(result.hint && t.has(`errors.${result.hint}`) ? t(`errors.${result.hint}`) : (result.error ?? 'Refused'));
+      }
       await refresh();
     });
   };
@@ -139,9 +154,19 @@ export function FloorBoard({
                   <>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{row.student_name}</span>
-                      {row.student_phone ? (
-                        <span className="ltr-nums block text-xs text-ink-muted">{row.student_phone}</span>
-                      ) : null}
+                      <span className="block truncate text-xs">
+                        <span className="font-semibold text-brand-700">
+                          {localized({ name_en: row.company_name_en, name_ar: row.company_name_ar }, 'name', locale)}
+                        </span>
+                        {row.student_phone ? (
+                          <>
+                            <span className="text-ink-muted"> · </span>
+                            <span className="ltr-nums text-ink-muted" dir="ltr">
+                              {row.student_phone}
+                            </span>
+                          </>
+                        ) : null}
+                      </span>
                     </span>
                     <Badge tone={STAGE_TONES[stage]}>{t(`stage.${stage}`)}</Badge>
                     {stage === 'done' && row.has_feedback === false ? (
@@ -169,6 +194,40 @@ export function FloorBoard({
                             </Button>
                           );
                         })}
+                        {stage === 'no_show' ? (
+                          confirming === row.booking_id ? (
+                            <>
+                              <Button
+                                type="button"
+                                variant="danger"
+                                disabled={pending}
+                                onClick={() => remove(row.booking_id!)}
+                                className="px-2.5 py-1 text-xs"
+                              >
+                                {t('floor.deleteConfirm')}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                disabled={pending}
+                                onClick={() => setConfirming(null)}
+                                className="px-2.5 py-1 text-xs"
+                              >
+                                {t('floor.deleteKeep')}
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="danger"
+                              disabled={pending}
+                              onClick={() => setConfirming(row.booking_id)}
+                              className="px-2.5 py-1 text-xs"
+                            >
+                              {t('floor.delete')}
+                            </Button>
+                          )
+                        ) : null}
                         {isManager ? (
                           <select
                             aria-label={t('floor.setStage')}
