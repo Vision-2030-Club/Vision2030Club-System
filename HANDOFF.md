@@ -1971,6 +1971,12 @@ together with its feedback.
   (`marked_no_show`), an empty form (`empty_feedback`: at least one rating
   or one comment) and released feedback (`feedback_sent`). A finished
   interview's feedback stays editable until it is released, as before.
+- **A company in two rooms on one day** (2026-10-18): the interviewer page
+  asks the rep to pick their room first (`?room=<room id>`, or `all`), and
+  shows only that room's students, so a rep does not fill in feedback for a
+  student in the other room. A Feedback link from a room's Google Sheet
+  (`?open=<booking>`) picks that booking's room by itself. With one room
+  that day, the page just names it.
 - **Organizers keep their Finished button.** The Floor marks a finished
   interview with no feedback as **No feedback yet** (`withFeedbackFlags`
   in `queries.ts`), so the club can chase the company.
