@@ -129,22 +129,25 @@ export default async function InterviewsCompaniesPage({
                   </div>
                 </div>
 
-                {manage ? (
-                  <div className="mt-3 flex flex-wrap items-start gap-2">
+                {/* HR marks a company full or open; editing and removing stay the managers'. */}
+                <div className="mt-3 flex flex-wrap items-start gap-2">
+                  {manage ? (
                     <Disclosure label={tCommon('edit')} title={name}>
                       <CompanyForm locale={locale} projectId={id} company={company} t={t} submitLabel={tCommon('save')} />
                     </Disclosure>
-                    <ActionForm
-                      action={setCompanyFullAction}
-                      submitLabel={full ? t('register.markOpen') : t('register.markFull')}
-                      variant="secondary"
-                      className="space-y-2"
-                    >
-                      <input type="hidden" name="locale" value={locale} />
-                      <input type="hidden" name="project_id" value={id} />
-                      <input type="hidden" name="company_id" value={company.id} />
-                      <input type="hidden" name="full" value={full ? 'false' : 'true'} />
-                    </ActionForm>
+                  ) : null}
+                  <ActionForm
+                    action={setCompanyFullAction}
+                    submitLabel={full ? t('register.markOpen') : t('register.markFull')}
+                    variant="secondary"
+                    className="space-y-2"
+                  >
+                    <input type="hidden" name="locale" value={locale} />
+                    <input type="hidden" name="project_id" value={id} />
+                    <input type="hidden" name="company_id" value={company.id} />
+                    <input type="hidden" name="full" value={full ? 'false' : 'true'} />
+                  </ActionForm>
+                  {manage ? (
                     <ConfirmForm
                       action={setCompanyHiddenAction}
                       trigger={t('register.remove')}
@@ -157,8 +160,8 @@ export default async function InterviewsCompaniesPage({
                       <input type="hidden" name="company_id" value={company.id} />
                       <input type="hidden" name="hidden" value="true" />
                     </ConfirmForm>
-                  </div>
-                ) : null}
+                  ) : null}
+                </div>
 
                 {/* The columns arrive with 0017; until then there is nothing to switch. */}
                 {manage && 'asr_break' in company ? (
