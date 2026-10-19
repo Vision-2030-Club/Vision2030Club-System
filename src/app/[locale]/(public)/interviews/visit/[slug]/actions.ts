@@ -1,16 +1,21 @@
 'use server';
 
+import { cookies } from 'next/headers';
 import { fail, fromPostgrest, ok, requiredText, text, type ActionResult } from '@/lib/actions';
-import { normalisePhone } from '@/lib/interviews/phone';
 import type { EditionSettings } from '@/lib/interviews/types';
 import { VISITOR_QUESTIONS, visitorFeedbackOpen } from '@/lib/interviews/visitorFeedback';
 import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/interviews';
 
+/** The cookie that says this device already answered this edition's form. */
+export async function answeredCookie(slug: string): Promise<string> {
+  return `vf_${slug}`;
+}
+
 /**
- * A student's visitor feedback (0018). The page checks the cheap things
- * (the link, open, every question answered, a phone number); the database
- * checks them again and that the phone belongs to someone who checked in,
- * and keeps one answer per student.
+ * A visitor's feedback (0018, anonymous since 0019: no phone number). The
+ * page checks the cheap things (the link, open, every question answered);
+ * the database checks them again. A cookie remembers that this device
+ * answered, so the page thanks it instead of asking again.
  */
 export async function visitorFeedbackAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   const slug = requiredText(formData, 'slug');
@@ -28,9 +33,6 @@ export async function visitorFeedbackAction(_previous: ActionResult, formData: F
     return fail('Visitor feedback is closed right now.', 'visitor_feedback_closed');
   }
 
-  const phone = normalisePhone(text(formData, 'phone'));
-  if (!phone || phone.length < 9) return fail('Enter a phone number.', 'missing_phone');
-
   const answers: Record<string, number> = {};
   for (const q of VISITOR_QUESTIONS) {
     const n = Number(text(formData, q));
@@ -40,7 +42,7 @@ export async function visitorFeedbackAction(_previous: ActionResult, formData: F
 
   const { data, error } = await db.rpc('submit_visitor_feedback', {
     p_edition: edition.id,
-    p_phone: phone,
+    p_phone: null,
     p_answers: answers,
     p_comment: text(formData, 'comment') ?? '',
     p_locale: locale,
@@ -53,5 +55,7 @@ export async function visitorFeedbackAction(_previous: ActionResult, formData: F
     console.error('[interviews/visit] submit failed', error.code);
     return fail('Something went wrong. Try again.', 'generic');
   }
+  const jar = await cookies();
+  jar.set(await answeredCookie(slug), '1', { path: '/', maxAge: 60 * 60 * 24 * 60, httpOnly: true, sameSite: 'lax' });
   return ok((data as { replaced?: boolean } | null)?.replaced ? 'replaced' : 'sent');
 }

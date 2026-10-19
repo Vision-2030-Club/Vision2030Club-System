@@ -153,15 +153,15 @@ export default async function AppLayout({
     const label = locale === 'ar' ? component.name_ar : component.name_en;
     const items: NavItem[] = (
       [
-        { href: base, label: tInterviews('tabs.overview'), icon: 'dashboard', show: true },
+        { href: base, label: tInterviews('tabs.overview'), icon: 'dashboard', show: can.floorAccess(role) },
         { href: `${base}/applicants`, label: tInterviews('tabs.applicants'), icon: 'members', show: can.decide(role) },
         { href: `${base}/register`, label: tInterviews('tabs.register'), icon: 'register', show: can.decide(role) },
         { href: `${base}/companies`, label: tInterviews('tabs.companies'), icon: 'company', show: can.decide(role) },
         { href: `${base}/rooms`, label: tInterviews('tabs.rooms'), icon: 'rooms', show: can.decide(role) },
         { href: `${base}/reception`, label: tInterviews('tabs.reception'), icon: 'attendance', show: can.reception(role) },
-        { href: `${base}/schedule`, label: tInterviews('tabs.schedule'), icon: 'calendar', show: true },
-        { href: `${base}/floor`, label: tInterviews('tabs.floor'), icon: 'stage', show: true },
-        { href: `${base}/visitor-feedback`, label: tInterviews('tabs.visitorFeedback'), icon: 'kpi', show: can.decide(role) },
+        { href: `${base}/schedule`, label: tInterviews('tabs.schedule'), icon: 'calendar', show: can.floorAccess(role) },
+        { href: `${base}/floor`, label: tInterviews('tabs.floor'), icon: 'stage', show: can.floorAccess(role) },
+        { href: `${base}/visitor-feedback`, label: tInterviews('tabs.visitorFeedback'), icon: 'kpi', show: can.visitorResults(role) },
         {
           href: `${base}/bookings`,
           label: tInterviews('tabs.bookings'),

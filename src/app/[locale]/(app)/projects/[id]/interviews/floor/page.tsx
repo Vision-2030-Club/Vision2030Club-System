@@ -53,6 +53,8 @@ export default async function InterviewsFloorPage({
   const access = await getInterviewAccess(id);
   if (!access?.edition) notFound();
   const { edition, settings, role, actor } = access;
+  // Not for a viewer (the Development team reads only the visitor ratings, 0072).
+  if (!can.floorAccess(role)) notFound();
 
   const t = await getTranslations('interviews');
   const tCommon = await getTranslations('common');
