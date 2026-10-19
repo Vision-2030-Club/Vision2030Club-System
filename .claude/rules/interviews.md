@@ -55,6 +55,7 @@ short:
   and only by saving its feedback (`finish_interview`, 0015); managers
   anywhere. The Google Sheets' Status column is read-only unless
   `sheet_status_edits` is on. Do not add another path that moves a stage
-  around these. Organizers do not mark or clear no-shows (`stageAction`
-  refuses it; managers still may). A no-show's booking is cancelled from
-  Reception (`removeNoShowAction`); that frees the slot and moves no stage.
+  around these. Nobody marks or clears a no-show from the Floor, managers
+  included (`stageAction` refuses it, 2026-10-20). A no-show's booking is
+  cancelled from Reception (`removeNoShowAction`); that frees the slot and
+  moves no stage.

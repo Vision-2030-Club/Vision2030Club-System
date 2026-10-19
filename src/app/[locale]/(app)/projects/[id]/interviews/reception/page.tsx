@@ -85,6 +85,8 @@ export default async function InterviewsReceptionPage({
           initialRows={rows}
           pollUrl={`/api/interviews/floor?project=${id}&day=${selectedDay}`}
           isToday={selectedDay === today}
+          day={selectedDay}
+          days={days}
           canSchedule={await canSchedule(role)}
         />
       )}

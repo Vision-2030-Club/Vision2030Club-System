@@ -1948,6 +1948,20 @@ Both checked on local Postgres 16: a Development member gets `viewer`, one
 who is also an organizer stays `organizer`, another team gets nothing;
 anonymous answers are saved, incomplete ones and a closed link refused.
 
+### Walk-ins into a time under way; no-show box; manual booking by day (2026-10-20)
+
+- `supabase/interviews/migrations/0020_walkin_started_slots.sql`
+  (Interviews database), **not yet applied**, applied by the project lead
+  when this is merged (before or after: the app does not depend on it).
+  `walkin_slots` and `confirm_walkin` now treat a time as free for a walk-in
+  until it **ends**, not until it starts. Without it, deleting a no-show's
+  booking freed a time the walk-in picker never offered. Checked on local
+  Postgres 16: a time under way is offered and can be confirmed, one that
+  is over is not and is refused (`slot_past`); applied twice.
+- Reception's **No show** box, the Floor without no-show, and Manual
+  booking's day picker and applicant check: see "Booking by hand at
+  Reception" and "No-shows are the reception desk's" below.
+
 ### Visitor feedback (0018, 2026-10-18)
 
 `supabase/interviews/migrations/0018_visitor_feedback.sql`, **not yet
@@ -2020,8 +2034,12 @@ together with its feedback.
 - **Booking by hand at Reception** (2026-10-19), for the project's managers
   and HR's Directors only (`canSchedule` in `access.ts`: role manager, or
   role hr with members.manage at all; not every HR person on the list).
-  **Manual booking**: a phone number, then the company, then one of that
-  company's free times that day (a company with none left is greyed out);
+  **Manual booking**: a phone number, then the day (any day with
+  interviews, the board's by default), the company, and one of that
+  company's free times that day (a company with none left is greyed out).
+  As the number is typed the panel shows who applied with it
+  (`deskLookupAction`), or that nobody did, and Book stays off until it is
+  a registered applicant (2026-10-20);
   `deskBookAction` finds the applicant by phone, puts them on that
   assignment's accepted list (`accept_for_session`) and books them, or moves
   their existing time with that company. A number nobody applied with is
@@ -2031,14 +2049,17 @@ together with its feedback.
   is open to the same people (booking and moving); cancelling there stays
   the managers'.
 - **No-shows are the reception desk's** (2026-10-19). Reception marks a
-  scheduled student **No show** (pressed twice to confirm) and can undo it
-  (`checkInAction`, moves `noShow` / `undoNoShow`, with `p_expected`). A
-  no-show is listed under "waiting" and has **Delete booking**
+  scheduled student **No show**, which opens a box asking *Delete the
+  booking?* (2026-10-20): **Yes** marks the no-show and deletes the booking
+  in one go (the time is free again, also for a walk-in, see 0020), **No**
+  only marks the no-show, **Back** does nothing. A no-show can be undone
+  (`checkInAction`, moves `noShow` / `undoNoShow`, with `p_expected`), and
+  one kept is listed under "waiting" with **Delete booking**
   (`removeNoShowAction`: `staff_cancel_booking`, logged, slot freed). The
-  Floor no longer offers no-show or delete to organizers, and `stageAction`
-  refuses an organizer's move to or from `no_show`; a manager can still set
-  any stage from the Floor's menu. The Floor and Reception show each
-  student's company in the brand colour.
+  Floor offers no no-show to anyone, managers included since 2026-10-20 (the
+  manager's stage menu leaves it out and hides itself on a no-show row), and
+  `stageAction` refuses every move to or from `no_show`. The Floor and
+  Reception show each student's company in the brand colour.
 - **Organizers keep their Finished button.** The Floor marks a finished
   interview with no feedback as **No feedback yet** (`withFeedbackFlags`
   in `queries.ts`), so the club can chase the company.
@@ -2076,8 +2097,10 @@ Reception tab (0069).
   same `apply_fields`), the CV, and ONE company, picked on the company cards.
   Only today's companies are shown, and only one with a free time later
   today can be picked; the others are greyed out. "Free" is the database's
-  `walkin_slots(edition)`: today on the edition's clock, not started, not
-  closed, not held, of a visible company that takes walk-ins. Sending it
+  `walkin_slots(edition)`: today on the edition's clock, not over (since
+  0020; 0016 said "not started", so a no-show's time, freed only once it
+  had started, could never go to a walk-in), not closed, not held, of a
+  visible company that takes walk-ins. Sending it
   uploads the CV and calls `submit_walkin`, which checks all of that again,
   refuses a second waiting request for the same email (`walkin_pending`)
   and an email that already has an interview with that company
