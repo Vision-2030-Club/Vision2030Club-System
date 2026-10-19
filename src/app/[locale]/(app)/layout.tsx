@@ -72,6 +72,8 @@ export default async function AppLayout({
   }
 
   const canDo = (key: string) => (permissions.get(key) ?? 'none') !== 'none';
+  // HR's Directors book and reschedule by hand, like the managers (canSchedule).
+  const hrDirector = permissions.get('members.manage') === 'all';
   const t = await getTranslations('nav');
   const tApp = await getTranslations('app');
   const tMembers = await getTranslations('members');
@@ -160,7 +162,12 @@ export default async function AppLayout({
         { href: `${base}/schedule`, label: tInterviews('tabs.schedule'), icon: 'calendar', show: can.floorAccess(role) },
         { href: `${base}/floor`, label: tInterviews('tabs.floor'), icon: 'stage', show: can.floorAccess(role) },
         { href: `${base}/visitor-feedback`, label: tInterviews('tabs.visitorFeedback'), icon: 'kpi', show: can.visitorResults(role) },
-        { href: `${base}/bookings`, label: tInterviews('tabs.bookings'), icon: 'tasks', show: can.manage(role) },
+        {
+          href: `${base}/bookings`,
+          label: tInterviews('tabs.bookings'),
+          icon: 'tasks',
+          show: can.manage(role) || (role === 'hr' && hrDirector),
+        },
         { href: `${base}/people`, label: tInterviews('tabs.people'), icon: 'teams', show: can.roster(role) },
         { href: `${base}/settings`, label: tInterviews('tabs.settings'), icon: 'admin', show: can.manage(role) },
         { href: `${base}/log`, label: tInterviews('tabs.log'), icon: 'requests', show: can.manage(role) },

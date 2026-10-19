@@ -2,7 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/interviews';
-import { getMyMember, PermissionError } from '@/lib/auth/session';
+import { getMyMember, PermissionError, scopeFor } from '@/lib/auth/session';
 import type { Edition, EditionSettings } from '@/lib/interviews/types';
 
 /**
@@ -138,4 +138,16 @@ export async function requireInterviewAccess(
     );
   }
   return { ...access, edition: access.edition, settings: access.settings };
+}
+
+/**
+ * Booking and rescheduling by hand (2026-10-19): the project's managers and
+ * HR's Directors (members.manage at scope all), not every HR person listed on
+ * the project. The Reception tab's Manual booking / Reschedule buttons and
+ * the Bookings tab.
+ */
+export async function canSchedule(role: ComponentRole): Promise<boolean> {
+  if (role === 'manager') return true;
+  if (role !== 'hr') return false;
+  return (await scopeFor('members.manage')) === 'all';
 }
