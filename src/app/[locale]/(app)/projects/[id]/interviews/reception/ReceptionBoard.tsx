@@ -172,7 +172,10 @@ export function ReceptionBoard({
     });
   };
 
-  /** No show → "Delete the booking?" → Yes: marked no-show, then the booking cancelled and the time freed. */
+  /**
+   * No show → "Delete the booking?" → Yes: marked no-show, then the booking
+   * cancelled and the time freed, in one press. No changes nothing (2026-10-20).
+   */
   const noShowAndRemove = (bookingId: string) => {
     setError(null);
     setConfirming(null);
@@ -383,11 +386,8 @@ export function ReceptionBoard({
             <Button type="button" variant="danger" disabled={pending} onClick={() => noShowAndRemove(r.booking_id)}>
               {t('reception.noShowYes')}
             </Button>
-            <Button type="button" variant="secondary" disabled={pending} onClick={() => act(r.booking_id, 'noShow')}>
-              {t('reception.noShowNo')}
-            </Button>
             <Button type="button" variant="secondary" disabled={pending} onClick={() => setConfirming(null)}>
-              {t('reception.noShowBack')}
+              {t('reception.noShowNo')}
             </Button>
           </div>
         </div>
