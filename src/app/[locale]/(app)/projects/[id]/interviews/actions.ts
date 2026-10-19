@@ -1230,10 +1230,12 @@ export async function stageAction(input: {
 }
 
 /**
- * Floor → a student marked "No show" → Delete booking: cancels it
- * (staff_cancel_booking, so it is logged and the slot is free again for a
+ * Floor or Reception → a student marked "No show" → Delete booking: cancels
+ * it (staff_cancel_booking, so it is logged and the slot is free again for a
  * walk-in or another booking). Only from no_show, so a stage button can never
- * become a delete by mistake; the same people and rooms as stageAction.
+ * become a delete by mistake. On the Floor the same people and rooms as
+ * stageAction; at Reception (2026-10-19) the desk too, for any room, since a
+ * no-show is the door's to clear.
  */
 export async function removeNoShowAction(input: {
   projectId: string;
@@ -1242,7 +1244,7 @@ export async function removeNoShowAction(input: {
 }): Promise<ActionResult> {
   let access: Awaited<ReturnType<typeof requireInterviewAccess>>;
   try {
-    access = await requireInterviewAccess(input.projectId, can.stage);
+    access = await requireInterviewAccess(input.projectId, (role) => can.stage(role) || can.reception(role));
   } catch (error) {
     return fail(error instanceof Error ? error.message : 'Not allowed.');
   }
@@ -1257,7 +1259,8 @@ export async function removeNoShowAction(input: {
   if (!booking || booking.cancelled_at) return fail('No such booking.', 'not_found');
   const t = await getTranslations({ locale: input.locale, namespace: 'interviews' });
   if (booking.stage !== 'no_show') return fail(t('errors.not_no_show'), 'not_no_show');
-  if (!can.manage(access.role)) {
+  // Only an organizer is held to the rooms they run; the desk and HR are not.
+  if (access.role === 'organizer') {
     const slot = (booking as unknown as { slots: { room_id: string; sessions: { day: string } | null } | null }).slots;
     const owner = slot?.sessions
       ? organizerOf(roomOrganizers(access.settings), slot.room_id, slot.sessions.day)
@@ -1267,7 +1270,7 @@ export async function removeNoShowAction(input: {
 
   const { error } = await db.rpc('staff_cancel_booking', {
     p_booking: input.bookingId,
-    p_reason: 'No show: removed on the floor',
+    p_reason: 'No show: booking removed',
     p_actor: access.actor,
   });
   if (error) return fromPostgrest(error);
