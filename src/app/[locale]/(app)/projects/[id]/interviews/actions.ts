@@ -8,6 +8,7 @@ import { getMyMember } from '@/lib/auth/session';
 import { all, fail, fromPostgrest, ok, requiredText, text, type ActionResult } from '@/lib/actions';
 import {
   can,
+  canSchedule,
   requireInterviewAccess,
   type ComponentRole,
   type InterviewAccess,
@@ -67,6 +68,14 @@ async function guard(
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Not allowed.' };
   }
+}
+
+/** A guard for booking and moving by hand: managers and HR's Directors (canSchedule). */
+async function scheduleGuard(formData: FormData): Promise<Guarded> {
+  const g = await guard(formData, can.decide);
+  if ('error' in g) return g;
+  if (!(await canSchedule(g.access.role))) return { error: 'Only the project managers and HR Directors book by hand.' };
+  return g;
 }
 
 /** Everything under /projects/<id>/interviews reads the second database live. */
@@ -1490,7 +1499,7 @@ export async function staffBookAction(
   _previous: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const g = await guard(formData, can.manage);
+  const g = await scheduleGuard(formData);
   if ('error' in g) return fail(g.error);
 
   const db = createInterviewsClient();
@@ -1511,7 +1520,7 @@ export async function staffMoveAction(
   _previous: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const g = await guard(formData, can.manage);
+  const g = await scheduleGuard(formData);
   if ('error' in g) return fail(g.error);
 
   const db = createInterviewsClient();
@@ -1546,6 +1555,111 @@ export async function staffCancelAction(
   kickEmailDelivery();
   kickSheetsSync(g.access.edition.id);
   revalidate(g.locale, g.projectId);
+  return ok();
+}
+
+/**
+ * Reception → Manual booking (managers and HR's Directors): a student found by
+ * phone number (normalised, applicationsByPhone) is put on the assignment's
+ * accepted list (accept_for_session, which also accepts them for the company)
+ * and booked into the chosen free slot, or, if they already hold a time with
+ * that company, moved to it. The same SQL functions as the Bookings tab, so
+ * every booking rule still holds; a past time can be booked (0012).
+ */
+export async function deskBookAction(input: {
+  projectId: string;
+  locale: string;
+  phone: string;
+  slotId: string;
+}): Promise<ActionResult> {
+  let access: Awaited<ReturnType<typeof requireInterviewAccess>>;
+  try {
+    access = await requireInterviewAccess(input.projectId, can.decide);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Not allowed.');
+  }
+  if (!(await canSchedule(access.role))) return fail('Not allowed.');
+  const t = await getTranslations({ locale: input.locale, namespace: 'interviews' });
+
+  const phone = normalisePhone(input.phone);
+  if (!phone || phone.length < 9) return fail(t('errors.missing_phone'), 'missing_phone');
+  const db = createInterviewsClient();
+  const match = (await applicationsByPhone(db, access.edition.id)).get(phone);
+  if (!match) return fail(t('errors.desk_no_applicant'), 'desk_no_applicant');
+
+  const { data: slot } = await db
+    .from('slots')
+    .select('id, session_id, company_id')
+    .eq('id', input.slotId)
+    .eq('edition_id', access.edition.id)
+    .maybeSingle();
+  if (!slot) return fail('No such slot.', 'not_found');
+
+  const accepted = await db.rpc('accept_for_session', {
+    p_session: slot.session_id,
+    p_application: match.id,
+    p_phone: phone,
+    p_token: null,
+    p_actor: access.actor,
+  });
+  if (accepted.error) return fromPostgrest(accepted.error);
+
+  const { data: held } = await db
+    .from('bookings')
+    .select('id')
+    .eq('application_id', match.id)
+    .eq('company_id', slot.company_id)
+    .is('cancelled_at', null)
+    .maybeSingle();
+  const { error } = held
+    ? await db.rpc('staff_move_booking', { p_booking: held.id, p_slot: slot.id, p_actor: access.actor })
+    : await db.rpc('staff_book_slot', { p_application: match.id, p_slot: slot.id, p_actor: access.actor });
+  if (error) return fromPostgrest(error);
+
+  kickEmailDelivery();
+  kickSheetsSync(access.edition.id);
+  revalidate(input.locale, input.projectId);
+  return ok(held ? 'moved' : 'booked');
+}
+
+/**
+ * Reception → Reschedule (managers and HR's Directors): a scheduled booking
+ * to another free slot of the same company (staff_move_booking refuses any
+ * other company, and anything already started).
+ */
+export async function deskMoveAction(input: {
+  projectId: string;
+  locale: string;
+  bookingId: string;
+  slotId: string;
+}): Promise<ActionResult> {
+  let access: Awaited<ReturnType<typeof requireInterviewAccess>>;
+  try {
+    access = await requireInterviewAccess(input.projectId, can.decide);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : 'Not allowed.');
+  }
+  if (!(await canSchedule(access.role))) return fail('Not allowed.');
+
+  const db = createInterviewsClient();
+  const { data: booking } = await db
+    .from('bookings')
+    .select('id')
+    .eq('id', input.bookingId)
+    .eq('edition_id', access.edition.id)
+    .maybeSingle();
+  if (!booking) return fail('No such booking.', 'not_found');
+
+  const { error } = await db.rpc('staff_move_booking', {
+    p_booking: input.bookingId,
+    p_slot: input.slotId,
+    p_actor: access.actor,
+  });
+  if (error) return fromPostgrest(error);
+
+  kickEmailDelivery();
+  kickSheetsSync(access.edition.id);
+  revalidate(input.locale, input.projectId);
   return ok();
 }
 

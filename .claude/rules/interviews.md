@@ -47,7 +47,8 @@ short:
   past time can be booked on purpose (0012).
 - Who moves a booking's stage is decided per role (the club's decisions of
   2026-10-14, 2026-10-19): reception checks in and marks no-shows, and
-  undoes either (`checkInAction`);
+  undoes either (`checkInAction`); booking and rescheduling by hand is for
+  managers and HR's Directors only (`canSchedule`);
   an organizer only in a room they run, or one nobody runs
   (`room_organizers`, enforced in `stageAction`); a company only to done,
   and only by saving its feedback (`finish_interview`, 0015); managers

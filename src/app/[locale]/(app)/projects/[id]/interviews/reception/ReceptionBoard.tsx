@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { Alert, Badge, Button, Input, cx } from '@/components/ui';
+import { Alert, Badge, Button, Input, Label, Select, cx } from '@/components/ui';
 import { formatTime, localized } from '@/lib/format';
 import { normalisePhone, westernDigits } from '@/lib/interviews/phone';
 import type { FloorRow, Stage } from '@/lib/interviews/types';
 import { STAGE_TONES } from '@/lib/interviews/ui';
-import { checkInAction, removeNoShowAction } from '../actions';
+import { checkInAction, deskBookAction, deskMoveAction, removeNoShowAction } from '../actions';
 
 const POLL_MS = 10_000;
 const MINUTE = 60_000;
@@ -41,6 +41,7 @@ export function ReceptionBoard({
   initialRows,
   pollUrl,
   isToday,
+  canSchedule = false,
 }: {
   locale: string;
   projectId: string;
@@ -48,6 +49,8 @@ export function ReceptionBoard({
   pollUrl: string;
   /** Lateness only means something on the day itself. */
   isToday: boolean;
+  /** Managers and HR's Directors: Manual booking and Reschedule (canSchedule). */
+  canSchedule?: boolean;
 }) {
   const t = useTranslations('interviews');
   const [rows, setRows] = useState(initialRows);
@@ -57,6 +60,14 @@ export function ReceptionBoard({
   const [pending, startTransition] = useTransition();
   /** The no-show whose Delete was pressed once and waits for the confirming press. */
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualPhone, setManualPhone] = useState('');
+  const [manualCompany, setManualCompany] = useState('');
+  const [manualSlot, setManualSlot] = useState('');
+  /** The booking whose Reschedule is open, and the time chosen for it. */
+  const [moving, setMoving] = useState<string | null>(null);
+  const [moveSlot, setMoveSlot] = useState('');
 
   const refresh = useCallback(async () => {
     try {
@@ -109,6 +120,63 @@ export function ReceptionBoard({
             ? t(`errors.${result.hint}`)
             : (result.error ?? t('reception.refused')),
         );
+      }
+      await refresh();
+    });
+  };
+
+  const failText = (result: { error?: string; hint?: string }) =>
+    result.hint && t.has(`errors.${result.hint}`) ? t(`errors.${result.hint}`) : (result.error ?? t('reception.refused'));
+
+  // Every free, open time of the day, for Manual booking and Reschedule.
+  const freeSlots = rows
+    .filter((r) => !r.booking_id && !r.is_closed)
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  const slotLabel = (r: FloorRow, withCompany: boolean) =>
+    [
+      formatTime(r.starts_at, locale),
+      withCompany ? localized({ name_en: r.company_name_en, name_ar: r.company_name_ar }, 'name', locale) : null,
+      r.room_name,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+
+  // The day's companies, each with how many free times it has left.
+  const dayCompanies = [...new Map(rows.map((r) => [r.company_id, r])).values()]
+    .map((r) => ({
+      id: r.company_id,
+      name: localized({ name_en: r.company_name_en, name_ar: r.company_name_ar }, 'name', locale),
+      free: freeSlots.filter((s) => s.company_id === r.company_id).length,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, locale));
+
+  const bookByHand = () => {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const result = await deskBookAction({ projectId, locale, phone: manualPhone, slotId: manualSlot });
+      if (!result.ok) setError(failText(result));
+      else {
+        setNotice(result.message === 'moved' ? t('reception.manualMoved') : t('reception.manualBooked'));
+        setManualPhone('');
+        setManualCompany('');
+        setManualSlot('');
+        setManualOpen(false);
+      }
+      await refresh();
+    });
+  };
+
+  const reschedule = (bookingId: string) => {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const result = await deskMoveAction({ projectId, locale, bookingId, slotId: moveSlot });
+      if (!result.ok) setError(failText(result));
+      else {
+        setNotice(t('reception.rescheduled'));
+        setMoving(null);
+        setMoveSlot('');
       }
       await refresh();
     });
@@ -252,6 +320,60 @@ export function ReceptionBoard({
           </span>
         )
       ) : null}
+      {canSchedule && r.stage === 'scheduled' ? (
+        moving === r.booking_id ? (
+          <span className="flex w-full flex-wrap items-center gap-2">
+            <Select
+              value={moveSlot}
+              onChange={(event) => setMoveSlot(event.target.value)}
+              aria-label={t('reception.rescheduleTo')}
+              className="max-w-xs"
+            >
+              <option value="">{t('reception.rescheduleTo')}</option>
+              {freeSlots
+                .filter((s) => s.company_id === r.company_id)
+                .map((s) => (
+                  <option key={s.slot_id} value={s.slot_id}>
+                    {slotLabel(s, false)}
+                  </option>
+                ))}
+            </Select>
+            <Button
+              type="button"
+              disabled={pending || !moveSlot}
+              onClick={() => reschedule(r.booking_id)}
+              className="px-2.5 py-1 text-xs"
+            >
+              {t('reception.reschedule')}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={pending}
+              onClick={() => setMoving(null)}
+              className="px-2.5 py-1 text-xs"
+            >
+              {t('floor.deleteKeep')}
+            </Button>
+            {freeSlots.some((s) => s.company_id === r.company_id) ? null : (
+              <span className="text-xs text-ink-muted">{t('reception.noFreeTimes')}</span>
+            )}
+          </span>
+        ) : (
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={pending}
+            onClick={() => {
+              setMoving(r.booking_id);
+              setMoveSlot('');
+            }}
+            className="px-2.5 py-1 text-xs"
+          >
+            {t('reception.reschedule')}
+          </Button>
+        )
+      ) : null}
     </li>
   );
 
@@ -302,7 +424,70 @@ export function ReceptionBoard({
         className="py-3 text-lg!"
       />
 
+      {canSchedule ? (
+        <div className="space-y-2">
+          <Button type="button" variant="secondary" onClick={() => setManualOpen((open) => !open)}>
+            {t('reception.manualBook')}
+          </Button>
+          {manualOpen ? (
+            <div className="grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
+              <div>
+                <Label htmlFor="manual-phone">{t('reception.manualPhone')}</Label>
+                <Input
+                  id="manual-phone"
+                  type="tel"
+                  dir="ltr"
+                  placeholder="05xxxxxxxx"
+                  value={manualPhone}
+                  onChange={(event) => setManualPhone(event.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="manual-company">{t('reception.manualCompany')}</Label>
+                <Select
+                  id="manual-company"
+                  value={manualCompany}
+                  onChange={(event) => {
+                    setManualCompany(event.target.value);
+                    setManualSlot('');
+                  }}
+                >
+                  <option value="">{t('reception.manualCompany')}</option>
+                  {dayCompanies.map((c) => (
+                    <option key={c.id} value={c.id} disabled={c.free === 0}>
+                      {c.free === 0 ? `${c.name} (${t('reception.full')})` : c.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="manual-slot">{t('reception.manualSlot')}</Label>
+                <Select
+                  id="manual-slot"
+                  value={manualSlot}
+                  disabled={!manualCompany}
+                  onChange={(event) => setManualSlot(event.target.value)}
+                >
+                  <option value="">{manualCompany ? t('reception.manualSlot') : t('reception.chooseCompanyFirst')}</option>
+                  {freeSlots
+                    .filter((s) => s.company_id === manualCompany)
+                    .map((s) => (
+                      <option key={s.slot_id} value={s.slot_id}>
+                        {slotLabel(s, false)}
+                      </option>
+                    ))}
+                </Select>
+              </div>
+              <Button type="button" disabled={pending || !manualPhone.trim() || !manualSlot} onClick={bookByHand}>
+                {t('reception.manualSubmit')}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {error ? <Alert tone="danger">{error}</Alert> : null}
+      {notice ? <Alert tone="ok">{notice}</Alert> : null}
 
       {searching ? (
         section(t('reception.results'), found)

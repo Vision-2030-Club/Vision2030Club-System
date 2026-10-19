@@ -1990,6 +1990,19 @@ together with its feedback.
   student in the other room. A Feedback link from a room's Google Sheet
   (`?open=<booking>`) picks that booking's room by itself. With one room
   that day, the page just names it.
+- **Booking by hand at Reception** (2026-10-19), for the project's managers
+  and HR's Directors only (`canSchedule` in `access.ts`: role manager, or
+  role hr with members.manage at all; not every HR person on the list).
+  **Manual booking**: a phone number, then the company, then one of that
+  company's free times that day (a company with none left is greyed out);
+  `deskBookAction` finds the applicant by phone, puts them on that
+  assignment's accepted list (`accept_for_session`) and books them, or moves
+  their existing time with that company. A number nobody applied with is
+  refused (add it to a room's accepted phones, or use walk-ins).
+  **Reschedule** on a scheduled student: another free time of the same
+  company that day (`deskMoveAction`, `staff_move_booking`). The Bookings tab
+  is open to the same people (booking and moving); cancelling there stays
+  the managers'.
 - **No-shows are the reception desk's** (2026-10-19). Reception marks a
   scheduled student **No show** (pressed twice to confirm) and can undo it
   (`checkInAction`, moves `noShow` / `undoNoShow`, with `p_expected`). A

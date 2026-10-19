@@ -5,7 +5,7 @@ import { ActionForm } from '@/components/ActionForm';
 import { ConfirmForm } from '@/components/ConfirmForm';
 import { Badge, Button, Card, EmptyState, Input, Label, Select } from '@/components/ui';
 import { formatDateTime, formatTime, localized } from '@/lib/format';
-import { can, getInterviewAccess } from '@/lib/interviews/access';
+import { can, canSchedule, getInterviewAccess } from '@/lib/interviews/access';
 import { loadApplicants, loadCompanies, loadFreeSlots, loadRooms } from '@/lib/interviews/queries';
 import type { Booking, SlotStatus } from '@/lib/interviews/types';
 import { STAGE_TONES } from '@/lib/interviews/ui';
@@ -13,9 +13,10 @@ import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { staffBookAction, staffCancelAction, staffMoveAction } from '../actions';
 
 /**
- * Any booking, by a manager: book a slot for a student who cannot, move one
- * to another free slot of the same company, or cancel it with a reason. The
- * same functions the student's own page calls, minus the window and cutoff.
+ * Any booking, by a manager or one of HR's Directors (canSchedule): book a
+ * slot for a student who cannot, or move one to another free slot of the same
+ * company; managers also cancel with a reason. The same functions the
+ * student's own page calls, minus the window and cutoff.
  */
 export default async function InterviewsBookingsPage({
   params,
@@ -34,7 +35,8 @@ export default async function InterviewsBookingsPage({
 
   const t = await getTranslations('interviews');
   const tCommon = await getTranslations('common');
-  if (!can.manage(role)) return <EmptyState>{tCommon('notPermitted')}</EmptyState>;
+  if (!(await canSchedule(role))) return <EmptyState>{tCommon('notPermitted')}</EmptyState>;
+  const manage = can.manage(role);
 
   const db = createInterviewsClient();
   const [companies, rooms] = await Promise.all([loadCompanies(db, edition.id), loadRooms(db, edition.id)]);
@@ -131,7 +133,7 @@ export default async function InterviewsBookingsPage({
                             </Select>
                           </ActionForm>
                         ) : null}
-                        {b.stage !== 'done' && b.stage !== 'in_interview' ? (
+                        {manage && b.stage !== 'done' && b.stage !== 'in_interview' ? (
                           <ConfirmForm
                             action={staffCancelAction}
                             trigger={tCommon('cancel')}

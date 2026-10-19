@@ -1118,7 +1118,8 @@
       "not_checked_in": "This phone number does not belong to anyone who checked in at the event. Use the number you registered with.",
       "bad_answers": "Answer every question.",
       "not_no_show": "Only a student marked as no-show can be deleted here.",
-      "no_show_at_reception": "No-shows are marked and cleared at Reception."
+      "no_show_at_reception": "No-shows are marked and cleared at Reception.",
+      "desk_no_applicant": "No one applied with this phone number. Add it to a room's accepted phones on the Rooms tab, or ask the student to register as a walk-in."
     },
     "student": {
       "hello": "Hello, {name}.",
@@ -1281,7 +1282,20 @@
       "refused": "That did not go through. Try again.",
       "noShows": "Marked as no-show",
       "noShowConfirm": "Yes, did not come",
-      "undoNoShow": "Undo no-show"
+      "undoNoShow": "Undo no-show",
+      "manualBook": "Manual booking",
+      "manualPhone": "Student's phone number",
+      "manualSlot": "Free time",
+      "manualSubmit": "Book",
+      "manualBooked": "Booked.",
+      "manualMoved": "They already had a time with that company; it was moved to the one you chose.",
+      "reschedule": "Reschedule",
+      "rescheduleTo": "Move to",
+      "rescheduled": "Rescheduled.",
+      "noFreeTimes": "No free time left that day.",
+      "manualCompany": "Company",
+      "chooseCompanyFirst": "Choose the company first",
+      "full": "no free time"
     },
     "walkins": {
       "title": "Walk-ins waiting",
