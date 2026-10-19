@@ -1281,7 +1281,6 @@
       "noDays": "No company has interview times yet.",
       "refused": "That did not go through. Try again.",
       "noShows": "Marked as no-show",
-      "noShowConfirm": "Yes, did not come",
       "undoNoShow": "Undo no-show",
       "manualBook": "Manual booking",
       "manualPhone": "Student's phone number",
@@ -1295,7 +1294,13 @@
       "noFreeTimes": "No free time left that day.",
       "manualCompany": "Company",
       "chooseCompanyFirst": "Choose the company first",
-      "full": "no free time"
+      "full": "no free time",
+      "noShowDelete": "Did not come. Delete the booking?",
+      "noShowDeleteHint": "Yes frees the time for a walk-in or another booking. No only marks them as no-show.",
+      "noShowYes": "Yes, delete",
+      "noShowNo": "No, only mark",
+      "noShowBack": "Back",
+      "manualNoName": "Registered (no name on file)"
     },
     "walkins": {
       "title": "Walk-ins waiting",

@@ -10,6 +10,9 @@ import { stageAction } from '../actions';
 
 const POLL_MS = 12_000;
 const ALL_STAGES: Stage[] = ['scheduled', 'arrived', 'in_interview', 'done', 'no_show'];
+// What a manager's "Set stage" offers: no no-show, which is the reception
+// desk's to mark and clear (2026-10-19), managers included (2026-10-20).
+const FLOOR_STAGES: Stage[] = ['scheduled', 'arrived', 'in_interview', 'done'];
 
 function timeLabel(iso: string, locale: string) {
   return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-u-ca-gregory-nu-latn' : 'en-GB', {
@@ -171,16 +174,16 @@ export function FloorBoard({
                             <Button
                               key={to}
                               type="button"
-                              variant={forward ? 'primary' : to === 'no_show' ? 'danger' : 'secondary'}
+                              variant={forward ? 'primary' : 'secondary'}
                               disabled={pending}
                               onClick={() => move(row.booking_id!, to)}
                               className="px-2.5 py-1 text-xs"
                             >
-                              {forward || to === 'no_show' ? t(`stage.${to}`) : `↶ ${t(`stage.${to}`)}`}
+                              {forward ? t(`stage.${to}`) : `↶ ${t(`stage.${to}`)}`}
                             </Button>
                           );
                         })}
-                        {isManager ? (
+                        {isManager && stage !== 'no_show' ? (
                           <select
                             aria-label={t('floor.setStage')}
                             value=""
@@ -191,7 +194,7 @@ export function FloorBoard({
                             className="rounded-lg border border-line bg-surface px-2 py-1 text-xs text-ink-muted"
                           >
                             <option value="">{t('floor.setStage')}</option>
-                            {ALL_STAGES.filter((s) => s !== stage).map((s) => (
+                            {FLOOR_STAGES.filter((s) => s !== stage).map((s) => (
                               <option key={s} value={s}>
                                 {t(`stage.${s}`)}
                               </option>

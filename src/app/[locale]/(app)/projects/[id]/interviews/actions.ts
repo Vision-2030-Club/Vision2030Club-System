@@ -1214,9 +1214,9 @@ export async function stageAction(input: {
     .eq('edition_id', access.edition.id)
     .maybeSingle();
   if (!booking) return fail('No such booking.', 'not_found');
-  // No-shows are the reception desk's (2026-10-19): only a manager marks or
-  // clears one from the Floor.
-  if (!can.manage(access.role) && (input.to === 'no_show' || booking.stage === 'no_show')) {
+  // No-shows are the reception desk's (2026-10-19): nobody marks or clears
+  // one from the Floor, managers included (2026-10-20).
+  if (input.to === 'no_show' || booking.stage === 'no_show') {
     const t = await getTranslations({ locale: input.locale, namespace: 'interviews' });
     return fail(t('errors.no_show_at_reception'), 'no_show_at_reception');
   }
@@ -1620,6 +1620,34 @@ export async function deskBookAction(input: {
   kickSheetsSync(access.edition.id);
   revalidate(input.locale, input.projectId);
   return ok(held ? 'moved' : 'booked');
+}
+
+/**
+ * Reception → Manual booking, while the phone number is typed: who applied
+ * with it, so the desk sees the name before booking. Only a registered
+ * applicant can be booked (deskBookAction refuses anyone else); this only
+ * shows it early. Null when not allowed or the number is too short.
+ */
+export async function deskLookupAction(input: {
+  projectId: string;
+  phone: string;
+}): Promise<{ found: boolean; name: string | null } | null> {
+  let access: Awaited<ReturnType<typeof requireInterviewAccess>>;
+  try {
+    access = await requireInterviewAccess(input.projectId, can.decide);
+  } catch {
+    return null;
+  }
+  if (!(await canSchedule(access.role))) return null;
+  const phone = normalisePhone(input.phone);
+  if (!phone || phone.length < 9) return null;
+
+  const db = createInterviewsClient();
+  const match = (await applicationsByPhone(db, access.edition.id)).get(phone);
+  if (!match) return { found: false, name: null };
+  const { data } = await db.from('applications').select('name').eq('id', match.id).maybeSingle();
+  const name = (data as { name: string | null } | null)?.name?.trim();
+  return { found: true, name: name || null };
 }
 
 /**

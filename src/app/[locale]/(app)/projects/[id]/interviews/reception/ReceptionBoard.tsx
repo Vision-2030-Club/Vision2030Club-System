@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Alert, Badge, Button, Input, Label, Select, cx } from '@/components/ui';
-import { formatTime, localized } from '@/lib/format';
+import { formatDate, formatTime, localized } from '@/lib/format';
 import { normalisePhone, westernDigits } from '@/lib/interviews/phone';
 import type { FloorRow, Stage } from '@/lib/interviews/types';
 import { STAGE_TONES } from '@/lib/interviews/ui';
-import { checkInAction, deskBookAction, deskMoveAction, removeNoShowAction } from '../actions';
+import { checkInAction, deskBookAction, deskLookupAction, deskMoveAction, removeNoShowAction } from '../actions';
 
 const POLL_MS = 10_000;
 const MINUTE = 60_000;
@@ -41,6 +41,8 @@ export function ReceptionBoard({
   initialRows,
   pollUrl,
   isToday,
+  day,
+  days = [],
   canSchedule = false,
 }: {
   locale: string;
@@ -49,6 +51,9 @@ export function ReceptionBoard({
   pollUrl: string;
   /** Lateness only means something on the day itself. */
   isToday: boolean;
+  /** The board's day, and every day with interviews (Manual booking can pick another). */
+  day: string;
+  days?: string[];
   /** Managers and HR's Directors: Manual booking and Reschedule (canSchedule). */
   canSchedule?: boolean;
 }) {
@@ -58,13 +63,21 @@ export function ReceptionBoard({
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date().getTime());
   const [pending, startTransition] = useTransition();
-  /** The no-show whose Delete was pressed once and waits for the confirming press. */
+  /**
+   * The booking whose No show (`ns-<id>`) or Delete (`<id>`) was pressed once
+   * and waits for the answer in its box.
+   */
   const [confirming, setConfirming] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualPhone, setManualPhone] = useState('');
   const [manualCompany, setManualCompany] = useState('');
   const [manualSlot, setManualSlot] = useState('');
+  const [manualDay, setManualDay] = useState(day);
+  /** Another day's rows, read when Manual booking picks a day that is not the board's. */
+  const [manualRows, setManualRows] = useState<FloorRow[] | null>(null);
+  /** Who applied with the typed number: undefined while not looked up yet. */
+  const [manualWho, setManualWho] = useState<{ found: boolean; name: string | null } | null | undefined>(undefined);
   /** The booking whose Reschedule is open, and the time chosen for it. */
   const [moving, setMoving] = useState<string | null>(null);
   const [moveSlot, setMoveSlot] = useState('');
@@ -92,6 +105,40 @@ export function ReceptionBoard({
       document.removeEventListener('visibilitychange', tick);
     };
   }, [refresh]);
+
+  // Manual booking on another day: read that day's slots once it is chosen.
+  useEffect(() => {
+    if (!manualOpen || manualDay === day) return;
+    let stale = false;
+    void (async () => {
+      try {
+        const response = await fetch(`/api/interviews/floor?project=${projectId}&day=${manualDay}`, { cache: 'no-store' });
+        if (!response.ok || stale) return;
+        const body = (await response.json()) as { rows: FloorRow[] };
+        if (!stale) setManualRows(body.rows);
+      } catch {
+        // Nothing to offer until it loads; picking the day again retries.
+      }
+    })();
+    return () => {
+      stale = true;
+    };
+  }, [manualOpen, manualDay, day, projectId]);
+
+  // Manual booking: who the typed number belongs to, shortly after typing stops.
+  useEffect(() => {
+    const phone = normalisePhone(manualPhone);
+    if (!manualOpen || !phone || phone.length < 9) return;
+    let stale = false;
+    const timer = setTimeout(async () => {
+      const who = await deskLookupAction({ projectId, phone: manualPhone });
+      if (!stale) setManualWho(who);
+    }, 400);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [manualOpen, manualPhone, projectId]);
 
   const act = (bookingId: string, move: 'checkIn' | 'undo' | 'noShow' | 'undoNoShow') => {
     setError(null);
@@ -125,10 +172,28 @@ export function ReceptionBoard({
     });
   };
 
+  /** No show → "Delete the booking?" → Yes: marked no-show, then the booking cancelled and the time freed. */
+  const noShowAndRemove = (bookingId: string) => {
+    setError(null);
+    setConfirming(null);
+    startTransition(async () => {
+      const marked = await checkInAction({ projectId, locale, bookingId, move: 'noShow' });
+      const result = marked.ok ? await removeNoShowAction({ projectId, locale, bookingId }) : marked;
+      if (!result.ok) {
+        setError(
+          result.hint && t.has(`errors.${result.hint}`)
+            ? t(`errors.${result.hint}`)
+            : (result.error ?? t('reception.refused')),
+        );
+      }
+      await refresh();
+    });
+  };
+
   const failText = (result: { error?: string; hint?: string }) =>
     result.hint && t.has(`errors.${result.hint}`) ? t(`errors.${result.hint}`) : (result.error ?? t('reception.refused'));
 
-  // Every free, open time of the day, for Manual booking and Reschedule.
+  // Every free, open time of the board's day, for Reschedule.
   const freeSlots = rows
     .filter((r) => !r.booking_id && !r.is_closed)
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
@@ -141,14 +206,22 @@ export function ReceptionBoard({
       .filter(Boolean)
       .join(' · ');
 
-  // The day's companies, each with how many free times it has left.
-  const dayCompanies = [...new Map(rows.map((r) => [r.company_id, r])).values()]
+  // Manual booking's day (the board's, or another one read for it): its
+  // companies, each with how many free times it has left.
+  const manualDayRows = manualDay === day ? rows : (manualRows ?? []);
+  const manualFree = manualDayRows
+    .filter((r) => !r.booking_id && !r.is_closed)
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  const dayCompanies = [...new Map(manualDayRows.map((r) => [r.company_id, r])).values()]
     .map((r) => ({
       id: r.company_id,
       name: localized({ name_en: r.company_name_en, name_ar: r.company_name_ar }, 'name', locale),
-      free: freeSlots.filter((s) => s.company_id === r.company_id).length,
+      free: manualFree.filter((s) => s.company_id === r.company_id).length,
     }))
     .sort((a, b) => a.name.localeCompare(b.name, locale));
+
+  const manualPhoneDigits = normalisePhone(manualPhone);
+  const manualPhoneReady = Boolean(manualPhoneDigits && manualPhoneDigits.length >= 9);
 
   const bookByHand = () => {
     setError(null);
@@ -159,6 +232,7 @@ export function ReceptionBoard({
       else {
         setNotice(result.message === 'moved' ? t('reception.manualMoved') : t('reception.manualBooked'));
         setManualPhone('');
+        setManualWho(undefined);
         setManualCompany('');
         setManualSlot('');
         setManualOpen(false);
@@ -232,38 +306,15 @@ export function ReceptionBoard({
           <Button type="button" disabled={pending} onClick={() => act(r.booking_id, 'checkIn')}>
             {t('reception.checkIn')}
           </Button>
-          {confirming === `ns-${r.booking_id}` ? (
-            <>
-              <Button
-                type="button"
-                variant="danger"
-                disabled={pending}
-                onClick={() => act(r.booking_id, 'noShow')}
-                className="px-2.5 py-1 text-xs"
-              >
-                {t('reception.noShowConfirm')}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={pending}
-                onClick={() => setConfirming(null)}
-                className="px-2.5 py-1 text-xs"
-              >
-                {t('floor.deleteKeep')}
-              </Button>
-            </>
-          ) : (
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={pending}
-              onClick={() => setConfirming(`ns-${r.booking_id}`)}
-              className="px-2.5 py-1 text-xs"
-            >
-              {t('stage.no_show')}
-            </Button>
-          )}
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={pending}
+            onClick={() => setConfirming(`ns-${r.booking_id}`)}
+            className="px-2.5 py-1 text-xs"
+          >
+            {t('stage.no_show')}
+          </Button>
         </span>
       ) : r.stage === 'arrived' ? (
         <Button
@@ -319,6 +370,27 @@ export function ReceptionBoard({
             </Button>
           </span>
         )
+      ) : null}
+      {r.stage === 'scheduled' && confirming === `ns-${r.booking_id}` ? (
+        <div
+          role="alertdialog"
+          aria-label={t('reception.noShowDelete')}
+          className="w-full space-y-2 rounded-xl border border-danger/40 bg-danger/5 p-3"
+        >
+          <p className="text-sm font-semibold">{t('reception.noShowDelete')}</p>
+          <p className="text-xs text-ink-muted">{t('reception.noShowDeleteHint')}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="danger" disabled={pending} onClick={() => noShowAndRemove(r.booking_id)}>
+              {t('reception.noShowYes')}
+            </Button>
+            <Button type="button" variant="secondary" disabled={pending} onClick={() => act(r.booking_id, 'noShow')}>
+              {t('reception.noShowNo')}
+            </Button>
+            <Button type="button" variant="secondary" disabled={pending} onClick={() => setConfirming(null)}>
+              {t('reception.noShowBack')}
+            </Button>
+          </div>
+        </div>
       ) : null}
       {canSchedule && r.stage === 'scheduled' ? (
         moving === r.booking_id ? (
@@ -430,7 +502,7 @@ export function ReceptionBoard({
             {t('reception.manualBook')}
           </Button>
           {manualOpen ? (
-            <div className="grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
+            <div className="grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] lg:items-start">
               <div>
                 <Label htmlFor="manual-phone">{t('reception.manualPhone')}</Label>
                 <Input
@@ -439,8 +511,37 @@ export function ReceptionBoard({
                   dir="ltr"
                   placeholder="05xxxxxxxx"
                   value={manualPhone}
-                  onChange={(event) => setManualPhone(event.target.value)}
+                  onChange={(event) => {
+                    setManualPhone(event.target.value);
+                    setManualWho(undefined);
+                  }}
                 />
+                {!manualPhoneReady || !manualWho ? null : manualWho.found ? (
+                  <p className="mt-1 text-xs font-semibold text-ok">
+                    ✓ {manualWho.name ?? t('reception.manualNoName')}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs font-semibold text-danger">{t('errors.desk_no_applicant')}</p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="manual-day">{t('schedule.day')}</Label>
+                <Select
+                  id="manual-day"
+                  value={manualDay}
+                  onChange={(event) => {
+                    setManualDay(event.target.value);
+                    setManualRows(null);
+                    setManualCompany('');
+                    setManualSlot('');
+                  }}
+                >
+                  {(days.length ? days : [day]).map((d) => (
+                    <option key={d} value={d}>
+                      {formatDate(`${d}T12:00:00Z`, locale)}
+                    </option>
+                  ))}
+                </Select>
               </div>
               <div>
                 <Label htmlFor="manual-company">{t('reception.manualCompany')}</Label>
@@ -469,7 +570,7 @@ export function ReceptionBoard({
                   onChange={(event) => setManualSlot(event.target.value)}
                 >
                   <option value="">{manualCompany ? t('reception.manualSlot') : t('reception.chooseCompanyFirst')}</option>
-                  {freeSlots
+                  {manualFree
                     .filter((s) => s.company_id === manualCompany)
                     .map((s) => (
                       <option key={s.slot_id} value={s.slot_id}>
@@ -478,7 +579,12 @@ export function ReceptionBoard({
                     ))}
                 </Select>
               </div>
-              <Button type="button" disabled={pending || !manualPhone.trim() || !manualSlot} onClick={bookByHand}>
+              <Button
+                type="button"
+                disabled={pending || !manualPhoneReady || !manualWho?.found || !manualSlot}
+                onClick={bookByHand}
+                className="lg:mt-6"
+              >
                 {t('reception.manualSubmit')}
               </Button>
             </div>
