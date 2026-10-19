@@ -37,6 +37,13 @@ export type ComponentAccess = {
   component_key: string;
   external_ref: string | null;
   role: ComponentRole;
+  /**
+   * Also listed as a receptionist (0069) while the role above is another one.
+   * my_component_access() answers only the strongest role, so an organizer
+   * who is also a receptionist read as an organizer and lost the Reception
+   * tab; the club wants them to have both (2026-10-20). See can.reception.
+   */
+  desk: boolean;
 };
 
 /** Where each component's pages live, keyed by `project_components.component_key`. */
@@ -52,8 +59,19 @@ export function componentHref(projectId: string, componentKey: string): string {
 /** One query per request, shared by the sidebar and every component page. */
 export const getMyComponentAccess = cache(async (): Promise<ComponentAccess[]> => {
   const supabase = await createClient();
-  const { data } = await supabase.rpc('my_component_access');
-  return (data ?? []) as ComponentAccess[];
+  const [{ data }, me] = await Promise.all([supabase.rpc('my_component_access'), getMyMember()]);
+  const rows = (data ?? []) as Omit<ComponentAccess, 'desk'>[];
+  // Where I am listed as a receptionist (readable by anyone signed in, 0062).
+  const desks = new Set<string>();
+  if (me && rows.some((r) => r.component_key === 'mock_interviews')) {
+    const { data: listed } = await supabase
+      .from('project_component_people')
+      .select('project_id')
+      .eq('member_id', me.id)
+      .eq('role', 'reception');
+    for (const row of (listed ?? []) as { project_id: string }[]) desks.add(row.project_id);
+  }
+  return rows.map((r) => ({ ...r, desk: desks.has(r.project_id) }));
 });
 
 /** The actor every write to the interviews database is recorded under. */
@@ -61,6 +79,8 @@ export type Actor = { kind: 'member'; id: string; name: string };
 
 export type InterviewAccess = {
   role: ComponentRole;
+  /** Also a receptionist (ComponentAccess.desk). */
+  desk: boolean;
   project: { id: string; name_en: string; name_ar: string };
   /** Null when the edition is missing or the interviews project is not configured. */
   edition: Edition | null;
@@ -80,6 +100,7 @@ export const getInterviewAccess = cache(
     const actor: Actor = { kind: 'member', id: me.id, name: me.name_en };
     const base = {
       role: row.role,
+      desk: row.desk,
       project: { id: row.project_id, name_en: row.name_en, name_ar: row.name_ar },
       actor,
     };
@@ -108,8 +129,13 @@ export const can = {
   manage: (role: ComponentRole) => role === 'manager',
   decide: (role: ComponentRole) => role === 'manager' || role === 'hr',
   stage: (role: ComponentRole) => role === 'manager' || role === 'organizer',
-  /** The Reception tab: checking a student in, and undoing it. */
-  reception: (role: ComponentRole) => role === 'manager' || role === 'hr' || role === 'reception',
+  /**
+   * The Reception tab: checking a student in, and undoing it. `desk`: listed
+   * as a receptionist too, whatever the strongest role (an organizer who also
+   * works the door, 2026-10-20).
+   */
+  reception: (role: ComponentRole, desk = false) =>
+    role === 'manager' || role === 'hr' || role === 'reception' || desk,
   /** Adding HR people is HR's own power; the club database re-checks it. */
   roster: (role: ComponentRole) => role === 'manager' || role === 'hr',
   /** The visitor ratings: managers, HR, and the Development team (0072). */
@@ -125,11 +151,11 @@ export const can = {
  */
 export async function requireInterviewAccess(
   projectId: string,
-  allowed: (role: ComponentRole) => boolean,
+  allowed: (role: ComponentRole, desk: boolean) => boolean,
 ): Promise<InterviewAccess & { edition: Edition; settings: EditionSettings }> {
   const access = await getInterviewAccess(projectId);
   if (!access) throw new PermissionError('interviews.open');
-  if (!allowed(access.role)) throw new PermissionError(`interviews.${access.role}`);
+  if (!allowed(access.role, access.desk)) throw new PermissionError(`interviews.${access.role}`);
   if (!access.edition || !access.settings) {
     throw new Error(
       access.configured

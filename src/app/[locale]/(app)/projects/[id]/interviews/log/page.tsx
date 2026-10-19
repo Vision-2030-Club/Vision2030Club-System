@@ -121,8 +121,8 @@ export default async function InterviewsLogPage({
                 const diff = changes(row);
                 return (
                   <tr key={row.id} className="border-t border-line align-top">
-                    <td className="ltr-nums whitespace-nowrap px-3 py-2 text-xs text-ink-muted">
-                      {formatDateTime(row.at, locale)}
+                    <td className="whitespace-nowrap px-3 py-2 text-xs text-ink-muted">
+                      <span className="ltr-nums">{formatDateTime(row.at, locale)}</span>
                     </td>
                     <td className="px-3 py-2 text-xs">
                       <Badge tone="neutral">{t(`actor.${row.actor_kind}`)}</Badge>{' '}

@@ -1845,8 +1845,12 @@ People at the door who check students in and do nothing else.
   `supabase/migrations/0069_interviews_reception.sql` widens
   `project_component_people.role` to `reception`, adds it to the write
   policy, and teaches `my_component_access()` to answer `reception`. The
-  strongest role still wins (manager > hr > organizer > reception), so a
-  person on both the organizer and reception lists acts as an organizer.
+  strongest role still wins (manager > hr > organizer > reception). Since
+  2026-10-20 a person on both the organizer and reception lists is an
+  organizer who ALSO gets the Reception tab and its actions: the app reads
+  their reception listing itself (`desk` on `ComponentAccess` /
+  `InterviewAccess`, `can.reception(role, desk)`); the database function is
+  unchanged.
 - **What they may do** (`can.reception` in `src/lib/interviews/access.ts`:
   receptionists, HR and managers). The **Reception** tab
   (`/projects/<id>/interviews/reception`): every company's students for one
@@ -2062,6 +2066,10 @@ together with its feedback.
   manager's stage menu leaves it out and hides itself on a no-show row), and
   `stageAction` refuses every move to or from `no_show`. The Floor and
   Reception show each student's company in the brand colour.
+- **Checking in is Reception's too** (2026-10-20). The Floor gives an
+  organizer no Arrived button on a scheduled student and no way back from
+  checked in to scheduled; `stageAction` refuses both for anyone but a
+  manager (`check_in_at_reception`). An organizer starts from In interview.
 - **Organizers keep their Finished button.** The Floor marks a finished
   interview with no feedback as **No feedback yet** (`withFeedbackFlags`
   in `queries.ts`), so the club can chase the company.

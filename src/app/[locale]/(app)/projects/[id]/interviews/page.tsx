@@ -155,11 +155,21 @@ export default async function InterviewsOverviewPage({
                         <span className="font-medium">{localized(company, 'name', locale)}</span>
                         {company.is_hidden ? <Badge>{t('companies.hidden')}</Badge> : null}
                       </td>
-                      <td className="ltr-nums py-2 pe-3">{c?.pending ?? 0}</td>
-                      <td className="ltr-nums py-2 pe-3">{c?.accepted ?? 0}</td>
-                      <td className="ltr-nums py-2 pe-3">{c?.rejected ?? 0}</td>
-                      <td className="ltr-nums py-2">
-                        {c?.slots_booked ?? 0} / {c?.slots_total ?? 0}
+                      {/* ltr-nums on a span, never on the td: it makes the cell inline-block and LTR,
+                          which pulls it out of its column (worst in Arabic). */}
+                      <td className="py-2 pe-3">
+                        <span className="ltr-nums">{c?.pending ?? 0}</span>
+                      </td>
+                      <td className="py-2 pe-3">
+                        <span className="ltr-nums">{c?.accepted ?? 0}</span>
+                      </td>
+                      <td className="py-2 pe-3">
+                        <span className="ltr-nums">{c?.rejected ?? 0}</span>
+                      </td>
+                      <td className="py-2">
+                        <span className="ltr-nums">
+                          {c?.slots_booked ?? 0} / {c?.slots_total ?? 0}
+                        </span>
                       </td>
                     </tr>
                   );

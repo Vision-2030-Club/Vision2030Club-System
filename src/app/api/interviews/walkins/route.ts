@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
   const access = await getInterviewAccess(project);
   if (!access?.edition) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  if (!can.reception(access.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!can.reception(access.role, access.desk)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const queue = await loadWalkinQueue(createInterviewsClient(), access.edition.id, editionToday(access.edition));
   return NextResponse.json(queue, { headers: { 'Cache-Control': 'no-store' } });
