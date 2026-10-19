@@ -46,11 +46,13 @@ short:
   TypeScript; `slotRules.ts` only mirrors the slot rules for display. A
   past time can be booked on purpose (0012).
 - Who moves a booking's stage is decided per role (the club's decisions of
-  2026-10-14): reception only checks in and undoes it (`checkInAction`);
+  2026-10-14, 2026-10-19): reception checks in and marks no-shows, and
+  undoes either (`checkInAction`);
   an organizer only in a room they run, or one nobody runs
   (`room_organizers`, enforced in `stageAction`); a company only to done,
   and only by saving its feedback (`finish_interview`, 0015); managers
   anywhere. The Google Sheets' Status column is read-only unless
   `sheet_status_edits` is on. Do not add another path that moves a stage
-  around these. A no-show can be cancelled from the Floor or Reception
-  (`removeNoShowAction`); that frees the slot and moves no stage.
+  around these. Organizers do not mark or clear no-shows (`stageAction`
+  refuses it; managers still may). A no-show's booking is cancelled from
+  Reception (`removeNoShowAction`); that frees the slot and moves no stage.

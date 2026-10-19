@@ -1990,13 +1990,14 @@ together with its feedback.
   student in the other room. A Feedback link from a room's Google Sheet
   (`?open=<booking>`) picks that booking's room by itself. With one room
   that day, the page just names it.
-- **Deleting a no-show** (2026-10-18): on the Floor, a student marked
-  *No show* gets **Delete booking** (pressed twice to confirm).
-  `removeNoShowAction` cancels it with `staff_cancel_booking`, so it is
-  logged and the slot is free again; only from no_show, for the same people
-  and rooms as the stage buttons. Reception has the same button
-  (2026-10-19), on the no-show list under "waiting" and in search results,
-  for receptionists, HR and managers in any room. The Floor and Reception show each
+- **No-shows are the reception desk's** (2026-10-19). Reception marks a
+  scheduled student **No show** (pressed twice to confirm) and can undo it
+  (`checkInAction`, moves `noShow` / `undoNoShow`, with `p_expected`). A
+  no-show is listed under "waiting" and has **Delete booking**
+  (`removeNoShowAction`: `staff_cancel_booking`, logged, slot freed). The
+  Floor no longer offers no-show or delete to organizers, and `stageAction`
+  refuses an organizer's move to or from `no_show`; a manager can still set
+  any stage from the Floor's menu. The Floor and Reception show each
   student's company in the brand colour.
 - **Organizers keep their Finished button.** The Floor marks a finished
   interview with no feedback as **No feedback yet** (`withFeedbackFlags`

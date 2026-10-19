@@ -82,10 +82,11 @@ export function ReceptionBoard({
     };
   }, [refresh]);
 
-  const act = (bookingId: string, undo: boolean) => {
+  const act = (bookingId: string, move: 'checkIn' | 'undo' | 'noShow' | 'undoNoShow') => {
     setError(null);
+    setConfirming(null);
     startTransition(async () => {
-      const result = await checkInAction({ projectId, locale, bookingId, undo });
+      const result = await checkInAction({ projectId, locale, bookingId, move });
       if (!result.ok) {
         setError(
           result.hint && t.has(`errors.${result.hint}`)
@@ -159,15 +160,49 @@ export function ReceptionBoard({
       {when(r)}
       <Badge tone={STAGE_TONES[r.stage]}>{t(`stage.${r.stage}`)}</Badge>
       {r.stage === 'scheduled' ? (
-        <Button type="button" disabled={pending} onClick={() => act(r.booking_id, false)}>
-          {t('reception.checkIn')}
-        </Button>
+        <span className="flex flex-wrap gap-1">
+          <Button type="button" disabled={pending} onClick={() => act(r.booking_id, 'checkIn')}>
+            {t('reception.checkIn')}
+          </Button>
+          {confirming === `ns-${r.booking_id}` ? (
+            <>
+              <Button
+                type="button"
+                variant="danger"
+                disabled={pending}
+                onClick={() => act(r.booking_id, 'noShow')}
+                className="px-2.5 py-1 text-xs"
+              >
+                {t('reception.noShowConfirm')}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={pending}
+                onClick={() => setConfirming(null)}
+                className="px-2.5 py-1 text-xs"
+              >
+                {t('floor.deleteKeep')}
+              </Button>
+            </>
+          ) : (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={pending}
+              onClick={() => setConfirming(`ns-${r.booking_id}`)}
+              className="px-2.5 py-1 text-xs"
+            >
+              {t('stage.no_show')}
+            </Button>
+          )}
+        </span>
       ) : r.stage === 'arrived' ? (
         <Button
           type="button"
           variant="secondary"
           disabled={pending}
-          onClick={() => act(r.booking_id, true)}
+          onClick={() => act(r.booking_id, 'undo')}
           className="px-2.5 py-1 text-xs"
         >
           ↶ {t('reception.undo')}
@@ -195,15 +230,26 @@ export function ReceptionBoard({
             </Button>
           </span>
         ) : (
-          <Button
-            type="button"
-            variant="danger"
-            disabled={pending}
-            onClick={() => setConfirming(r.booking_id)}
-            className="px-2.5 py-1 text-xs"
-          >
-            {t('floor.delete')}
-          </Button>
+          <span className="flex gap-1">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={pending}
+              onClick={() => act(r.booking_id, 'undoNoShow')}
+              className="px-2.5 py-1 text-xs"
+            >
+              ↶ {t('reception.undoNoShow')}
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              disabled={pending}
+              onClick={() => setConfirming(r.booking_id)}
+              className="px-2.5 py-1 text-xs"
+            >
+              {t('floor.delete')}
+            </Button>
+          </span>
         )
       ) : null}
     </li>

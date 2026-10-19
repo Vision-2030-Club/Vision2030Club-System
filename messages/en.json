@@ -1117,7 +1117,8 @@
       "visitor_feedback_closed": "Visitor feedback is not open right now.",
       "not_checked_in": "This phone number does not belong to anyone who checked in at the event. Use the number you registered with.",
       "bad_answers": "Answer every question.",
-      "not_no_show": "Only a student marked as no-show can be deleted here."
+      "not_no_show": "Only a student marked as no-show can be deleted here.",
+      "no_show_at_reception": "No-shows are marked and cleared at Reception."
     },
     "student": {
       "hello": "Hello, {name}.",
@@ -1278,7 +1279,9 @@
       "today": "today",
       "noDays": "No company has interview times yet.",
       "refused": "That did not go through. Try again.",
-      "noShows": "Marked as no-show"
+      "noShows": "Marked as no-show",
+      "noShowConfirm": "Yes, did not come",
+      "undoNoShow": "Undo no-show"
     },
     "walkins": {
       "title": "Walk-ins waiting",
