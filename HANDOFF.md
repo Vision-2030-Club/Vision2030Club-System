@@ -2051,10 +2051,12 @@ together with its feedback.
 - **No-shows are the reception desk's** (2026-10-19). Reception marks a
   scheduled student **No show**, which opens a box asking *Delete the
   booking?* (2026-10-20): **Yes** marks the no-show and deletes the booking
-  in one go (the time is free again, also for a walk-in, see 0020), **No**
-  only marks the no-show, **Back** does nothing. A no-show can be undone
-  (`checkInAction`, moves `noShow` / `undoNoShow`, with `p_expected`), and
-  one kept is listed under "waiting" with **Delete booking**
+  in one go (the time is free again, also for a walk-in, see 0020); **No**
+  changes nothing, the student stays scheduled (the club's decision of
+  2026-10-20: a no-show is always deleted, never kept). A no-show marked
+  before that, or from the sheet, is listed under "waiting" with **Undo**
+  (`checkInAction`, moves `noShow` / `undoNoShow`, with `p_expected`) and
+  **Delete booking**
   (`removeNoShowAction`: `staff_cancel_booking`, logged, slot freed). The
   Floor offers no no-show to anyone, managers included since 2026-10-20 (the
   manager's stage menu leaves it out and hides itself on a no-show row), and
