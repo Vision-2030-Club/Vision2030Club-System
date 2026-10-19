@@ -158,7 +158,7 @@ export default async function AppLayout({
         { href: `${base}/register`, label: tInterviews('tabs.register'), icon: 'register', show: can.decide(role) },
         { href: `${base}/companies`, label: tInterviews('tabs.companies'), icon: 'company', show: can.decide(role) },
         { href: `${base}/rooms`, label: tInterviews('tabs.rooms'), icon: 'rooms', show: can.decide(role) },
-        { href: `${base}/reception`, label: tInterviews('tabs.reception'), icon: 'attendance', show: can.reception(role) },
+        { href: `${base}/reception`, label: tInterviews('tabs.reception'), icon: 'attendance', show: can.reception(role, component.desk) },
         { href: `${base}/schedule`, label: tInterviews('tabs.schedule'), icon: 'calendar', show: can.floorAccess(role) },
         { href: `${base}/floor`, label: tInterviews('tabs.floor'), icon: 'stage', show: can.floorAccess(role) },
         { href: `${base}/visitor-feedback`, label: tInterviews('tabs.visitorFeedback'), icon: 'kpi', show: can.visitorResults(role) },

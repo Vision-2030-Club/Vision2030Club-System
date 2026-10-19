@@ -35,7 +35,7 @@ export default async function InterviewsReceptionPage({
 
   const t = await getTranslations('interviews');
   const tCommon = await getTranslations('common');
-  if (!can.reception(role)) return <EmptyState>{tCommon('notPermitted')}</EmptyState>;
+  if (!can.reception(role, access.desk)) return <EmptyState>{tCommon('notPermitted')}</EmptyState>;
 
   const db = createInterviewsClient();
   const days = sessionDays(await loadSessions(db, edition.id));

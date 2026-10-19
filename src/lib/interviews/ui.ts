@@ -22,8 +22,9 @@ export const STAGE_TONES: Record<Stage, 'neutral' | 'brand' | 'warn' | 'ok' | 'd
  * draw.
  */
 export const ORGANIZER_MOVES: Record<Stage, Stage[]> = {
-  scheduled: ['arrived'],
-  arrived: ['in_interview', 'scheduled'],
+  // Checking in (and undoing it) is Reception's (2026-10-20).
+  scheduled: [],
+  arrived: ['in_interview'],
   in_interview: ['done', 'arrived'],
   done: ['in_interview'],
   // No-shows are marked and cleared at Reception (2026-10-19).

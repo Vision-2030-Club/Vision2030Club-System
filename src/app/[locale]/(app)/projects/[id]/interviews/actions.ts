@@ -1220,6 +1220,15 @@ export async function stageAction(input: {
     const t = await getTranslations({ locale: input.locale, namespace: 'interviews' });
     return fail(t('errors.no_show_at_reception'), 'no_show_at_reception');
   }
+  // Checking in, and undoing it, is Reception's too (2026-10-20): an
+  // organizer starts with a student who is already checked in.
+  if (
+    !can.manage(access.role) &&
+    ((booking.stage === 'scheduled' && input.to === 'arrived') || (booking.stage === 'arrived' && input.to === 'scheduled'))
+  ) {
+    const t = await getTranslations({ locale: input.locale, namespace: 'interviews' });
+    return fail(t('errors.check_in_at_reception'), 'check_in_at_reception');
+  }
   if (!can.manage(access.role)) {
     const slot = (booking as unknown as { slots: { room_id: string; sessions: { day: string } | null } | null }).slots;
     const owner = slot?.sessions
@@ -1259,7 +1268,7 @@ export async function removeNoShowAction(input: {
 }): Promise<ActionResult> {
   let access: Awaited<ReturnType<typeof requireInterviewAccess>>;
   try {
-    access = await requireInterviewAccess(input.projectId, (role) => can.stage(role) || can.reception(role));
+    access = await requireInterviewAccess(input.projectId, (role, desk) => can.stage(role) || can.reception(role, desk));
   } catch (error) {
     return fail(error instanceof Error ? error.message : 'Not allowed.');
   }

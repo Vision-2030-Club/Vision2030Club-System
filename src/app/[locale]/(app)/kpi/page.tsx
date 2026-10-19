@@ -378,7 +378,9 @@ export default async function KpiPage({
             <tbody className="divide-y divide-line">
               {monthRowsShown.map((m) => (
                 <tr key={`${m.month}:${m.member_id}`} className="hover:bg-surface-muted">
-                  <td className="px-4 py-2.5 ltr-nums">{m.month}</td>
+                  <td className="px-4 py-2.5">
+                    <span className="ltr-nums">{m.month}</span>
+                  </td>
                   <td className="px-4 py-2.5">
                     <MemberLink
                       id={m.member_id}

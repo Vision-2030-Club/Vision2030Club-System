@@ -93,7 +93,9 @@ export default async function InterviewsMessagesPage({
                       </div>
                     </td>
                     <td className="px-3 py-2 text-xs">{t(`emailKind.${row.kind}`)}</td>
-                    <td className="ltr-nums px-3 py-2 text-xs text-ink-muted">{formatDateTime(row.created_at, locale)}</td>
+                    <td className="px-3 py-2 text-xs text-ink-muted">
+                      <span className="ltr-nums">{formatDateTime(row.created_at, locale)}</span>
+                    </td>
                     <td className="px-3 py-2 text-xs">
                       <Badge tone={TONES[state]}>{t(`messages.state_${state}`)}</Badge>
                       {row.sent_at ? (

@@ -51,7 +51,8 @@ short:
   undoes either (`checkInAction`); booking and rescheduling by hand is for
   managers and HR's Directors only (`canSchedule`);
   an organizer only in a room they run, or one nobody runs
-  (`room_organizers`, enforced in `stageAction`); a company only to done,
+  (`room_organizers`, enforced in `stageAction`), from checked in onwards:
+  checking in and undoing it are Reception's (2026-10-20); a company only to done,
   and only by saving its feedback (`finish_interview`, 0015); managers
   anywhere. The Google Sheets' Status column is read-only unless
   `sheet_status_edits` is on. Do not add another path that moves a stage

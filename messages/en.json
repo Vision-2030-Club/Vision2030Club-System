@@ -1119,6 +1119,7 @@
       "bad_answers": "Answer every question.",
       "not_no_show": "Only a student marked as no-show can be deleted here.",
       "no_show_at_reception": "No-shows are marked and cleared at Reception.",
+      "check_in_at_reception": "Checking a student in is done at Reception.",
       "desk_no_applicant": "No one applied with this phone number. Add it to a room's accepted phones on the Rooms tab, or ask the student to register as a walk-in."
     },
     "student": {
