@@ -7,7 +7,7 @@ import { formatTime, localized } from '@/lib/format';
 import { normalisePhone, westernDigits } from '@/lib/interviews/phone';
 import type { FloorRow, Stage } from '@/lib/interviews/types';
 import { STAGE_TONES } from '@/lib/interviews/ui';
-import { checkInAction } from '../actions';
+import { checkInAction, removeNoShowAction } from '../actions';
 
 const POLL_MS = 10_000;
 const MINUTE = 60_000;
@@ -55,6 +55,8 @@ export function ReceptionBoard({
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date().getTime());
   const [pending, startTransition] = useTransition();
+  /** The no-show whose Delete was pressed once and waits for the confirming press. */
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -95,6 +97,22 @@ export function ReceptionBoard({
     });
   };
 
+  const remove = (bookingId: string) => {
+    setError(null);
+    setConfirming(null);
+    startTransition(async () => {
+      const result = await removeNoShowAction({ projectId, locale, bookingId });
+      if (!result.ok) {
+        setError(
+          result.hint && t.has(`errors.${result.hint}`)
+            ? t(`errors.${result.hint}`)
+            : (result.error ?? t('reception.refused')),
+        );
+      }
+      await refresh();
+    });
+  };
+
   const booked = rows
     .filter((r): r is Booked => Boolean(r.booking_id && r.stage))
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
@@ -108,6 +126,7 @@ export function ReceptionBoard({
   const late = booked.filter((r) => r.stage === 'scheduled' && startsIn(r) <= 0);
   const soon = booked.filter((r) => r.stage === 'scheduled' && startsIn(r) > 0 && startsIn(r) <= SOON_MINUTES);
   const waiting = booked.filter((r) => r.stage === 'arrived');
+  const noShows = booked.filter((r) => r.stage === 'no_show');
 
   const when = (row: Booked) => {
     if (!isToday || row.stage !== 'scheduled') return null;
@@ -153,6 +172,39 @@ export function ReceptionBoard({
         >
           ↶ {t('reception.undo')}
         </Button>
+      ) : r.stage === 'no_show' ? (
+        confirming === r.booking_id ? (
+          <span className="flex gap-1">
+            <Button
+              type="button"
+              variant="danger"
+              disabled={pending}
+              onClick={() => remove(r.booking_id)}
+              className="px-2.5 py-1 text-xs"
+            >
+              {t('floor.deleteConfirm')}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={pending}
+              onClick={() => setConfirming(null)}
+              className="px-2.5 py-1 text-xs"
+            >
+              {t('floor.deleteKeep')}
+            </Button>
+          </span>
+        ) : (
+          <Button
+            type="button"
+            variant="danger"
+            disabled={pending}
+            onClick={() => setConfirming(r.booking_id)}
+            className="px-2.5 py-1 text-xs"
+          >
+            {t('floor.delete')}
+          </Button>
+        )
       ) : null}
     </li>
   );
@@ -213,6 +265,7 @@ export function ReceptionBoard({
           {section(t('reception.late'), late, 'danger')}
           {section(t('reception.soon', { minutes: SOON_MINUTES }), soon)}
           {section(t('reception.waitingList'), waiting)}
+          {noShows.length ? section(t('reception.noShows'), noShows) : null}
         </>
       ) : (
         <>

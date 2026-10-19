@@ -1994,7 +1994,9 @@ together with its feedback.
   *No show* gets **Delete booking** (pressed twice to confirm).
   `removeNoShowAction` cancels it with `staff_cancel_booking`, so it is
   logged and the slot is free again; only from no_show, for the same people
-  and rooms as the stage buttons. The Floor and Reception show each
+  and rooms as the stage buttons. Reception has the same button
+  (2026-10-19), on the no-show list under "waiting" and in search results,
+  for receptionists, HR and managers in any room. The Floor and Reception show each
   student's company in the brand colour.
 - **Organizers keep their Finished button.** The Floor marks a finished
   interview with no feedback as **No feedback yet** (`withFeedbackFlags`

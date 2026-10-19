@@ -1277,7 +1277,8 @@
       "allOfDay": "Everyone on this day",
       "today": "today",
       "noDays": "No company has interview times yet.",
-      "refused": "That did not go through. Try again."
+      "refused": "That did not go through. Try again.",
+      "noShows": "Marked as no-show"
     },
     "walkins": {
       "title": "Walk-ins waiting",
