@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Button, Card, EmptyState, Label, Select } from '@/components/ui';
 import { formatDate } from '@/lib/format';
-import { can, getInterviewAccess } from '@/lib/interviews/access';
+import { can, canSchedule, getInterviewAccess } from '@/lib/interviews/access';
 import { loadDayRows, loadSessions, sessionDays, toFloorRow } from '@/lib/interviews/queries';
 import { editionToday, loadWalkinQueue, walkinSettings } from '@/lib/interviews/walkins';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
@@ -85,6 +85,7 @@ export default async function InterviewsReceptionPage({
           initialRows={rows}
           pollUrl={`/api/interviews/floor?project=${id}&day=${selectedDay}`}
           isToday={selectedDay === today}
+          canSchedule={await canSchedule(role)}
         />
       )}
     </div>
