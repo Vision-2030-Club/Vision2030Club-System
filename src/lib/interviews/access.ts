@@ -24,7 +24,9 @@ import type { Edition, EditionSettings } from '@/lib/interviews/types';
  *              Checks students in at the door (the Reception tab) and
  *              nothing else.
  *   member     Outreach only (0065): on the project, works its targets.
- *   viewer     Outreach only: may see the project's KPI, reads the numbers.
+ *   viewer     Outreach: may see the project's KPI, reads the numbers.
+ *              Mock Interviews (0072): the Development team, who read the
+ *              visitor ratings (the Visitor feedback tab) and nothing else.
  */
 export type ComponentRole = 'manager' | 'hr' | 'organizer' | 'reception' | 'member' | 'viewer';
 
@@ -110,6 +112,10 @@ export const can = {
   reception: (role: ComponentRole) => role === 'manager' || role === 'hr' || role === 'reception',
   /** Adding HR people is HR's own power; the club database re-checks it. */
   roster: (role: ComponentRole) => role === 'manager' || role === 'hr',
+  /** The visitor ratings: managers, HR, and the Development team (0072). */
+  visitorResults: (role: ComponentRole) => role === 'manager' || role === 'hr' || role === 'viewer',
+  /** Every page that shows students: everyone with a working role, not a viewer. */
+  floorAccess: (role: ComponentRole) => role !== 'viewer' && role !== 'member',
 };
 
 /**

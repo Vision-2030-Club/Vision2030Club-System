@@ -1921,6 +1921,33 @@ needs (`fitName`), on one line or two. Up next is smaller cards of the same
 kind. Checked in a headless browser at 1920×1080 and 1080×1920 with 1, 4, 9
 and 14 people called.
 
+### Visitor feedback without a phone; the Development team reads it (2026-10-19)
+
+Two migrations, **not yet applied**, both applied by the project lead
+**before** this change is merged (the new form sends no phone, which 0018
+refuses):
+
+- `supabase/interviews/migrations/0019_visitor_feedback_anonymous.sql`
+  (Interviews database): `application_id` and `phone` may be empty, and
+  `submit_visitor_feedback` saves an answer with no phone as anonymous. A
+  phone, if a page still sends one, is handled exactly as in 0018. The form
+  no longer asks for a phone; a cookie (`vf_<slug>`) remembers that a device
+  answered, and the page thanks it instead of asking again. The database
+  does not limit anonymous answers per person.
+- `supabase/migrations/0072_interviews_development_viewer.sql` (club
+  database): `my_component_access()` gives the **Development team**
+  (`teams.key = 'DEVELOPMENT'`) the role `viewer` on every Mock Interviews
+  project, below reception. A viewer sees only the **Visitor feedback** tab
+  (`can.visitorResults`); the overview sends them there, and Schedule,
+  Floor and `/api/interviews/floor` refuse them (`can.floorAccess`); every
+  other page already required a stronger role.
+- The results page shows no names any more, also for answers given with a
+  phone before 0019.
+
+Both checked on local Postgres 16: a Development member gets `viewer`, one
+who is also an organizer stays `organizer`, another team gets nothing;
+anonymous answers are saved, incomplete ones and a closed link refused.
+
 ### Visitor feedback (0018, 2026-10-18)
 
 `supabase/interviews/migrations/0018_visitor_feedback.sql`, **not yet

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { Link } from '@/i18n/navigation';
+import { Link, redirect } from '@/i18n/navigation';
 import { StatTile } from '@/components/charts/BarList';
 import { Badge, Card, EmptyState } from '@/components/ui';
 import { formatDateTime, localized } from '@/lib/format';
@@ -37,6 +37,8 @@ export default async function InterviewsOverviewPage({
   const access = await getInterviewAccess(id);
   if (!access?.edition) notFound();
   const { edition, role } = access;
+  // The Development team reads only the visitor ratings (0072).
+  if (!can.floorAccess(role)) redirect({ href: `/projects/${id}/interviews/visitor-feedback`, locale });
 
   const t = await getTranslations('interviews');
   const db = createInterviewsClient();

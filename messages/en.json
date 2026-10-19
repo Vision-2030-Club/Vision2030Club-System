@@ -1332,10 +1332,8 @@
     },
     "visitorFeedback": {
       "title": "Visitor feedback",
-      "intro": "Thank you for coming. Enter the phone number you registered with and tell us how the event went.",
+      "intro": "Thank you for coming. Tell us how the event went; your answers are anonymous.",
       "closed": "Visitor feedback is not open right now.",
-      "phone": "Phone number",
-      "phoneHint": "The number you registered with at the event.",
       "q": {
         "event_quality": "How satisfied are you with the quality of the event?",
         "club_goals": "How clear are the club's goals?",
@@ -1353,7 +1351,7 @@
       "thanks": "Thank you! Your feedback was received.",
       "replaced": "Thank you! Your earlier answer was replaced with this one.",
       "settingsTitle": "Visitor feedback",
-      "settingsHint": "A public link for students who checked in to rate the event. Only someone who checked in can answer, by their phone number, once (sending again replaces their answer). Results are on the Visitor feedback tab.",
+      "settingsHint": "Visitor feedback is anonymous: the form asks no name or phone number, and each device answers once. Results are on the Visitor feedback tab (managers, HR and the Development team).",
       "qrAlt": "QR code for the visitor feedback link",
       "resultsTitle": "Visitor feedback",
       "responses": "{count, plural, =0 {No answers yet} one {# answer} other {# answers}}",

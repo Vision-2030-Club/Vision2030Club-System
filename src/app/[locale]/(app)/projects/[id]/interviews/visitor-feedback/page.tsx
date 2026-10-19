@@ -9,7 +9,9 @@ import { createInterviewsClient } from '@/lib/supabase/interviews';
 /**
  * What the students who checked in said about the event (0018): for each
  * question how many chose each answer, and the written comments. HR and the
- * managers; the link itself is switched on in Settings.
+ * managers, and the Development team (0072, read only); the link itself is
+ * switched on in Settings. The answers are anonymous (0019); no names are
+ * shown, even for answers given with a phone before that.
  */
 export default async function VisitorFeedbackResultsPage({
   params,
@@ -25,7 +27,7 @@ export default async function VisitorFeedbackResultsPage({
 
   const t = await getTranslations('interviews');
   const tCommon = await getTranslations('common');
-  if (!can.decide(role)) return <EmptyState>{tCommon('notPermitted')}</EmptyState>;
+  if (!can.visitorResults(role)) return <EmptyState>{tCommon('notPermitted')}</EmptyState>;
 
   const summary = await loadVisitorSummary(createInterviewsClient(), edition.id);
 
@@ -77,9 +79,7 @@ export default async function VisitorFeedbackResultsPage({
             {summary.comments.map((c, i) => (
               <li key={i} className="py-2 text-sm">
                 <p className="whitespace-pre-line">{c.comment}</p>
-                <p className="mt-1 text-xs text-ink-muted">
-                  {c.name} · {formatDateTime(c.at, locale)}
-                </p>
+                <p className="mt-1 text-xs text-ink-muted">{formatDateTime(c.at, locale)}</p>
               </li>
             ))}
           </ul>

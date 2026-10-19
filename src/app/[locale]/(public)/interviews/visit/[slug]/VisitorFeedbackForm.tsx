@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Alert, Button, Input, Label, Textarea, cx } from '@/components/ui';
+import { Alert, Button, Label, Textarea, cx } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
 import { visitorFeedbackAction } from './actions';
 
@@ -10,7 +10,7 @@ import { visitorFeedbackAction } from './actions';
 const QUESTIONS = ['event_quality', 'club_goals', 'activities', 'team'] as const;
 const SCALE = [4, 3, 2, 1] as const;
 
-/** Phone, four questions on a four-step scale, an optional comment. */
+/** Four questions on a four-step scale and an optional comment; no phone (0019). */
 export function VisitorFeedbackForm({ slug, locale }: { slug: string; locale: string }) {
   const t = useTranslations('interviews');
   const tCommon = useTranslations('common');
@@ -42,12 +42,6 @@ export function VisitorFeedbackForm({ slug, locale }: { slug: string; locale: st
       {/* A field no person sees; anything in it means a bot filled the form. */}
       <div className="hidden" aria-hidden="true">
         <input name="website" tabIndex={-1} autoComplete="off" />
-      </div>
-
-      <div>
-        <Label htmlFor="phone">{t('visitorFeedback.phone')}</Label>
-        <Input id="phone" name="phone" type="tel" dir="ltr" required autoComplete="tel" placeholder="05xxxxxxxx" />
-        <p className="mt-1 text-xs text-ink-muted">{t('visitorFeedback.phoneHint')}</p>
       </div>
 
       {QUESTIONS.map((q) => (
