@@ -1200,11 +1200,17 @@ export async function stageAction(input: {
   // or one nobody runs (roomOrganizers.ts). Managers may act anywhere.
   const { data: booking } = await db
     .from('bookings')
-    .select('id, slots(room_id, sessions(day))')
+    .select('id, stage, slots(room_id, sessions(day))')
     .eq('id', input.bookingId)
     .eq('edition_id', access.edition.id)
     .maybeSingle();
   if (!booking) return fail('No such booking.', 'not_found');
+  // No-shows are the reception desk's (2026-10-19): only a manager marks or
+  // clears one from the Floor.
+  if (!can.manage(access.role) && (input.to === 'no_show' || booking.stage === 'no_show')) {
+    const t = await getTranslations({ locale: input.locale, namespace: 'interviews' });
+    return fail(t('errors.no_show_at_reception'), 'no_show_at_reception');
+  }
   if (!can.manage(access.role)) {
     const slot = (booking as unknown as { slots: { room_id: string; sessions: { day: string } | null } | null }).slots;
     const owner = slot?.sessions
@@ -1282,16 +1288,28 @@ export async function removeNoShowAction(input: {
 }
 
 /**
- * The Reception tab's only move: the student is in the building (scheduled →
- * arrived), or that was a mistake (arrived → scheduled). Nothing else, so the
- * door can never change what happens inside a room. `p_expected` (0011)
- * makes a stale screen harmless: if the student was moved on in the meantime,
- * the database refuses instead of pulling them back.
+ * The Reception tab's moves, all at the door: the student is in the building
+ * (scheduled → arrived) or that was a mistake (arrived → scheduled); the
+ * student did not come (scheduled → no_show, the club's decision of
+ * 2026-10-19: reception marks no-shows, not organizers) or that was a mistake
+ * (no_show → scheduled). Nothing that happens inside a room. `p_expected`
+ * (0011) makes a stale screen harmless: if the student was moved on in the
+ * meantime, the database refuses instead of pulling them back.
  */
+const DESK_MOVES = {
+  checkIn: { from: 'scheduled', to: 'arrived' },
+  undo: { from: 'arrived', to: 'scheduled' },
+  noShow: { from: 'scheduled', to: 'no_show' },
+  undoNoShow: { from: 'no_show', to: 'scheduled' },
+} as const;
+
 export async function checkInAction(input: {
   projectId: string;
   locale: string;
   bookingId: string;
+  /** Default: check in. */
+  move?: keyof typeof DESK_MOVES;
+  /** Kept for older screens still open: the same as move 'undo'. */
   undo?: boolean;
 }): Promise<ActionResult> {
   let access: InterviewAccess & { edition: NonNullable<InterviewAccess['edition']> };
@@ -1312,12 +1330,14 @@ export async function checkInAction(input: {
     .maybeSingle();
   if (!booking) return fail('No such booking.', 'not_found');
 
+  const move = DESK_MOVES[input.move ?? (input.undo ? 'undo' : 'checkIn')];
+  if (!move) return fail('Not allowed.');
   const { error } = await db.rpc('advance_stage', {
     p_booking: input.bookingId,
-    p_to: input.undo ? 'scheduled' : 'arrived',
+    p_to: move.to,
     p_actor: access.actor,
     p_as_manager: false,
-    p_expected: input.undo ? 'arrived' : 'scheduled',
+    p_expected: move.from,
   });
   if (error) return fromPostgrest(error);
 

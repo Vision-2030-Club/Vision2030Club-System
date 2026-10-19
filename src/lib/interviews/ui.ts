@@ -17,15 +17,17 @@ export const STAGE_TONES: Record<Stage, 'neutral' | 'brand' | 'warn' | 'ok' | 'd
 
 /**
  * What an organizer may press from each stage: one step forward, one step
- * back, and no-show from the waiting stages. The database enforces the same
- * table (advance_stage, 0002); this only decides which buttons to draw.
+ * back. No-shows are the reception desk's (checkInAction, 2026-10-19), and
+ * stageAction refuses them to organizers; this only decides which buttons to
+ * draw.
  */
 export const ORGANIZER_MOVES: Record<Stage, Stage[]> = {
-  scheduled: ['arrived', 'no_show'],
-  arrived: ['in_interview', 'no_show', 'scheduled'],
+  scheduled: ['arrived'],
+  arrived: ['in_interview', 'scheduled'],
   in_interview: ['done', 'arrived'],
   done: ['in_interview'],
-  no_show: ['scheduled'],
+  // No-shows are marked and cleared at Reception (2026-10-19).
+  no_show: [],
 };
 
 /** Moves that go forward (drawn as the primary button) versus corrections. */

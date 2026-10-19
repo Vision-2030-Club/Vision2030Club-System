@@ -6,7 +6,7 @@ import { Alert, Badge, Button, Input, cx } from '@/components/ui';
 import { localized } from '@/lib/format';
 import type { FloorRow, Stage } from '@/lib/interviews/types';
 import { FORWARD_MOVES, ORGANIZER_MOVES, STAGE_TONES } from '@/lib/interviews/ui';
-import { removeNoShowAction, stageAction } from '../actions';
+import { stageAction } from '../actions';
 
 const POLL_MS = 12_000;
 const ALL_STAGES: Stage[] = ['scheduled', 'arrived', 'in_interview', 'done', 'no_show'];
@@ -49,8 +49,6 @@ export function FloorBoard({
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date().getTime());
   const [pending, startTransition] = useTransition();
-  /** The no-show whose Delete was pressed once and waits for the confirming press. */
-  const [confirming, setConfirming] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -81,18 +79,6 @@ export function FloorBoard({
     startTransition(async () => {
       const result = await stageAction({ projectId, locale, bookingId, to });
       if (!result.ok) setError(result.error ?? 'Refused');
-      await refresh();
-    });
-  };
-
-  const remove = (bookingId: string) => {
-    setError(null);
-    setConfirming(null);
-    startTransition(async () => {
-      const result = await removeNoShowAction({ projectId, locale, bookingId });
-      if (!result.ok) {
-        setError(result.hint && t.has(`errors.${result.hint}`) ? t(`errors.${result.hint}`) : (result.error ?? 'Refused'));
-      }
       await refresh();
     });
   };
@@ -194,40 +180,6 @@ export function FloorBoard({
                             </Button>
                           );
                         })}
-                        {stage === 'no_show' ? (
-                          confirming === row.booking_id ? (
-                            <>
-                              <Button
-                                type="button"
-                                variant="danger"
-                                disabled={pending}
-                                onClick={() => remove(row.booking_id!)}
-                                className="px-2.5 py-1 text-xs"
-                              >
-                                {t('floor.deleteConfirm')}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                disabled={pending}
-                                onClick={() => setConfirming(null)}
-                                className="px-2.5 py-1 text-xs"
-                              >
-                                {t('floor.deleteKeep')}
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="danger"
-                              disabled={pending}
-                              onClick={() => setConfirming(row.booking_id)}
-                              className="px-2.5 py-1 text-xs"
-                            >
-                              {t('floor.delete')}
-                            </Button>
-                          )
-                        ) : null}
                         {isManager ? (
                           <select
                             aria-label={t('floor.setStage')}
