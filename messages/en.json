@@ -1296,11 +1296,10 @@
       "manualCompany": "Company",
       "chooseCompanyFirst": "Choose the company first",
       "full": "no free time",
-      "noShowDelete": "Did not come. Delete the booking?",
-      "noShowDeleteHint": "Yes frees the time for a walk-in or another booking. No only marks them as no-show.",
+      "noShowDelete": "No-show: delete the booking?",
+      "noShowDeleteHint": "Yes records that they did not come and deletes the booking, freeing the time for a walk-in or another booking. No changes nothing.",
       "noShowYes": "Yes, delete",
-      "noShowNo": "No, only mark",
-      "noShowBack": "Back",
+      "noShowNo": "No",
       "manualNoName": "Registered (no name on file)"
     },
     "walkins": {
