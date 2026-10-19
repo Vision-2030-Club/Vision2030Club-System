@@ -1292,7 +1292,10 @@
       "reschedule": "Reschedule",
       "rescheduleTo": "Move to",
       "rescheduled": "Rescheduled.",
-      "noFreeTimes": "No free time left that day."
+      "noFreeTimes": "No free time left that day.",
+      "manualCompany": "Company",
+      "chooseCompanyFirst": "Choose the company first",
+      "full": "no free time"
     },
     "walkins": {
       "title": "Walk-ins waiting",

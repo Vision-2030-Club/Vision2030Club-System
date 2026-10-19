@@ -63,6 +63,7 @@ export function ReceptionBoard({
   const [notice, setNotice] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualPhone, setManualPhone] = useState('');
+  const [manualCompany, setManualCompany] = useState('');
   const [manualSlot, setManualSlot] = useState('');
   /** The booking whose Reschedule is open, and the time chosen for it. */
   const [moving, setMoving] = useState<string | null>(null);
@@ -140,6 +141,15 @@ export function ReceptionBoard({
       .filter(Boolean)
       .join(' · ');
 
+  // The day's companies, each with how many free times it has left.
+  const dayCompanies = [...new Map(rows.map((r) => [r.company_id, r])).values()]
+    .map((r) => ({
+      id: r.company_id,
+      name: localized({ name_en: r.company_name_en, name_ar: r.company_name_ar }, 'name', locale),
+      free: freeSlots.filter((s) => s.company_id === r.company_id).length,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, locale));
+
   const bookByHand = () => {
     setError(null);
     setNotice(null);
@@ -149,6 +159,7 @@ export function ReceptionBoard({
       else {
         setNotice(result.message === 'moved' ? t('reception.manualMoved') : t('reception.manualBooked'));
         setManualPhone('');
+        setManualCompany('');
         setManualSlot('');
         setManualOpen(false);
       }
@@ -419,7 +430,7 @@ export function ReceptionBoard({
             {t('reception.manualBook')}
           </Button>
           {manualOpen ? (
-            <div className="grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-[1fr_2fr_auto] sm:items-end">
+            <div className="grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
               <div>
                 <Label htmlFor="manual-phone">{t('reception.manualPhone')}</Label>
                 <Input
@@ -432,14 +443,39 @@ export function ReceptionBoard({
                 />
               </div>
               <div>
-                <Label htmlFor="manual-slot">{t('reception.manualSlot')}</Label>
-                <Select id="manual-slot" value={manualSlot} onChange={(event) => setManualSlot(event.target.value)}>
-                  <option value="">{freeSlots.length ? t('reception.manualSlot') : t('reception.noFreeTimes')}</option>
-                  {freeSlots.map((s) => (
-                    <option key={s.slot_id} value={s.slot_id}>
-                      {slotLabel(s, true)}
+                <Label htmlFor="manual-company">{t('reception.manualCompany')}</Label>
+                <Select
+                  id="manual-company"
+                  value={manualCompany}
+                  onChange={(event) => {
+                    setManualCompany(event.target.value);
+                    setManualSlot('');
+                  }}
+                >
+                  <option value="">{t('reception.manualCompany')}</option>
+                  {dayCompanies.map((c) => (
+                    <option key={c.id} value={c.id} disabled={c.free === 0}>
+                      {c.free === 0 ? `${c.name} (${t('reception.full')})` : c.name}
                     </option>
                   ))}
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="manual-slot">{t('reception.manualSlot')}</Label>
+                <Select
+                  id="manual-slot"
+                  value={manualSlot}
+                  disabled={!manualCompany}
+                  onChange={(event) => setManualSlot(event.target.value)}
+                >
+                  <option value="">{manualCompany ? t('reception.manualSlot') : t('reception.chooseCompanyFirst')}</option>
+                  {freeSlots
+                    .filter((s) => s.company_id === manualCompany)
+                    .map((s) => (
+                      <option key={s.slot_id} value={s.slot_id}>
+                        {slotLabel(s, false)}
+                      </option>
+                    ))}
                 </Select>
               </div>
               <Button type="button" disabled={pending || !manualPhone.trim() || !manualSlot} onClick={bookByHand}>

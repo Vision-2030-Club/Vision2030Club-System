@@ -1993,7 +1993,8 @@ together with its feedback.
 - **Booking by hand at Reception** (2026-10-19), for the project's managers
   and HR's Directors only (`canSchedule` in `access.ts`: role manager, or
   role hr with members.manage at all; not every HR person on the list).
-  **Manual booking**: a phone number and any free time that day;
+  **Manual booking**: a phone number, then the company, then one of that
+  company's free times that day (a company with none left is greyed out);
   `deskBookAction` finds the applicant by phone, puts them on that
   assignment's accepted list (`accept_for_session`) and books them, or moves
   their existing time with that company. A number nobody applied with is

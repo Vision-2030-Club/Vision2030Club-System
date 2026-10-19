@@ -1292,7 +1292,10 @@
       "reschedule": "إعادة جدولة",
       "rescheduleTo": "نقل إلى",
       "rescheduled": "تمت إعادة الجدولة.",
-      "noFreeTimes": "لا توجد أوقات متاحة في ذلك اليوم."
+      "noFreeTimes": "لا توجد أوقات متاحة في ذلك اليوم.",
+      "manualCompany": "الشركة",
+      "chooseCompanyFirst": "اختر الشركة أولًا",
+      "full": "لا أوقات متاحة"
     },
     "walkins": {
       "title": "الحضور دون موعد",
