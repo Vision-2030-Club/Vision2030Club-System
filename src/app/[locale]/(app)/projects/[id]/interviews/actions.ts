@@ -1631,13 +1631,22 @@ export async function deskBookAction(input: {
   });
   if (accepted.error) return fromPostgrest(accepted.error);
 
+  // One live booking per student per company (bookings_one_per_company): a
+  // scheduled one is moved to the chosen time; any other cannot be, so say why
+  // rather than the database's "already started" (2026-10-20).
   const { data: held } = await db
     .from('bookings')
-    .select('id')
+    .select('id, stage, starts_at')
     .eq('application_id', match.id)
     .eq('company_id', slot.company_id)
     .is('cancelled_at', null)
     .maybeSingle();
+  if (held && held.stage !== 'scheduled') {
+    const when = formatDate(held.starts_at, input.locale);
+    return held.stage === 'no_show'
+      ? fail(t('errors.desk_held_no_show', { when }), 'desk_held_no_show')
+      : fail(t('errors.desk_already_interviewed', { when }), 'desk_already_interviewed');
+  }
   const { error } = held
     ? await db.rpc('staff_move_booking', { p_booking: held.id, p_slot: slot.id, p_actor: access.actor })
     : await db.rpc('staff_book_slot', { p_application: match.id, p_slot: slot.id, p_actor: access.actor });

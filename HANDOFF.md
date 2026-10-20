@@ -2047,7 +2047,11 @@ together with its feedback.
   in a form (apply, candidate link, walk-in), which always leaves a name: a
   number HR only pasted into an accepted list is a phone-only application
   with an empty name and is refused (`desk_not_registered`), here and on the
-  Bookings tab (`staffBookAction`), so no booking is made with just a phone;
+  Bookings tab (`staffBookAction`), so no booking is made with just a phone.
+  A student holds one live booking per company: a scheduled one is moved to
+  the chosen time; one already started or done is refused as
+  `desk_already_interviewed`, a kept no-show as `desk_held_no_show` (delete
+  it at Reception first) instead of the database's "already started";
   `deskBookAction` finds the applicant by phone, puts them on that
   assignment's accepted list (`accept_for_session`) and books them, or moves
   their existing time with that company. A number nobody applied with is
