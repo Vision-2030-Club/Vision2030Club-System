@@ -2043,7 +2043,11 @@ together with its feedback.
   company's free times that day (a company with none left is greyed out).
   As the number is typed the panel shows who applied with it
   (`deskLookupAction`), or that nobody did, and Book stays off until it is
-  a registered applicant (2026-10-20);
+  a registered applicant (2026-10-20). Registered means the student filled
+  in a form (apply, candidate link, walk-in), which always leaves a name: a
+  number HR only pasted into an accepted list is a phone-only application
+  with an empty name and is refused (`desk_not_registered`), here and on the
+  Bookings tab (`staffBookAction`), so no booking is made with just a phone;
   `deskBookAction` finds the applicant by phone, puts them on that
   assignment's accepted list (`accept_for_session`) and books them, or moves
   their existing time with that company. A number nobody applied with is
