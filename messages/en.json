@@ -1120,7 +1120,8 @@
       "not_no_show": "Only a student marked as no-show can be deleted here.",
       "no_show_at_reception": "No-shows are marked and cleared at Reception.",
       "check_in_at_reception": "Checking a student in is done at Reception.",
-      "desk_no_applicant": "No one applied with this phone number. Add it to a room's accepted phones on the Rooms tab, or ask the student to register as a walk-in."
+      "desk_no_applicant": "No one applied with this phone number. Add it to a room's accepted phones on the Rooms tab, or ask the student to register as a walk-in.",
+      "desk_not_registered": "This number was only added to an accepted list; the student never registered. Ask them to register on the company's candidate link or as a walk-in, then book them."
     },
     "student": {
       "hello": "Hello, {name}.",
@@ -1299,8 +1300,7 @@
       "noShowDelete": "No-show: delete the booking?",
       "noShowDeleteHint": "Yes records that they did not come and deletes the booking, freeing the time for a walk-in or another booking. No changes nothing.",
       "noShowYes": "Yes, delete",
-      "noShowNo": "No",
-      "manualNoName": "Registered (no name on file)"
+      "noShowNo": "No"
     },
     "walkins": {
       "title": "Walk-ins waiting",

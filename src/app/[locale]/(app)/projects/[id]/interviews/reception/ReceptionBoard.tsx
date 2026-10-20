@@ -77,7 +77,7 @@ export function ReceptionBoard({
   /** Another day's rows, read when Manual booking picks a day that is not the board's. */
   const [manualRows, setManualRows] = useState<FloorRow[] | null>(null);
   /** Who applied with the typed number: undefined while not looked up yet. */
-  const [manualWho, setManualWho] = useState<{ found: boolean; name: string | null } | null | undefined>(undefined);
+  const [manualWho, setManualWho] = useState<{ found: boolean; registered: boolean; name: string | null } | null | undefined>(undefined);
   /** The booking whose Reschedule is open, and the time chosen for it. */
   const [moving, setMoving] = useState<string | null>(null);
   const [moveSlot, setMoveSlot] = useState('');
@@ -516,12 +516,12 @@ export function ReceptionBoard({
                     setManualWho(undefined);
                   }}
                 />
-                {!manualPhoneReady || !manualWho ? null : manualWho.found ? (
-                  <p className="mt-1 text-xs font-semibold text-ok">
-                    ✓ {manualWho.name ?? t('reception.manualNoName')}
-                  </p>
+                {!manualPhoneReady || !manualWho ? null : manualWho.registered ? (
+                  <p className="mt-1 text-xs font-semibold text-ok">✓ {manualWho.name}</p>
                 ) : (
-                  <p className="mt-1 text-xs font-semibold text-danger">{t('errors.desk_no_applicant')}</p>
+                  <p className="mt-1 text-xs font-semibold text-danger">
+                    {manualWho.found ? t('errors.desk_not_registered') : t('errors.desk_no_applicant')}
+                  </p>
                 )}
               </div>
               <div>
@@ -581,7 +581,7 @@ export function ReceptionBoard({
               </div>
               <Button
                 type="button"
-                disabled={pending || !manualPhoneReady || !manualWho?.found || !manualSlot}
+                disabled={pending || !manualPhoneReady || !manualWho?.registered || !manualSlot}
                 onClick={bookByHand}
                 className="lg:mt-6"
               >

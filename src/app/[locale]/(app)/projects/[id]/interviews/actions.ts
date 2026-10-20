@@ -1512,8 +1512,13 @@ export async function staffBookAction(
   if ('error' in g) return fail(g.error);
 
   const db = createInterviewsClient();
+  const applicationId = requiredText(formData, 'application_id');
+  if (!(await registeredName(db, applicationId))) {
+    const t = await getTranslations({ locale: g.locale, namespace: 'interviews' });
+    return fail(t('errors.desk_not_registered'), 'desk_not_registered');
+  }
   const { error } = await db.rpc('staff_book_slot', {
-    p_application: requiredText(formData, 'application_id'),
+    p_application: applicationId,
     p_slot: requiredText(formData, 'slot_id'),
     p_actor: g.access.actor,
   });
@@ -1568,6 +1573,18 @@ export async function staffCancelAction(
 }
 
 /**
+ * Registered = the student filled in a form themselves (the apply form, a
+ * candidate link, or a walk-in), which always gives a name. A number HR
+ * pasted into an accepted list (0013, 0014) is an application with only a
+ * phone and an empty name until the student opens the candidate link; it is
+ * not a registration, and the club does not want such bookings (2026-10-20).
+ */
+async function registeredName(db: ReturnType<typeof createInterviewsClient>, applicationId: string): Promise<string | null> {
+  const { data } = await db.from('applications').select('name').eq('id', applicationId).maybeSingle();
+  return (data as { name: string | null } | null)?.name?.trim() || null;
+}
+
+/**
  * Reception → Manual booking (managers and HR's Directors): a student found by
  * phone number (normalised, applicationsByPhone) is put on the assignment's
  * accepted list (accept_for_session, which also accepts them for the company)
@@ -1595,6 +1612,7 @@ export async function deskBookAction(input: {
   const db = createInterviewsClient();
   const match = (await applicationsByPhone(db, access.edition.id)).get(phone);
   if (!match) return fail(t('errors.desk_no_applicant'), 'desk_no_applicant');
+  if (!(await registeredName(db, match.id))) return fail(t('errors.desk_not_registered'), 'desk_not_registered');
 
   const { data: slot } = await db
     .from('slots')
@@ -1640,7 +1658,7 @@ export async function deskBookAction(input: {
 export async function deskLookupAction(input: {
   projectId: string;
   phone: string;
-}): Promise<{ found: boolean; name: string | null } | null> {
+}): Promise<{ found: boolean; registered: boolean; name: string | null } | null> {
   let access: Awaited<ReturnType<typeof requireInterviewAccess>>;
   try {
     access = await requireInterviewAccess(input.projectId, can.decide);
@@ -1653,10 +1671,9 @@ export async function deskLookupAction(input: {
 
   const db = createInterviewsClient();
   const match = (await applicationsByPhone(db, access.edition.id)).get(phone);
-  if (!match) return { found: false, name: null };
-  const { data } = await db.from('applications').select('name').eq('id', match.id).maybeSingle();
-  const name = (data as { name: string | null } | null)?.name?.trim();
-  return { found: true, name: name || null };
+  if (!match) return { found: false, registered: false, name: null };
+  const name = await registeredName(db, match.id);
+  return { found: true, registered: name !== null, name };
 }
 
 /**
