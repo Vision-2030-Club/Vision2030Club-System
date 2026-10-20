@@ -1122,8 +1122,8 @@
       "check_in_at_reception": "Checking a student in is done at Reception.",
       "desk_no_applicant": "No one applied with this phone number. Add it to a room's accepted phones on the Rooms tab, or ask the student to register as a walk-in.",
       "desk_not_registered": "This number was only added to an accepted list; the student never registered. Ask them to register on the company's candidate link or as a walk-in, then book them.",
-      "desk_already_interviewed": "This student already has an interview with this company ({when}) that has started or finished. A student gets one interview per company.",
-      "desk_held_no_show": "This student is marked as a no-show with this company ({when}). Delete that booking first (Reception → Marked as no-show → Delete booking), then book again."
+      "desk_in_interview": "This student is in an interview with this company right now. Book them again once it is finished.",
+      "already_interviewed": "You already had your interview with this company."
     },
     "student": {
       "hello": "Hello, {name}.",
