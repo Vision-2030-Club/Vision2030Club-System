@@ -1631,31 +1631,48 @@ export async function deskBookAction(input: {
   });
   if (accepted.error) return fromPostgrest(accepted.error);
 
-  // One live booking per student per company (bookings_one_per_company): a
-  // scheduled one is moved to the chosen time; any other cannot be, so say why
-  // rather than the database's "already started" (2026-10-20).
+  // Booking by hand overrides what the student holds with that company
+  // (2026-10-20): a scheduled booking is moved to the chosen time; a no-show
+  // or a checked-in one is cancelled (logged) and the student booked again; a
+  // finished interview is kept, with its feedback, next to the new booking
+  // (0021 lets a done one stand beside a live one). Only someone in the
+  // interview right now is refused.
   const { data: held } = await db
     .from('bookings')
-    .select('id, stage, starts_at')
+    .select('id, stage')
     .eq('application_id', match.id)
     .eq('company_id', slot.company_id)
     .is('cancelled_at', null)
+    .neq('stage', 'done')
     .maybeSingle();
-  if (held && held.stage !== 'scheduled') {
-    const when = formatDate(held.starts_at, input.locale);
-    return held.stage === 'no_show'
-      ? fail(t('errors.desk_held_no_show', { when }), 'desk_held_no_show')
-      : fail(t('errors.desk_already_interviewed', { when }), 'desk_already_interviewed');
+  if (held?.stage === 'in_interview') return fail(t('errors.desk_in_interview'), 'desk_in_interview');
+  const rebook = held && held.stage !== 'scheduled';
+  if (rebook) {
+    // Free first, so a taken time does not cost the student the booking they had.
+    const { data: taken } = await db
+      .from('bookings')
+      .select('id')
+      .eq('slot_id', slot.id)
+      .is('cancelled_at', null)
+      .maybeSingle();
+    if (taken) return fail(t('errors.slot_taken'), 'slot_taken');
+    const cancelled = await db.rpc('staff_cancel_booking', {
+      p_booking: held.id,
+      p_reason: 'Booked again by hand at Reception',
+      p_actor: access.actor,
+    });
+    if (cancelled.error) return fromPostgrest(cancelled.error);
   }
-  const { error } = held
-    ? await db.rpc('staff_move_booking', { p_booking: held.id, p_slot: slot.id, p_actor: access.actor })
-    : await db.rpc('staff_book_slot', { p_application: match.id, p_slot: slot.id, p_actor: access.actor });
+  const { error } =
+    held && !rebook
+      ? await db.rpc('staff_move_booking', { p_booking: held.id, p_slot: slot.id, p_actor: access.actor })
+      : await db.rpc('staff_book_slot', { p_application: match.id, p_slot: slot.id, p_actor: access.actor });
   if (error) return fromPostgrest(error);
 
   kickEmailDelivery();
   kickSheetsSync(access.edition.id);
   revalidate(input.locale, input.projectId);
-  return ok(held ? 'moved' : 'booked');
+  return ok(held && !rebook ? 'moved' : 'booked');
 }
 
 /**

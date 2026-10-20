@@ -2048,10 +2048,17 @@ together with its feedback.
   number HR only pasted into an accepted list is a phone-only application
   with an empty name and is refused (`desk_not_registered`), here and on the
   Bookings tab (`staffBookAction`), so no booking is made with just a phone.
-  A student holds one live booking per company: a scheduled one is moved to
-  the chosen time; one already started or done is refused as
-  `desk_already_interviewed`, a kept no-show as `desk_held_no_show` (delete
-  it at Reception first) instead of the database's "already started";
+  Manual booking overrides what the student holds with that company
+  (2026-10-20): a scheduled booking is moved to the chosen time; a no-show
+  or a checked-in one is cancelled (logged, the student emailed) and the
+  student booked again; a finished interview is kept with its feedback and a
+  second booking is made beside it; only a student in the interview right
+  now is refused (`desk_in_interview`). The second-booking case needs
+  **Interviews 0021** (`0021_manual_booking_override.sql`):
+  `bookings_one_per_company` now ignores done bookings, and `app.do_book`
+  still refuses a student booking for themselves after a finished interview
+  with that company (`already_interviewed`). Applied by the project lead in
+  the SQL editor; until then that one case is refused as `already_booked`;
   `deskBookAction` finds the applicant by phone, puts them on that
   assignment's accepted list (`accept_for_session`) and books them, or moves
   their existing time with that company. A number nobody applied with is
