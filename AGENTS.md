@@ -26,8 +26,9 @@ stop.
 ## Read before working
 
 - `CONTRIBUTING.md` — the branch-and-review routine and the commands.
-- `HANDOFF.md` — how every part of the system works, what breaks easily,
-  and what is still open. Read the section for the area you are touching.
+- `HANDOFF.md` — the current state, setup, and what is still open. It links
+  to `docs/`, one file per area (club, interviews, integrations, data and
+  testing, the spec). Read the file for the area you are touching.
 - `.claude/rules/` — the detailed rules. `team-workflow.md` and
   `secrets.md` always apply; `database.md`, `interviews.md` and
   `i18n-ui.md` apply to the paths they name. Other assistants: read them all.
@@ -52,6 +53,7 @@ stop.
 2. New text is in both `messages/en.json` and `messages/ar.json`.
 3. The change was tried on the Vercel preview, in Arabic and English, at
    phone width.
-4. `HANDOFF.md` is updated if behaviour, setup, or a fragile part changed.
+4. `HANDOFF.md` or the matching file in `docs/` is updated if behaviour,
+   setup, or a fragile part changed.
 5. A database migration says in the pull request who applies it and when.
 6. The pull request body says what changed, why, and how to try it.

@@ -18,8 +18,12 @@ assistant follows it without being told each time.
   checklist. Do not leave the body empty.
 - Commit messages are one plain sentence saying what changed and why, in
   the style of the existing history (`git log --oneline -20`).
-- Update `HANDOFF.md` in the same pull request whenever you change how a
-  part of the system works, what breaks easily, or the setup steps.
+- Commits are credited to the person who made them only. Do not add a
+  `Co-Authored-By:` line, a session link, or any other trailer naming an AI
+  assistant to a commit message.
+- Update `HANDOFF.md`, or the matching file in `docs/`, in the same pull
+  request whenever you change how a part of the system works, what breaks
+  easily, or the setup steps.
 
 ## Never
 

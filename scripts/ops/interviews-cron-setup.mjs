@@ -5,7 +5,7 @@
  *   npm run interviews:cron -- --off     remove them
  *   npm run interviews:cron -- --status  just show them
  *
- * Same mechanism as the push sweep (scripts/push-cron-setup.mjs): pg_cron in
+ * Same mechanism as the push sweep (scripts/ops/push-cron-setup.mjs): pg_cron in
  * the CLUB's Supabase project calls the deployed site with the CRON_SECRET
  * bearer token, kept in Vault. Two jobs:
  *

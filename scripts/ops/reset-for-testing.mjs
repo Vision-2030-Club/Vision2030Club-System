@@ -52,7 +52,7 @@ const KEEP_EMAIL = keepIndex === -1 ? null : (args[keepIndex + 1] ?? '').toLower
 const PASSWORD = 'Vision2030!test';
 const DOMAIN = 'vision2030.test';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const db = new pg.Client({
   connectionString: SUPABASE_DB_URL,

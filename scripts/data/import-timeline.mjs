@@ -1,7 +1,7 @@
 /**
  * Puts the semester timeline into the club calendar.
  *
- *   node --env-file=.env.local scripts/import-timeline.mjs [--sheet 1] [--dry]
+ *   node --env-file=.env.local scripts/data/import-timeline.mjs [--sheet 1] [--dry]
  *
  * Reads `First Semester Timeline- 26_48 (1).xlsx`. That workbook has ten
  * sheets — one per team — laid out as alternating rows: a row of dates, then a

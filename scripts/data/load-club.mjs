@@ -18,7 +18,7 @@
  *      backups/reset-*.json — the one `db:reset-for-testing` wrote before it
  *      replaced the club with testers). Their ids are kept.
  *   3. The members in members-import.csv — run
- *      `node scripts/build-member-csv.mjs` first so it reflects
+ *      `node scripts/data/build-member-csv.mjs` first so it reflects
  *      `Database club.xlsx`. Where the backup knows a student ID, that
  *      person's old id is reused, so nothing that pointed at them dangles.
  *      Project links follow the file: named against a project = member of it;
@@ -44,7 +44,7 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CSV = join(ROOT, 'members-import.csv');
 const ZERO = '00000000-0000-0000-0000-000000000000';
 

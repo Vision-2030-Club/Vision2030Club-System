@@ -5,7 +5,7 @@ import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/i
 import { CLUB_TIME_ZONE } from '@/lib/time';
 
 /**
- * The interviews sweep, every five minutes (scripts/interviews-cron-setup.mjs
+ * The interviews sweep, every five minutes (scripts/ops/interviews-cron-setup.mjs
  * schedules it with pg_cron in the club's Supabase project, exactly like the
  * push sweep). Three jobs:
  *

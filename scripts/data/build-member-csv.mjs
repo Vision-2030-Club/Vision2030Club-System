@@ -2,7 +2,7 @@
  * Turns the club's membership spreadsheet into a CSV the admin import screen
  * accepts.
  *
- *   node scripts/build-member-csv.mjs ["path/to/sheet.xlsx"]
+ *   node scripts/data/build-member-csv.mjs ["path/to/sheet.xlsx"]
  *
  * Defaults to `Database club.xlsx` in the repo root (gitignored, like every
  * .xlsx). Written for the first-semester 1448H sheet: name in Arabic and
@@ -22,7 +22,7 @@
  * leaving out the rows that cannot be imported and naming each one.
  */
 import { writeFileSync } from 'node:fs';
-import { openWorkbook } from './lib/xlsx.mjs';
+import { openWorkbook } from '../lib/xlsx.mjs';
 
 const XLSX = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'Database club.xlsx';
 const OUT = 'members-import.csv';

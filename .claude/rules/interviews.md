@@ -8,8 +8,8 @@ paths:
 
 # Mock Interviews (افترض)
 
-Read the "Mock Interviews component" section of `HANDOFF.md` first. In
-short:
+Read `docs/interviews.md` first, especially "Things easy to break" at
+its end. In short:
 
 - The interviews database is server-only. Pages and server actions use
   `createInterviewsClient()` (service role) and call SQL functions with the

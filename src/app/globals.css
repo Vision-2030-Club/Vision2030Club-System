@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
-  Brand palette sampled directly from Assets/PNG Logos:
+  Brand palette sampled directly from design/logos/:
   deep teal #007a8f (shield + palm) and bright teal #12abb8 (wordmark).
 */
 @theme {
