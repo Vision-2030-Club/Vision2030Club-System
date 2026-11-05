@@ -40,7 +40,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DATA = join(ROOT, 'simulation-data', 'kpi-simulation.json');
 const LAST = join(ROOT, 'simulation-data', 'last-run.json');
 const TAG = '[simulation kpi-sheets-2026-09]';

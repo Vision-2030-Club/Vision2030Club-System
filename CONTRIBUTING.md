@@ -39,7 +39,8 @@ press **Merge**. Delete the branch afterwards; GitHub offers a button.
 - **Every user-facing string goes in both `messages/en.json` and
   `messages/ar.json`.**
 - **Read `HANDOFF.md` before touching an area you have not worked in.** It
-  explains how each part works and what breaks easily.
+  links to the file in `docs/` that explains how that part works and what
+  breaks easily.
 
 ## Running locally
 

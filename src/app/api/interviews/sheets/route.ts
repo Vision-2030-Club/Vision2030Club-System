@@ -4,7 +4,7 @@ import { pullSheets } from '@/lib/interviews/sheetsSync';
 import { createInterviewsClient, isInterviewsConfigured } from '@/lib/supabase/interviews';
 
 /**
- * The Google Sheets pull, every minute (scripts/interviews-cron-setup.mjs
+ * The Google Sheets pull, every minute (scripts/ops/interviews-cron-setup.mjs
  * schedules it with pg_cron next to the five-minute sweep): a Status changed
  * in the floor sheet or a company's sheet becomes the booking's stage in the
  * app, and every sheet is brought back into agreement (sheetsSync.ts,

@@ -43,25 +43,27 @@ next-env.d.ts
 
 # Agent skills, installed per-developer rather than shared
 /.agents/
-# Claude Code: personal settings and local skills stay out; the shared rules go in.
+# Claude Code: personal settings (settings.local.json) and local skills stay
+# out; the shared rules and the shared settings.json go in.
 /.claude/*
 !/.claude/rules/
+!/.claude/settings.json
 /skills-lock.json
 
 # Real member data — national IDs, phones, emails for ~100 people.
 # Kept out of git deliberately: a private repo is not a controlled store for
 # personal data, history is permanent, and members-import.csv is regenerated
-# from the spreadsheet by scripts/build-member-csv.mjs whenever it is needed.
+# from the spreadsheet by scripts/data/build-member-csv.mjs whenever it is needed.
 *.xlsx
 members-import.csv
 
 # Source video masters. The .mov is a 21 MB QuickTime/ProRes editing file no
-# browser can play; keep masters in Drive. A web-encoded copy belongs in
-# public/ and is committed deliberately, not dragged in from the repo root.
+# browser can play; keep masters in Drive. The web-encoded copy is
+# design/video/logo-animation.mp4, committed deliberately.
 /*.mp4
 /*.mov
 
-# Database backups taken by scripts/reset-for-testing.mjs — real national IDs.
+# Database backups taken by scripts/ops/reset-for-testing.mjs — real national IDs.
 /backups/
 
 # KPI simulation input: real names and grades, never committed

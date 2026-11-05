@@ -8,7 +8,7 @@
  * Input:  "Development VC2030/" — thirteen .xlsx files, gitignored because
  *         they name real people and carry their grades.
  * Output: simulation-data/kpi-simulation.json, also gitignored, in the shape
- *         scripts/simulate-kpi.mjs expects.
+ *         scripts/data/simulate-kpi.mjs expects.
  *
  * Two shapes live in that folder:
  *
@@ -32,9 +32,9 @@
 import { readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openWorkbook } from './lib/xlsx.mjs';
+import { openWorkbook } from '../lib/xlsx.mjs';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry');
 const dirArg = args.indexOf('--dir');

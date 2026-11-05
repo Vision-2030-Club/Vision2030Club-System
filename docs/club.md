@@ -1,0 +1,628 @@
+# How the club system works
+
+Part of the project handoff — start at [`HANDOFF.md`](../HANDOFF.md).
+
+The architecture, the migrations one by one, and how each part of the club side behaves.
+
+## What exists
+
+### Stack
+
+Next.js 16.3 (App Router, Turbopack) · TypeScript · Tailwind v4 · next-intl 4 ·
+Supabase (Postgres + RLS + Auth). Node 24.
+
+Two Next 16 details that differ from older docs: middleware is now
+**`proxy.ts`** (`src/proxy.ts`), and version-matched docs ship inside
+`node_modules/next/dist/docs/` — read those rather than relying on memory.
+The block at the top of `AGENTS.md`, which `next dev` keeps current, points to them.
+
+### The two ideas everything else hangs off
+
+1. **Permissions are data (§2).** `role_permissions` maps (role, permission) →
+   scope; `role_permission_team_overrides` adds team-specific exceptions.
+   `app.can(permission, team, owner, project, assigned)` reads that mapping and
+   compares it to the row in hand. No role name appears in any policy or in any
+   application code. Changing what a role can do is an `UPDATE` — and
+   `db:prove` demonstrates exactly that, live, against an unchanged token.
+2. **The database is the security boundary.** Every table has RLS enabled
+   (deny-by-default). The API layer re-checks only to produce readable errors.
+   Audit history and status-transition validation are triggers, so no code path
+   can skip them.
+
+Two consequences worth remembering before changing anything:
+
+- `src/lib/supabase/server.ts` acts **as the signed-in user**, so RLS applies.
+  `admin.ts` (service role) bypasses RLS and is restricted to exactly two
+  operations: creating the auth account on first login, and a Super Admin
+  password reset. Do not use it for ordinary reads or writes.
+- `getMyPermissions()` in `src/lib/auth/session.ts` is for greying out buttons
+  and early error messages. It is not a gate.
+
+### Migrations (`supabase/migrations/`)
+
+| File | Contents |
+|---|---|
+| `0001_foundation.sql` | `app` schema, enums, teams, roles, members, `member_sensitive` (§5 isolation), the permission tables, `role_change_log`. Also created `skills` / `member_skills`, which 0024 drops |
+| `0002_access_functions.sql` | `app.current_member_id/current_team_id/is_signed_in`, `effective_scope`, `is_project_manager`, `is_on_project`, **`app.can`**, `app.require` |
+| `0003_foundation_rls.sql` | RLS for all of 0001; column gates — role changes need `roles.configure` (audited), team/student-ID/email/status changes need `members.manage`, `auth_user_id` is server-only |
+| `0004_seed_access_config.sql` | 8 teams, 7 roles, 23 permissions, the full baseline scope matrix, the HR and Finance team overrides |
+| `0005_projects_tasks_posts.sql` | Projects, `project_members`, `project_managers` (max-4 trigger), tasks (project XOR team), `team_posts`, their RLS |
+| `0006_request_engine.sql` | `request_hooks`, `request_types`, `request_statuses`, `request_transitions`, `requests`, `request_status_history`, `can_act_on_request`, and the three triggers |
+| `0007_calendar.sql` | `calendar_entries` (meeting **scope**), `calendar_entry_audiences` (**visibility**), `calendar_audience_roles`, `audience_matches`, RLS, and `app.hook_create_calendar_entry` registered as a hook |
+| `0008_seed_request_types.sql` | Meeting Request with the unbounded counter loop, plus money / design / IT-ticket types |
+| `0009_assets_attendance.sql` | Assets + checkouts (partial unique index = one active holder, §8), attendance with the FK-less `event_id` placeholder (§9) |
+| `0010_api_functions.sql` | `my_permissions()`, `my_member()`, `transition_request()`, `import_members()` |
+| `0011_fix_calendar_policy_recursion.sql` | Fixes a mutual-recursion bug between the calendar policies — see below |
+| `0012_kpi_module.sql` | **KPI addendum.** Splits, the task workflow columns, `task_scores` (§8 isolation), `app.can_administer_task` / `can_confirm_task` / `can_view_kpi_for_*`, the five workflow functions, and the five derived views |
+| `0013_seed_kpi_access.sql` | The Development team, the `kpi.view` and `tasks.confirm` permissions, their baseline scopes, and Development's team overrides |
+| `0014_fix_task_policy_recursion.sql` | Same 42P17 bug as 0011, latent in 0005 between `tasks` and `task_assignees` — see below |
+| `0015_task_score_delete_paths.sql` | Scores may be deleted by cascade, never by hand |
+| `0016_kpi_task_visibility.sql` | `kpi.view` widens `tasks_select` so the views can reach the rows they aggregate |
+| `0017_task_claiming_policy.sql` | The narrow INSERT policy that makes §3 self-service claiming possible |
+| `0018_kpi_project_visibility.sql` | Same as 0016, for `projects` and `project_splits` |
+| `0019_project_member_kpi_grain.sql` | One falling-behind flag per member per project, not one per split |
+| `0020_task_kpi_capabilities.sql` | `can_claim` / `can_confirm` / `can_administer` flags so the UI never re-derives authority |
+| `0021_remove_technical_team.sql` | Deletes the Technical team, refusing rather than orphaning if anything still points at it |
+| `0022_phone_format.sql` | `app.normalize_phone`, the BEFORE trigger that applies it, and the `+9665XXXXXXXX` CHECK |
+| `0023_assets_to_finance.sql` | Asset custody moves from IT to Finance; the register leaves everyone else's reach; the Asset Request type |
+| `0024_member_profile.sql` | `members.avatar_path` + the private `avatars` bucket, `member_experience`, and skills dropped |
+| `0025_asset_request_flow.sql` | `requestable_assets` (the catalogue, as opposed to the register), `app.hook_checkout_asset`, and the Asset Request's live asset picker |
+| `0026_rooms_and_bookings.sql` | **Meetings step 1.** `rooms`, `booking_settings`, `room_bookings`, the `rooms.book` / `rooms.manage` permissions, and the EXCLUDE constraint that makes double-booking impossible |
+| `0027_booking_time_zone.sql` | The club's clock becomes a setting; every hour comparison is made in it rather than in the server's timezone |
+| `0028_meeting_target_individual.sql` | Adds `individual` to `request_target_kind`, alone in its own file — Postgres will not let a new enum value be used in the transaction that adds it |
+| `0029_meetings.sql` | **The Meetings component.** `requests.target_member_id`, `meeting_details`, `app.sync_meeting_hold`, `app.meeting_recipients`, `app.hook_confirm_meeting`, and the guard making a meeting's calendar entry read-only |
+| `0030_meeting_request_config.sql` | The Meeting Request's form (online/in-person, room, "booking as"), `my_booking_identities`, `pickable_rooms` |
+| `0031_pin_meeting_proposer_party.sql` | The proposer's group is pinned at proposal time — `app.can` asks about whoever is *acting*, which is the wrong person once the other side starts countering |
+| `0032_google_connection.sql` | `google_credentials` (RLS on, zero policies), the `integrations.configure` permission, and `meeting_invite_payload` granted to the service role alone |
+| `0033_transition_fields.sql` | `request_transitions.field_schema` (what a MOVE asks) and `request_statuses.required_data_keys` (what a request must HAVE to sit somewhere); the meeting counter-offer becomes configuration |
+| `0034_workflow_hooks.sql` | `request_types.submit_permission`, `request_transitions.on_transition_hook`, `request_types.on_meeting_confirmed_hook`, and `app.system_transition` for moves a hook makes |
+| `0035_design_request.sql` | **The Design Request (§7).** Its statuses, transitions, the `open_meeting` / `resume_after_meeting` hooks, and the private `design-files` bucket |
+| `0036_status_clears_data.sql` | `request_statuses.clears_data_keys` — a status can void data that arriving there makes untrue |
+| `0038`–`0045` | **Requests that become one real Task.** `request_types.creates_task` and friends; `tasks.source_request_id` / `submission_url`; the `either` actor rule; Design and Media rebuilt on it; and four fixes the suites caught — see below |
+| `0046_remove_join_date.sql` | Drops `members.join_date` and regenerates `import_members` without it. Nothing derived from it — no ordering, filter, KPI, policy or view |
+| `0047_project_managers_and_role_names.sql` | `import_members` now writes `project_managers` too, plus a backfill for the 19 already imported; `مدير الفريق` → `قائد فريق`, `مدير المشروع` → `مدير مشروع` (`name_ar` only — the keys are what policies use) |
+| `0048_member_directory_permission.sql` | `members.directory`: the directory screen gets its own permission so `members.view` can stay `all` and the people-pickers keep working. Presidency by role, HR's Directors by team override |
+| `0037_derive_booking_identity.sql` | `app.default_booking_identity()` — the meeting form stops asking which group books the room; Money Request renamed to Fund Request / أمر صرف |
+
+Things in there that are easy to break by accident:
+
+- **RLS policies must not refer to each other in a cycle.** 0007 shipped with
+  `calendar_entries_select` selecting from `calendar_entry_audiences` while
+  that table's own policy selected back from `calendar_entries`. Postgres
+  raised `42P17 infinite recursion detected in policy` on *every* calendar
+  read, including the club-event list Guests are supposed to see. 0011 breaks
+  the cycle by moving the audience lookup into the SECURITY DEFINER function
+  `app.entry_audience_includes_me`, which is not subject to RLS while the outer
+  policy is being evaluated. If you add a policy that reads another RLS-guarded
+  table, check for the loop. **It happened twice**: 0005 shipped the identical
+  cycle between `tasks` and `task_assignees`, which went unnoticed only because
+  the tables were empty — the tasks page ignores the query error and renders
+  "no tasks". 0014 fixes it the same way, via `app.is_task_assignee`.
+- **Task status is not a column.** 0012 dropped `tasks.status`; state, risk
+  tier and both scores are derived live by `public.task_kpi`. Writes to the
+  workflow columns are rejected by `app.enforce_task_workflow` unless the
+  caller is one of `claim_task` / `submit_task_for_review` / `confirm_task` /
+  `reject_task` / `mark_task_not_done`, which signal themselves with a
+  transaction-local `app.task_workflow` setting. If you need a sixth verb, add
+  a function that sets the same flag — do not loosen the trigger.
+- **`task_scores` is isolated the way `member_sensitive` is.** §8 forbids
+  anyone seeing their own KPI, so the grade lives in its own table whose policy
+  refuses the assignee. Moving `quality` back onto `tasks` would silently
+  undo that, because assignees can already select their own task row.
+- **Every blanket `grant … delete on all tables` line** (0005, 0012, 0024)
+  re-grants DELETE on `task_scores`. 0015 revokes it, and 0024 repeats that
+  revoke for exactly this reason; repeat it again if you add another blanket
+  grant.
+- **AFTER-trigger order on `requests` is alphabetical.**
+  `requests_history_write` must sort before `requests_hook_on_approval` so the
+  history row exists before a hook runs. Renaming either trigger can silently
+  reorder them.
+- **`app.can` is called with named arguments** in policies
+  (`p_team => team_id`). Changing the parameter list breaks every policy.
+- **`own_projects` means "projects I manage"**, never "projects I'm on".
+  Membership visibility is handled separately by `app.is_on_project` in the
+  view policies. Conflating the two hands PMs manage rights on projects they
+  merely joined.
+- **The engine knows nothing about calendars.** The only link is the row in
+  `request_hooks` and the `on_approval_hook` name on the type. Keep it that way.
+- **Phone numbers are normalised by a trigger, not by callers.** 0022 rewrites
+  anything recognisably Saudi to `+9665XXXXXXXX` BEFORE the CHECK constraint
+  runs, which is why the CSV import needed no change to start conforming. The
+  member search relies on that single stored form: `phoneSearchTerm` in
+  `src/lib/phone.ts` reduces whatever was typed to the digits inside it. If you
+  loosen the trigger, the search silently stops finding people.
+- **Profile photos are in a PRIVATE bucket.** `members.avatar_path` stores an
+  object path, never a URL; pages sign one per render through
+  `src/lib/avatars.ts`. Making the bucket public would undo that in one click
+  and is the same mistake as moving `national_id` back onto `members`.
+- **"Require Meeting" is a hook, and the coupling runs one way only.** The
+  Design Request registers `open_meeting` on a transition; that hook inserts an
+  ordinary `meeting_request` row and sets `meeting_details.origin_request_id`.
+  On confirmation the Meetings component calls
+  `app.notify_meeting_confirmed`, which looks up the ORIGIN's type and runs
+  whatever that type registered. Nothing in the Meetings component names a
+  design request — `db:design` asserts that by grepping the function
+  definitions.
+- **A new foreign key can silently break a page.** PostgREST resolves an embed
+  like `members(...)` by finding THE foreign key between the two tables. Add a
+  second one and the embed becomes ambiguous — and PostgREST answers ambiguity
+  by failing the whole query with a 300, so the page renders nothing at all
+  rather than dropping one field.
+  It has happened twice, from the same migration: `requests` gained
+  `target_member_id` (a second FK to `members`) and `meeting_details` gained
+  `origin_request_id` (a second FK back to `requests`). Both took a request
+  page down completely and neither was caught by the suites, which talk to the
+  API without embeds. **When you add a FK to a table something already embeds,
+  grep for that embed and name the column: `members:submitted_by(...)`,
+  `meeting_details!request_id(...)`.**
+- **"Becomes a task" is a capability, not a type.** `request_types.creates_task`
+  turns it on; `task_due_date_keys` is an ordered list of data keys so one type
+  can carry two flavours without a branch in code. Nothing names Design or
+  Media. Every other type has the flag off and is untouched.
+- **Confirming the task IS approving the request.** There is no second review
+  layer — the task's confirm/reject is the review, which is what puts this work
+  into the KPI like all other work. `tasks.source_request_id` plus
+  `app.notify_task_event` carry the news back, deliberately the same shape as
+  `app.notify_meeting_confirmed`.
+- **A function that is not SECURITY DEFINER answers for whoever called it.**
+  `submit_task_for_review` looked up "does this need a link?" by joining to the
+  request type — as the ASSIGNEE, who usually cannot see that request. The
+  lookup found nothing, the flag stayed false, and the check failed OPEN. If a
+  guard reads a row the actor may not see, it needs a definer helper (0044).
+- **`enforce_task_workflow` has two branches for a reason.** A task may be
+  CREATED already assigned; it may not be created already submitted. Rewriting
+  the function without the INSERT branch broke most task creation and was
+  caught by db:kpi's first check (0045).
+- **A test that assumes club configuration is a broken test.** `db:rooms` and
+  `db:meetings` pin `booking_settings` to noon–midnight for the run and put the
+  club's real window back afterwards. They started failing the day somebody set
+  closing to 21:00 through the admin screen, which was the suite's fault, not
+  the system's. Anything new that depends on a setting a person can change
+  should do the same.
+- **Risk tier labels describe TIME LEFT, not lateness.** `medium` means three
+  to five days remain. It was labelled "Delayed" / "متأخرة", so a task with
+  three days left read as overdue to the people using it. Only `overdue` means
+  the date has passed; `is_delayed` in the KPI views is the separate,
+  genuinely-behind measure.
+- **`required_data_keys` asks whether data is PRESENT; `clears_data_keys` is
+  what makes it current.** 0036 exists because §7's "new Starting and Delivery
+  Date on every revision" was passing without anyone re-committing: the dates
+  from the first acceptance were still sitting in `data`. Entering
+  `revision_required` now voids them. If you add a "must be re-supplied" rule,
+  it takes both columns, not one.
+- **A transition can ask questions; a status can insist on answers.** 0033's
+  two columns are what removed the last special case from shared code — the
+  request screen used to draw two date inputs whenever a type had a field
+  called `proposed_start`, which was the meeting counter-offer form living
+  inside a component every type runs through. Put new mid-workflow inputs in
+  `request_transitions.field_schema`, and new "you cannot be here without X"
+  rules in `request_statuses.required_data_keys`. Neither needs code.
+- **The database never calls Google.** `app.hook_confirm_meeting` marks the
+  row `pending`; `ensureMeetLink` in `src/lib/google/meetings.ts` does the call
+  afterwards, from the server action that performed the transition. A trigger
+  making a network call would hold its transaction open for the length of that
+  call and turn a Google outage into "you cannot confirm your meeting". A
+  failure is recorded on the row and retried, never thrown back at the person
+  confirming.
+- **`src/lib/google/` is the third and last place allowed to use the service
+  role**, alongside creating an auth account on first login and a Super Admin
+  password reset. It has to be: `google_credentials` denies everyone else, and
+  `meeting_invite_payload` returns real email addresses.
+- **A meeting IS a request.** There is no second state machine: the
+  negotiation is the `meeting_request` type in the engine, counter loop and
+  history included. `meeting_details` holds only what is not an answer on a
+  form — the room hold, the Meet link, and what spawned it.
+- **`app.meeting_recipients` is the ONLY definition of "who is party to this
+  meeting".** The Google invite list and the calendar entry's audience are both
+  that function. Writing it twice is how the invite and the calendar start
+  disagreeing about who the meeting was with.
+- **The proposer's group is pinned, and re-checking it is a bug.** `app.can`
+  always asks about whoever is *currently acting*. `db:meetings` caught the
+  first version re-checking on every write, so a target countering a Design
+  meeting was asked whether they could book as Design. 0031 pins the party to
+  `meeting_details` at proposal time and only authorises it while the proposer
+  themself is acting.
+- **A meeting's calendar entry is a projection.** Anything with
+  `source_request_id` set refuses edits to its time, title or location — change
+  the meeting, not the calendar. Free hand-made entries stay editable.
+- **Double-booking is stopped by an EXCLUDE constraint, not by code.**
+  `room_bookings_no_overlap` is a GiST index over `(room_id, tstzrange(...))`,
+  so the rule holds under concurrency the same way `asset_checkouts_one_active`
+  does. Holds, confirmed bookings and IT blocks share one table precisely so
+  that one constraint covers all nine combinations of them. Never pre-check
+  availability before inserting — let the constraint refuse the loser.
+- **One screen is both the booking flow and the schedule.** §6 says clicking a
+  free block "starts a direct room booking … not a separate booking
+  mechanism", so `/rooms` is §4 and §6 together rather than two grids to keep
+  in step. `src/lib/rooms.ts` holds the geometry (`buildSlots`, `buildColumn`)
+  and the identity encoding; the page does the database work and the labels,
+  and `RoomSchedule.tsx` only draws. Rooms are grid COLUMNS, so adding a room
+  adds a column with no code change.
+- **`booking_settings` holds the club's clock.** Every hour comparison reads
+  `at time zone s.time_zone`. If you add a rule that depends on what hour it
+  is, do the same — reading the hour off a `timestamptz` gives you the server's
+  timezone, which is UTC.
+- **`requestable_assets` bypasses RLS on purpose.** It is the one view in the
+  system created `with (security_invoker = off)` — every KPI view is `on` —
+  because a member has to be able to pick the camera off a list without being
+  able to read who is holding it. What keeps that safe is its COLUMN LIST, not
+  a policy. Adding a column widens what every member in the club can see.
+- **A request type's select can source its options live.** `options_source` on
+  a field (today only `"assets"`) makes `loadFieldOptions` in
+  `src/lib/requests.ts` fill the list from a table instead of the JSON. Both
+  the new-request form and the request detail page call it — the form to render
+  the select, the detail page to turn the stored id back into a name. Adding a
+  source means one entry in `OPTION_SOURCES`, not a new component.
+- **Assets are Finance's, by override, not by code.** 0023 sets every role's
+  baseline for the three `assets.*` permissions to 'none' below the Presidency
+  and lifts it again for `team_director` + `FINANCE`. Nothing names Finance
+  outside that row — moving custody to another team is three UPDATEs.
+
+### Application code
+
+- `src/proxy.ts` — locale resolution + session refresh + signed-out redirect
+- `src/i18n/*`, `messages/{ar,en}.json` — Arabic default, full RTL
+- `src/lib/` — `supabase/`, `auth/session.ts`, `actions.ts` (server-action
+  result shape), `format.ts` (Arabic dates use Gregorian + Latin digits
+  deliberately), `requests.ts`, `calendar.ts` (month-grid geometry), `fonts.ts`
+- `src/components/` — `ui.tsx` (logical-property primitives), `ActionForm`,
+  `ConfirmForm` (a real `<dialog>`, for deletes), `Disclosure` ("New X +"),
+  `ActionsMenu` (the profile's Actions dropdown), `Avatar`, `TaskCard`,
+  `NavLinks`, `NavIcons`, `LocaleSwitch`, `RequestFields`, `charts/`
+- Pages: login, app shell with permission-filtered nav, dashboard, members
+  list + detail, teams list + detail with posts, projects list + detail, tasks,
+  requests list / new / detail, **calendar + calendar/new**, **assets**,
+  **attendance**, **admin** (index, permission matrix, request types, CSV
+  import)
+
+### Verification
+
+- `npm run db:test` — `scripts/tests/permission-tests.mjs`, 32 checks. Seeds five
+  people (`permtest-…`), signs each in, and hits the REST API **directly**
+  rather than through the UI, then deletes them again. Covers every scenario
+  §10 asks for: the non-HR-Director rollback, Guest visibility, the illegal
+  status jump, the five-counter meeting request, the all-or-nothing CSV
+  import, and two concurrent checkouts of one asset.
+- `npm run db:prove` — `scripts/tests/extensibility-proof.mjs`, 12 checks. Adds a
+  Sponsorship Request type with nothing but INSERTs and drives a request
+  through it end to end, then flips one `role_permissions` row and shows the
+  same token's access change and revert. Both without a rebuild or restart.
+
+- `npm run db:meetings` — `scripts/tests/meeting-tests.mjs`, 38 checks. Seeds six
+  people — including TWO Directors of one team, so §5's "every Director,
+  whichever one negotiated" has something to prove — and drives real meetings
+  through the engine: an individual target, the hold appearing on submission
+  and moving with a counter, a counter to online releasing the room, approval
+  turning the hold into a two-party booking, the calendar audience matching the
+  recipients exactly, and confirmation FAILING when somebody else has taken the
+  room in the meantime.
+
+- `npm run db:rooms` — `scripts/tests/room-tests.mjs`, 27 checks. Seeds five people
+  (`roomtest-`), one per kind §4 distinguishes, plus its own room and project.
+  Proves who may book and as whom, the operating-hours and half-hour rules, IT's
+  block-and-delete powers, that a plain Member cannot even see the schedule, and
+  that rooms can be retired but never deleted. The one that matters most fires
+  two bookings of the same slot **concurrently** and checks exactly one survives
+  — which is the guarantee §4 actually asks for.
+
+- `npm run db:kpi` — `scripts/tests/kpi-tests.mjs`, 72 checks, same discipline.
+  Seeds seven people (`kpitest-…`), a project with two splits and a spread of
+  tasks, then proves the addendum against the REST API: that status cannot be
+  PATCHed, that a score cannot be inserted outside the workflow, both of §4's
+  worked examples (Excellent-but-late = 75, Not Done = 0), every risk
+  threshold, that an In Progress task is excluded rather than counted as 0,
+  split claiming and confirmation authority, that deleting a task recalculates
+  %Performance, and that nobody — Development and Presidency included — can
+  read their own figures.
+
+All six scripts are idempotent and only ever touch rows they created.
+
+### Suites written against an empty club
+
+Two have now had to be corrected because they assumed the club had nobody in
+it, and more will:
+
+- `db:rooms` hardcoded a noon-to-midnight booking window, and broke the moment
+  somebody changed the closing hour through the admin screen. It now pins
+  `booking_settings` and restores it.
+- `db:meetings` asserted that every attendee on a built invitation carried the
+  `meettest-` prefix. Once the real 98 arrived, DESIGN's two elected Directors
+  became legitimate recipients — `app.meeting_recipients` includes every
+  Director of the target team — and a correct system started failing the check.
+  It now compares set-equality against `app.meeting_recipients` itself.
+
+The lesson for the next one: **assert against the rule, not against a naming
+convention that only holds while the database is empty.** A suite failing after
+real data arrives is more likely stale than a regression — check which before
+you 'fix' the system.
+
+## Who can see the member directory
+
+`/members` and each profile page are limited to the Presidency and HR's
+Directors — six people today. This is `members.directory`, added by 0048.
+
+The obvious implementation would have been to take `members.view` away from
+everyone else, and it would have been quietly damaging. `members.view` decides
+who can read a member ROW, and the assignee dropdown on `/tasks`, the people
+picker for staffing a project split, the target of an individual meeting
+request, every team roster and the calendar audience picker are all plain
+selects against `members`. Revoking it leaves a Team Director looking at a
+dropdown holding only their own name.
+
+So the directory screen has its own narrower permission and `members.view` is
+untouched. `MemberLink` (`src/components/MemberLink.tsx`) renders a name as a
+link only when the viewer can follow it, so nobody is offered a link into a
+refusal — and the "you can always open your own profile" rule lives inside that
+component rather than at each call site.
+
+**Be clear about what this is not: a data boundary.** `members_select` still
+resolves `members.view`, which every role holds at `all`, so a signed-in member
+can read email, phone, student ID and college through the API directly. This
+stops the UI handing them out; it does not stop the database. Making that a
+real boundary means moving those columns behind a view, or narrowing
+`members.view` and giving the pickers a name-only source — a deliberate piece
+of work, not a patch.
+
+National IDs are the exception and were never part of this: `member_sensitive`
+is a separate table with its own policy, Presidency and HR only.
+
+## The semester as a unit (2026-09-24)
+
+The Presidency asked for a full picture without the noise. The plan is an
+exceptions list on the dashboard (teams and projects off track, worst first,
+with the accountable Director or PM), a decision queue, and a weekly push
+digest, all scoped by permissions so a Director gets the same page for their
+team. Every number on it is a semester number, so the semester came first.
+
+- **`semester_settings` (`0067`).** One row: `name_en`, `name_ar`,
+  `starts_on`, `ends_on`. Seeded with the first-semester timeline the
+  calendar already carries (2026-08-08 to 2026-11-21). Anyone signed in
+  reads it; the update policy asks `app.can('calendar.manage')` with no
+  team in hand, which only club scope satisfies — the Presidency and the
+  Super Admin, not a Director. Edited at `/admin/semester`; the card on
+  `/admin` shows for `calendar.manage = all`.
+- **`club_semester_kpi`.** One row: the semester and its tasks by state
+  (planned, completed, not done, pending confirmation, overdue). A task is
+  in the semester by its due date, or by its creation day when it has none.
+  It reads `tasks` directly with the same state rules as `task_kpi`, not
+  `task_kpi` itself: this runs on every dashboard load for every member,
+  and going through the per-row view would add §2's cost to the front page.
+  `security_invoker`, so each person counts the tasks `tasks_select` shows
+  them.
+- **The semester line** (`src/components/SemesterLine.tsx`) sits above the
+  dashboard grid: name, "week 7 of 15" (`src/lib/semester.ts`, day
+  arithmetic at UTC noon like `time.ts`), a progress bar, the task counts,
+  and the next `kind = 'club'` calendar entry. When the view is missing the
+  component returns nothing, so the page is safe to deploy before the
+  migration is applied.
+- **Still all-time:** `member_kpi`, `project_kpi` and `/kpi`. Bounding them
+  to the semester is the next step, together with the per-team view the
+  exceptions list needs (there is no `team_kpi` today).
+
+## Hours, the month, and the Outreach component (2026-09-21)
+
+The Development directors asked for the teams' KPI trackers (Design, HR,
+Finance; Shark Tank, Seen) to be simulated in the system. The gap report is
+a Claude doc: https://claude.ai/code/artifact/c2375491-7991-4c54-8367-c57193d7ed74.
+Two things the sheets had and the system lacked were built; the seed comes
+after the migrations are applied.
+
+- **Hours (`0063`).** `tasks.hours` is set by the member on submitting
+  (`submit_task_for_review(…, p_hours)`) and corrected by the confirmer
+  (`confirm_task(…, p_hours)`); the workflow guard refuses any other write.
+  `task_kpi.hours` carries it; `member_month_kpi` is per member per month
+  (Asia/Riyadh, by the date the work was submitted): tasks, completed, not
+  done, pending, hours, average score — with §8's self-exclusion. The KPI
+  page shows the six most recent months. The old three-argument function
+  signatures are dropped, not overloaded: PostgREST cannot pick between a
+  function and one whose arguments extend it.
+- **Importing history (`0064`).** `import_task_history` writes the workflow
+  columns of one task with real dates and a quality, service role only
+  (`auth.role() = 'service_role'`, execute revoked from authenticated). The
+  seed script is its only caller. Never expose it to the app.
+- **Outreach (`0065`).** A second project component, in THIS database:
+  `outreach_types` (per project: shark, sponsor, speaker…),
+  `outreach_targets` (type, name, owner, status new/waiting/meeting/
+  confirmed/rejected, notes), `outreach_status_history` (written by a
+  definer trigger), and the views `outreach_member_summary` /
+  `outreach_type_summary` that reproduce the sheets' summary page.
+  Access is through existing helpers: managers do everything, people on the
+  project add targets and change their own, KPI viewers read. Attaching it
+  from the project page seeds three types. `my_component_access()` returns
+  `member` / `viewer` for this component only; the interviews pages filter by
+  component_key and never see those roles. Pages: `/projects/[id]/outreach`
+  (`src/lib/outreach/`, one page, a self-submitting status select).
+  Unlike Mock Interviews it does not switch the shell or the theme.
+- **The seed** is `npm run kpi:simulate` (`scripts/data/simulate-kpi.mjs`): reads
+  `simulation-data/kpi-simulation.json` (gitignored — real names and grades;
+  built from the five PDFs on 2026-09-21 with the parser kept in the session
+  scratchpad, rebuild it from the sheets if lost), matches members, teams
+  and projects by name, refuses to write while a TASK's member or project
+  is unmatched (an outreach owner who is not a club member is loaded with
+  no owner and the sheet's name in the notes), tags every row with
+  `[simulation kpi-sheets-2026-09]`, records ids in
+  `simulation-data/last-run.json`, and `--undo` removes exactly those rows.
+  Dry run by default; `--yes` writes. The sheet names the projects as
+  قروش, افترض, سين, خطى المملكة, الإرشاد المهني and النادي (team-level);
+  the dry run prints which rows it could not place.
+
+**State on 2026-09-22 (second pass).** The first pass was built from five of
+the workbooks, uploaded as PDFs from a phone. The folder
+`Development VC2030/` (gitignored) holds THIRTEEN, and the whole set is now
+loaded. What changed:
+
+- **`0066_outreach_pipeline.sql`.** The teams write nine status words; two
+  pairs are one thing spelled twice, and "Contacted" (Career Guidance's
+  dialect) is "Waiting for Response" (everyone else's). What is left is a
+  seven-step pipeline, so `in_progress` and `on_hold` joined the enum, in
+  place, keeping pipeline order. The two summary views are DROPPED and
+  recreated, not replaced: `create or replace view` may append a column but
+  never rename or reorder one. They compare `status::text` because Postgres
+  refuses to use an enum value added in the same transaction, and db-push
+  wraps each migration in one.
+- **A project may carry two components.** `project_components` is keyed on
+  (project_id, component_key) now. افترض runs Mock Interviews AND its own
+  outreach list of 109 companies, sponsors and workshops. The project page
+  lists components rather than showing one, and detaching takes a
+  `component_key`.
+- **The menu lists PROJECTS, not components.** A component is something a
+  project carries, so the way into one is its project's page; a component
+  never puts a button in the sidebar. Every project the viewer may see gets
+  one, ordered active → planned → completed → cancelled and then by name, so
+  the April archive sorts to the bottom instead of vanishing. Which projects
+  come back is the `projects` policy's answer, not a filter in the layout.
+  Mock Interviews still takes over the whole shell inside its own pages —
+  that is driven by the URL, so it is unaffected.
+- **`scripts/lib/xlsx.mjs` had a real bug.** An empty cell is written
+  self-closing (`<c r="G1" s="3"/>`), and the cell regex only matched the
+  `<c …>…</c>` form, so an empty cell swallowed the next one and every value
+  after a blank column shifted left. It read Shark Tank as 8 targets instead
+  of 154. `build-member-csv`, `import-timeline` and `import-mock-interviews`
+  share that reader, so they were reading shifted values too wherever a
+  blank cell sat mid-row. Fixed by matching both forms.
+- **`npm run kpi:build`** (`scripts/data/build-kpi-simulation.mjs`) turns the
+  thirteen workbooks into `simulation-data/kpi-simulation.json`. A TEAM
+  tracker is one sheet of tasks plus a Task/Hours table in columns Z and AA;
+  a PROJECT tracker is a "Raw Data" sheet of five-column blocks (Source,
+  Member, Target, Status, Type) laid side by side, found by looking for
+  "Source" along row 1. Types are read from every row including the example,
+  so a project whose list is still empty still gets its types — which is why
+  Seen has four types and no targets.
+- **Six of the eight team trackers are the same filled-in template**
+  (Finance, Content, Design, Media, PR, Tech/IT): identical dates, identical
+  Excellent/Good/Poor ladder, only the names swapped. The club chose to load
+  them anyway, so those grades sit on real people. `kpi:build` flags them in
+  its report. Only HR and Development hold logged work.
+- **A name the directory does not know no longer stops the run.** A handful
+  of sheet names are spelling variants of real members and are listed in
+  `ALIASES` in the seed, each checked by hand. The rest — graduates,
+  volunteers, "HR Team" meaning the team — load with nobody holding the row
+  and the sheet's name kept in the description or notes, so the work counts
+  for its project and for nobody's personal score.
+
+**Loaded on 2026-09-22:** 60 tasks (15 confirmed, across 2026-08 and
+2026-09, carrying hours) and 618 outreach targets over five projects —
+Career Fair 304, Shark Tank 154, Mockup Interviews 109, Kingdom Steps 51,
+Seen 0 (its sheet is an untouched template). Every row is tagged
+`[simulation kpi-sheets-2026-09]`; `npm run kpi:simulate -- --undo` removes
+exactly them, reading `simulation-data/last-run.json`.
+
+**Still open, the directors':** whether hours are asked on submit or logged
+as the work happens, and the five questions at the end of the gap report.
+
+## Short links and QR codes (2026-10-02)
+
+A QR code is nothing but the address printed inside it, so a code that must
+keep working after its destination moves has to point at an address the club
+owns. That address is `/go/<slug>` on this site; where it leads is a row the
+Presidency edits at `/admin/links`.
+
+- **`short_links` (`0068`, not yet applied — the project lead pastes it into
+  the SQL editor).** `slug` (the printed part, `^[a-z0-9][a-z0-9-]{0,39}$`,
+  fixed for life), `label`, `target_url` (must start with `http(s)://`),
+  `visits`. One permission, `links.manage`, granted at club scope to the
+  Super Admin, the President and the Vice President; every policy on the
+  table asks for it, and the permissions page can hand it to another role
+  without a code change.
+- **`/go/<slug>`** (`src/app/go/[slug]/route.ts`) is public and locale-free:
+  the proxy matcher skips `go/`, and the route uses a cookie-less anon client
+  to call `resolve_short_link`, a definer function that returns the one
+  destination and adds a visit. The redirect is a **307 with `no-store`**,
+  never a 301: a permanent redirect would be remembered by the phone that
+  scanned the code, and changing the row would then change nothing for it.
+  An unknown slug gets a small bilingual "this link no longer works" page.
+- **`/admin/links`** creates a link, shows its QR (an SVG `<img>` from a
+  data URL, made on the server by the `qrcode` package in `src/lib/links.ts`),
+  offers the PNG (1024 px) and SVG for download, and edits the label and
+  destination. Deleting is behind a confirmation: every printed copy dies
+  with the row.
+- **The printed address is `siteUrl()` + `/go/<slug>`**, and `siteUrl()` now
+  lives in `src/lib/site.ts` (the interviews' `email.ts` re-exports it). It
+  reads `SITE_URL`, then Vercel's production address, then the project's
+  `vision2030club-system.vercel.app`. Decide the domain *before* the first
+  poster is printed: a code printed with the Vercel address keeps that
+  address even if `SITE_URL` later changes, so the old host must keep
+  answering `/go/…` for as long as those posters are up.
+
+## Performance — what was done, and what is next
+
+Every page is user-scoped and therefore fully dynamic; that part is correct and
+cannot change. What was wrong is that nothing *streamed*:
+
+- `loading.tsx` now exists beside every heavy route (`src/components/Skeleton.tsx`
+  supplies the shapes). A `loading.tsx` covers its child segments too, so the
+  detail pages — which have the deepest waterfalls — are covered by their
+  parent's.
+- The shared layout used to make three serial round trips before any page could
+  start. `getMyMember` and `getMyPermissions` now run together, and the avatar's
+  signed URL streams in behind `<Suspense>` instead of blocking the shell.
+- `/kpi` is no longer revalidated on every task button press. It issues five
+  unfiltered aggregates over every task in the club; the cheapest buttons were
+  paying for the most expensive page.
+- `ensureMeetLink` is no longer awaited — approving a meeting used to wait on an
+  OAuth refresh and a Calendar insert first.
+- `experimental.staleTimes` gives the client router 30s on dynamic pages, so
+  Back stops re-running everything.
+
+**The next performance item, not yet done:** `task_kpi` runs roughly eight
+non-inlinable `SECURITY DEFINER` calls PER ROW — `0042` lines 43-45 plus `0016`
+lines 62-68 — and several of them re-read the same task row. At 300 tasks that
+is thousands of nested calls, and it is the real ceiling on `/tasks` and `/kpi`.
+Fixing it means reworking those policies and the capability flags together,
+with the suites as the safety net.
+
+**Region mismatch, now confirmed and still unfixed.** The Supabase project is
+in `ap-southeast-2` (Sydney); the Vercel function answers from `bom1` (Mumbai).
+Every round trip pays that distance twice, and the layout alone makes several.
+This is a settings change rather than a code one, and is probably the largest
+single win left on perceived speed.
+
+## Interface guidelines
+
+`npx skills add vercel-labs/agent-skills -s web-design-guidelines --full-depth`
+installs Vercel's checklist; the audit found and fixed:
+
+- **No button in the app had a visible focus ring.** `Button` in
+  `src/components/ui.tsx` now has `focus-visible:outline-*`, and named
+  transition properties instead of `transition` on everything.
+- `touch-manipulation` on buttons and fields (removes the 300ms double-tap delay).
+- `font-variant-numeric: tabular-nums` folded into `.ltr-nums` in `globals.css` —
+  every ID, phone, time and score already carries that class, so digits line up
+  everywhere from one change.
+- `color-scheme: light` declared, so native controls stop rendering dark.
+- A skip link in the app layout; `width`/`height` on the avatar `<img>` to stop
+  the header jumping.
+
+Design advice deliberately NOT taken, because it would break this app:
+
+- *"Swap the font to Geist/Satoshi/Outfit"* — none carry Arabic glyphs.
+  `src/lib/fonts.ts` pairs IBM Plex Sans Arabic with Gilroy on purpose.
+- *"Dashboards should not have a left sidebar"* — `NavLinks.tsx` is built on
+  logical properties precisely so it flips for RTL.
+- *"Add background imagery and noise"* — external images, in an app being fixed
+  because it is slow.
+
+## Brand assets
+
+`design/` holds the originals — the full font families (`design/fonts/`),
+the logo masters (`design/logos/`) and the logo animation (`design/video/`).
+Nothing in `design/` is served. What the app loads lives elsewhere, under the
+app's own names: logos in `public/brand/` (`layout.tsx` and the login page)
+and the four weights of each face in `src/fonts/` (`src/lib/fonts.ts`). They
+are separate on purpose — copy what a page needs into `public/brand/` or
+`src/fonts/` rather than pointing the app at `design/`.
+
+Anything in `public/` can be downloaded by anyone who knows the address, which
+is why only files a page actually uses go there.
+
+Two logo animations were supplied. `design/video/logo-animation.mp4` is
+604 KB, H.264 + AAC, 6 seconds, and is web-usable, but **no page uses it
+yet**; the natural home is the login screen, muted and looping, with a still
+fallback under `prefers-reduced-motion`. Copy it into `public/brand/` in the
+pull request that uses it. The `.mov` is 21 MB QuickTime with no
+browser-playable codec (ProRes family): it is an editing master, is
+gitignored at the repo root, and should stay in Drive.
+
+Gilroy is a commercial typeface, and `src/fonts/` serves four of its weights
+to every visitor. Whoever holds the club's brand files should confirm the
+licence covers web use.

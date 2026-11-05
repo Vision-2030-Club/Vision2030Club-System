@@ -21,7 +21,7 @@
  * paths are kept as `cv_import_ref` text.
  */
 import { randomBytes } from 'node:crypto';
-import { openWorkbook } from './lib/xlsx.mjs';
+import { openWorkbook } from '../lib/xlsx.mjs';
 
 const FILE = 'mockinterviews.xlsx';
 const SLUG = 'april-2026';
