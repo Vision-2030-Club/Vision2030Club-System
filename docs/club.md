@@ -402,7 +402,7 @@ team. Every number on it is a semester number, so the semester came first.
 ## Hours, the month, and the Outreach component (2026-09-21)
 
 The Development directors asked for the teams' KPI trackers (Design, HR,
-Finance; Shark Tank, Seen) to be simulated in the system. The gap report is
+Finance; Quroosh (formerly Shark Tank), Seen) to be simulated in the system. The gap report is
 a Claude doc: https://claude.ai/code/artifact/c2375491-7991-4c54-8367-c57193d7ed74.
 Two things the sheets had and the system lacked were built; the seed comes
 after the migrations are applied.
@@ -476,7 +476,7 @@ loaded. What changed:
 - **`scripts/lib/xlsx.mjs` had a real bug.** An empty cell is written
   self-closing (`<c r="G1" s="3"/>`), and the cell regex only matched the
   `<c …>…</c>` form, so an empty cell swallowed the next one and every value
-  after a blank column shifted left. It read Shark Tank as 8 targets instead
+  after a blank column shifted left. It read Quroosh as 8 targets instead
   of 154. `build-member-csv`, `import-timeline` and `import-mock-interviews`
   share that reader, so they were reading shifted values too wherever a
   blank cell sat mid-row. Fixed by matching both forms.
@@ -502,7 +502,7 @@ loaded. What changed:
 
 **Loaded on 2026-09-22:** 60 tasks (15 confirmed, across 2026-08 and
 2026-09, carrying hours) and 618 outreach targets over five projects —
-Career Fair 304, Shark Tank 154, Mockup Interviews 109, Kingdom Steps 51,
+Career Fair 304, Quroosh 154, Mockup Interviews 109, Kingdom Steps 51,
 Seen 0 (its sheet is an untouched template). Every row is tagged
 `[simulation kpi-sheets-2026-09]`; `npm run kpi:simulate -- --undo` removes
 exactly them, reading `simulation-data/last-run.json`.
