@@ -199,7 +199,7 @@
     "kpiHidden": "You do not have permission to see this project’s KPI figures.",
     "noPmsAvailable": "Nobody holds the Project Manager role yet — assign it on a member's profile first.",
     "component": "Component",
-    "componentHint": "Whole systems this project carries, with their own data: Mock Interviews, Outreach, or both.",
+    "componentHint": "Whole systems this project carries, with their own data: Mock Interviews, Outreach, Quroosh, or more than one.",
     "component_mock_interviews": "Mock Interviews",
     "openComponent": "Open →",
     "componentNoAccess": "You are not on this component’s roster.",
@@ -212,7 +212,8 @@
     "componentEdition": "Edition",
     "componentEditionNew": "Start a new edition",
     "component_outreach": "Outreach",
-    "componentEditionHint": "Mock Interviews only; ignored for Outreach."
+    "componentEditionHint": "Mock Interviews only; ignored for Outreach and Quroosh.",
+    "component_quroosh": "Quroosh"
   },
   "tasks": {
     "title": "Tasks",
@@ -1429,5 +1430,21 @@
     "typeNameEn": "Name (English)",
     "typeNameAr": "Name (Arabic)",
     "sortOrder": "Order"
+  },
+  "quroosh": {
+    "tabs": {
+      "overview": "Overview",
+      "projectDetails": "Project details"
+    },
+    "role": {
+      "manager": "Manager",
+      "member": "Member",
+      "viewer": "Viewer"
+    },
+    "overview": {
+      "title": "Quroosh’s home in the system",
+      "body": "This is where the Quroosh project’s work will live. Its sections are being built and will appear in the menu as each one is ready.",
+      "managerNote": "The project’s tasks, people and KPIs are still under Project details in the menu."
+    }
   }
 }

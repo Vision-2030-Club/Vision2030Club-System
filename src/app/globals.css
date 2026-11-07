@@ -30,6 +30,8 @@
      own world leaves them unused. */
   --color-accent: #c3f04a;
   --color-accent-2: #a6eddd;
+  /* Quroosh's teal, for its waves; unused elsewhere. */
+  --color-accent-3: #09798b;
 
   --color-ok: #15803d;
   --color-warn: #b45309;
@@ -158,6 +160,36 @@ html[data-theme="interviews"][lang="en"] {
    keeps its contrast on the stronger background. */
 html[data-theme="interviews"] :is(.bg-surface, .bg-surface-muted) {
   --color-ink-muted: #2d5257;
+}
+
+html[data-theme="quroosh"] {
+  /* قروش: the identity's purple #542f90 at 600, its lavenders #cbc1db and
+     #9b91c0 at 200 and 400, #3e3661 at 800 and the navy #1e1338 at 950. The
+     app stays light (see html above), so the navy is the ink and the hero
+     band, not the page. The mints and the teal are the accents: the logo on
+     the band, and the waves. */
+  --color-brand-50: #f5f3fa;
+  --color-brand-100: #e9e4f2;
+  --color-brand-200: #cbc1db;
+  --color-brand-300: #b3a9d0;
+  --color-brand-400: #9b91c0;
+  --color-brand-500: #7656ad;
+  --color-brand-600: #542f90;
+  --color-brand-700: #47287a;
+  --color-brand-800: #3e3661;
+  --color-brand-900: #1b2b50;
+  --color-brand-950: #1e1338;
+  --color-canvas: #f5f8fa;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f1eef7;
+  --color-line: #ded8ea;
+  --color-ink: #1e1338;
+  --color-ink-muted: #5b5378;
+  --color-accent: #90d4d6;
+  --color-accent-2: #bee5ec;
+  /* Titillium Web, as the identity specifies. It has no Arabic, so Arabic
+     falls back glyph by glyph to the club's Arabic face. */
+  font-family: var(--font-quroosh), var(--font-arabic), system-ui, sans-serif;
 }
 
 html.theme-animate {

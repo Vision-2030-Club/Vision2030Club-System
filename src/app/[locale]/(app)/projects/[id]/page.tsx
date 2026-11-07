@@ -35,11 +35,12 @@ import {
 
 /**
  * Which component a project opens in, when it carries one the viewer may
- * open: Mock Interviews first, else Outreach. `?details=1` is the way to the
+ * open: Mock Interviews first, then Outreach, then Quroosh (last while its
+ * pages are a skeleton, so it does not take members away from Outreach). `?details=1` is the way to the
  * project page itself (tasks, people, KPIs, components) — the "Project
  * details" menu item and Outreach's back link use it.
  */
-const OPENS_IN = ['mock_interviews', 'outreach'] as const;
+const OPENS_IN = ['mock_interviews', 'outreach', 'quroosh'] as const;
 
 export default async function ProjectPage({
   params,
@@ -153,7 +154,7 @@ export default async function ProjectPage({
   const canOpen = (key: string) =>
     componentAccess.some((row) => row.project_id === id && row.component_key === key);
   // Every component the project does not already carry.
-  const attachable = (['mock_interviews', 'outreach'] as const).filter((key) => !has(key));
+  const attachable = (['mock_interviews', 'outreach', 'quroosh'] as const).filter((key) => !has(key));
 
   const managerIds = new Set((managers ?? []).map((m) => m.member_id as string));
   const projectScope = await scopeFor('projects.manage');

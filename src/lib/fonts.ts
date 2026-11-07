@@ -39,3 +39,19 @@ export const theSansArabic = localFont({
     { path: '../fonts/TheSansArabic-Bold.ttf', weight: '600 800', style: 'normal' },
   ],
 });
+
+/**
+ * The Quroosh (قروش) face, used inside that component's pages: Titillium
+ * Web, as the identity specifies. It has no Arabic glyphs, so Arabic text
+ * falls back to IBM Plex Sans Arabic glyph by glyph (see globals.css).
+ */
+export const titillium = localFont({
+  variable: '--font-quroosh',
+  display: 'swap',
+  src: [
+    { path: '../fonts/TitilliumWeb-300.woff2', weight: '300', style: 'normal' },
+    { path: '../fonts/TitilliumWeb-400.woff2', weight: '400', style: 'normal' },
+    { path: '../fonts/TitilliumWeb-600.woff2', weight: '600', style: 'normal' },
+    { path: '../fonts/TitilliumWeb-700.woff2', weight: '700', style: 'normal' },
+  ],
+});

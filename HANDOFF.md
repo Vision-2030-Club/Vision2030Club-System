@@ -9,6 +9,7 @@ still open. How each part works lives in `docs/`, one file per area.
 |---|---|
 | [`docs/club.md`](docs/club.md) | The club side: stack, the permission model, every migration, the directory, the semester, hours and Outreach, short links, performance, UI rules, brand assets |
 | [`docs/interviews.md`](docs/interviews.md) | The Mock Interviews component (افترض): its second database, rooms, the floor, reception, walk-ins, the sheets, feedback. Ends with **"Things easy to break"** |
+| [`docs/quroosh.md`](docs/quroosh.md) | The Quroosh component (قروش): its identity, how it is wired, what is still to build |
 | [`docs/integrations.md`](docs/integrations.md) | Google (Calendar and Sheets) and push notifications |
 | [`docs/data-and-testing.md`](docs/data-and-testing.md) | Importing the member list and the timeline, the testing rounds with the club, how the real club was loaded |
 | [`docs/spec.md`](docs/spec.md) | The system specification being implemented. Section references in these documents (§2, §3, …) point into it |

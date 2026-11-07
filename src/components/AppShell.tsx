@@ -9,6 +9,10 @@ import { cx } from '@/components/ui';
 /** One project component's world: its pages, its name, where "back" goes. */
 export type ComponentShell = {
   projectId: string;
+  /** Where this world's pages live, e.g. `/projects/<id>/interviews`. */
+  base: string;
+  /** The `data-theme` on <html> inside it; globals.css holds each palette. */
+  theme: 'interviews' | 'quroosh';
   /** The project's name in the current language; the header mark shows it. */
   label: string;
   items: NavItem[];
@@ -21,7 +25,7 @@ export type ComponentShell = {
  * The signed-in shell, and the crossing between its two worlds.
  *
  * Everywhere in the club the header carries the club logo and the sidebar
- * lists the club's sections. Inside a project's Mock Interviews pages the
+ * lists the club's sections. Inside a project's Mock Interviews (or Quroosh) pages the
  * same header and sidebar — the same DOM, never remounted — show that
  * component's mark and only its pages, with a way back on top. Because the
  * nodes persist, the change can be animated: the logos cross-fade, the list
@@ -53,19 +57,20 @@ export function AppShell({
   const pathname = usePathname();
   const active =
     components.find((component) => {
-      const base = `/projects/${component.projectId}/interviews`;
+      const { base } = component;
       return pathname === base || pathname.startsWith(`${base}/`);
     }) ?? null;
   const inComponent = active !== null;
+  const theme = active?.theme ?? null;
 
   useEffect(() => {
     const root = document.documentElement;
-    if (inComponent) root.dataset.theme = 'interviews';
+    if (theme) root.dataset.theme = theme;
     else delete root.dataset.theme;
     // Enable the colour transition only once the first world has painted.
     const timer = window.setTimeout(() => root.classList.add('theme-animate'), 50);
     return () => window.clearTimeout(timer);
-  }, [inComponent]);
+  }, [theme]);
 
   return (
     <div className="min-h-dvh">
@@ -131,7 +136,7 @@ export function AppShell({
               which also covers the typeface swap, the one thing CSS cannot
               fade. Within a world the key is stable, so pages navigate
               without remounting. */}
-          <div key={active ? 'interviews' : 'club'} className="shell-fade">
+          <div key={theme ?? 'club'} className="shell-fade">
             {children}
           </div>
         </main>
