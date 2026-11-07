@@ -50,6 +50,7 @@ export type ComponentAccess = {
 export const COMPONENT_ROUTES: Record<string, string> = {
   mock_interviews: 'interviews',
   outreach: 'outreach',
+  quroosh: 'quroosh',
 };
 
 export function componentHref(projectId: string, componentKey: string): string {

@@ -9,6 +9,7 @@ import { signAvatar } from '@/lib/avatars';
 import { AppShell, type ComponentShell } from '@/components/AppShell';
 import { Avatar } from '@/components/Avatar';
 import { InterviewsLogo } from '@/components/InterviewsLogo';
+import { QurooshLogo } from '@/components/QurooshLogo';
 import { LocaleSwitch } from '@/components/LocaleSwitch';
 import { type NavItem } from '@/components/NavLinks';
 import { ProfileMenu } from '@/components/ProfileMenu';
@@ -78,6 +79,7 @@ export default async function AppLayout({
   const tApp = await getTranslations('app');
   const tMembers = await getTranslations('members');
   const tInterviews = await getTranslations('interviews');
+  const tQuroosh = await getTranslations('quroosh');
 
   /*
    * A Project Manager's projects are on their dashboard, so the club-wide
@@ -184,6 +186,8 @@ export default async function AppLayout({
 
     return {
       projectId: component.project_id,
+      base,
+      theme: 'interviews' as const,
       label,
       items,
       // Not the project page: opening it would land straight back here.
@@ -191,6 +195,33 @@ export default async function AppLayout({
       logo: <InterviewsLogo name={label} />,
     };
   });
+
+  // Quroosh (0074) is a world of its own too: its identity on the header and
+  // its pages in the sidebar. A skeleton for now, one page and the way out.
+  for (const component of components.filter((c) => c.component_key === 'quroosh')) {
+    const base = `/projects/${component.project_id}/quroosh`;
+    const label = locale === 'ar' ? component.name_ar : component.name_en;
+    const items: NavItem[] = (
+      [
+        { href: base, label: tQuroosh('tabs.overview'), icon: 'dashboard', show: true },
+        {
+          href: `/projects/${component.project_id}?details=1`,
+          label: tQuroosh('tabs.projectDetails'),
+          icon: 'projects',
+          show: component.role === 'manager',
+        },
+      ] satisfies NavItem[]
+    ).filter((item) => item.show);
+    componentShells.push({
+      projectId: component.project_id,
+      base,
+      theme: 'quroosh',
+      label,
+      items,
+      backHref: '/dashboard',
+      logo: <QurooshLogo name={label} className="text-brand-950" />,
+    });
+  }
 
   // `satisfies` (rather than a plain annotation) contextually types the
   // literal so each `icon` narrows to NavIconName instead of widening to

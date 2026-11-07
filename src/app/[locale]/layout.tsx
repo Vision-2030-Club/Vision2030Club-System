@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { routing, localeDirection, type Locale } from '@/i18n/routing';
-import { plexArabic, gilroy, theSansArabic } from '@/lib/fonts';
+import { plexArabic, gilroy, theSansArabic, titillium } from '@/lib/fonts';
 import '../globals.css';
 
 export const metadata: Metadata = {
@@ -46,14 +46,15 @@ export default async function LocaleLayout({
     <html
       lang={locale}
       dir={localeDirection[locale as Locale]}
-      className={`${plexArabic.variable} ${gilroy.variable} ${theSansArabic.variable} h-full`}
+      className={`${plexArabic.variable} ${gilroy.variable} ${theSansArabic.variable} ${titillium.variable} h-full`}
       // The inline script below adds `data-theme` before React hydrates.
       suppressHydrationWarning
     >
       <body className="min-h-full antialiased">
         {/*
-          Which colours the first paint uses. A project component's pages
-          (and the public interviews pages) wear the interviews palette; the
+          Which colours the first paint uses. A project's Mock Interviews pages
+          (and the public interviews pages) wear the interviews palette, its
+          Quroosh pages the Quroosh palette; the
           shell keeps this attribute in step afterwards. Setting it here,
           before anything renders, is what stops a direct load of such a page
           from painting teal and then fading to mint.
@@ -61,7 +62,7 @@ export default async function LocaleLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){var p=location.pathname;if(/^\\/(ar|en)\\/(projects\\/[^/]+\\/interviews|interviews)(\\/|$)/.test(p)){document.documentElement.setAttribute('data-theme','interviews')}})();",
+              "(function(){var p=location.pathname;if(/^\\/(ar|en)\\/(projects\\/[^/]+\\/interviews|interviews)(\\/|$)/.test(p)){document.documentElement.setAttribute('data-theme','interviews')}else if(/^\\/(ar|en)\\/projects\\/[^/]+\\/quroosh(\\/|$)/.test(p)){document.documentElement.setAttribute('data-theme','quroosh')}})();",
           }}
         />
         <NextIntlClientProvider>{children}</NextIntlClientProvider>
