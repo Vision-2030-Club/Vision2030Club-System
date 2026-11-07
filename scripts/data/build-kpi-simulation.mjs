@@ -17,7 +17,7 @@
  *   Completed, Status, Quality — and a small Task/Hours table off to the
  *   right in columns Z and AA that gives the hours for a task by name.
  *
- *   A PROJECT tracker (Shark Tank, Seen, افترض, خطى المملكة, Career Guidance
+ *   A PROJECT tracker (Quroosh, Seen, افترض, خطى المملكة, Career Guidance
  *   Exhibition) has a "Raw Data" sheet holding several five-column blocks
  *   side by side — Source, Member, Target, Status, Type — one block per kind
  *   of target. Blocks are found by looking for "Source" along row 1 rather
