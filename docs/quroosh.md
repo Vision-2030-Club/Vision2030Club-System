@@ -7,10 +7,9 @@ club migration `0073`). Since `0074` it is a **project component** of its
 own, like Mock Interviews and Outreach: a project carries it, and its pages
 wear the Quroosh identity instead of the club's.
 
-**State: a skeleton.** One overview page, the identity, and the access rule.
-The component's real screens, and any tables they need, are still to be
-decided with the club. Each one becomes a page under
-`projects/[id]/quroosh/` and an item in the Quroosh sidebar.
+**State:** the overview page, the identity, the access rule (`0074`), and
+**applying** (`0075`, below). Further screens become pages under
+`projects/[id]/quroosh/` and items in the Quroosh sidebar.
 
 ## How it is wired
 
@@ -28,6 +27,42 @@ decided with the club. Each one becomes a page under
 Who gets in, until the club decides its own roles (the Outreach rule):
 **manager** (`projects.manage` over the project), **member** (on the
 project), **viewer** (may see the project's KPI). Anyone else gets a 404.
+
+## Applying (0075)
+
+Founders apply on a **public page**, without an account:
+`/<locale>/quroosh/apply/<project id>`. Managers open and close it, set the
+privacy-notice link, and read the applications on the component's
+**Applications** page (`projects/[id]/quroosh/applications`).
+
+- **The questions** are the club's "أسئلة التسجيل في قروش 2026" with the
+  changes asked for on 2026-11-07: filming consent is required (an answer,
+  yes or no), the team's work experience is asked (optional), "describe the
+  startup in one sentence" became *what problem are you solving* and *your
+  elevator pitch in under 100 seconds* (written, about 250 words), and
+  *market research, user testing or pilots to date* is asked (required; "none
+  yet" is an answer).
+- **One list drives everything:** `src/lib/quroosh/questions.ts`. The form,
+  the server action and the managers' view all read it. To add a question:
+  a column (with its CHECK) in a new migration, an entry in `SECTIONS`, and
+  its wording under `quroosh.apply` in both catalogs.
+- **Validation lives in the database.** `quroosh_apply()` (a definer
+  function granted to anonymous visitors) checks the form is open and
+  inserts; the table's CHECK constraints decide what is valid, and a
+  refusal comes back with a hint the page translates (`already_applied`,
+  `applications_closed`, `invalid`, …). The page checks phones and the
+  multi-choice questions first only so it can say which field is wrong.
+- **One application per founder phone per project.** A second one is
+  refused; there is no editing by the applicant yet.
+- **Personal data.** Applications (names, phones, emails, ages, the team's
+  contacts) are readable by the project's **managers only**, not by members
+  or KPI viewers. Nobody can write them directly; there is no delete.
+- **The public path.** `/quroosh` is in the proxy's `PUBLIC_PATHS`, and the
+  root layout's inline script paints `/quroosh/...` in the Quroosh palette.
+  The page's frame is `src/app/[locale]/(quroosh-public)/layout.tsx`.
+- **Bots.** The form has the same hidden "website" field as the Mock
+  Interviews form; filled in, the action pretends to succeed and stores
+  nothing. There is no rate limit beyond one application per phone.
 
 ## The identity
 
@@ -65,5 +100,10 @@ Drive, it is 10 MB).
   as everywhere else in the app.
 - `AppShell` decides the world from `base`. A Quroosh page outside
   `projects/[id]/quroosh/` will not get the Quroosh header or colours.
+- The option values in `questions.ts` must match the CHECK lists in `0075`.
+  A value in one and not the other makes every answer with it fail as
+  `invalid`.
+- The dates in the commitment question's help line (21–26 November) are
+  in the catalogs; change them for the next edition.
 - `0074` replaces `my_component_access()` with 0072's version plus two lines.
   A later migration that changes the function must start from 0074's.

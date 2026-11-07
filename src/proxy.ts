@@ -13,8 +13,11 @@ const handleLocale = createIntlMiddleware(routing);
  * form, a student's personal link, a company's interviewer link and the
  * waiting-area TV. Each is guarded by an unguessable token checked on the
  * server, not by a session.
+ *
+ * `/quroosh/...` is the Quroosh component's public face: its application
+ * form, open to anyone while the project's managers keep it open.
  */
-const PUBLIC_PATHS = ['/login', '/interviews'];
+const PUBLIC_PATHS = ['/login', '/interviews', '/quroosh'];
 
 /** Public paths that make no sense once signed in: a member is sent on. */
 const SIGNED_OUT_ONLY_PATHS = ['/login'];
