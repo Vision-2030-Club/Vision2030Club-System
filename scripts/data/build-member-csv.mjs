@@ -70,7 +70,7 @@ const PROJECTS = {
   'سين': 'Seen',
   'خطى المملكة': 'Kingdom Steps',
   'خطي المملكة': 'Kingdom Steps',
-  'قروش': 'Shark Tank',
+  'قروش': 'Quroosh',
 };
 
 /** Header text → field. Anything not listed (#, IDs, notes) is ignored. */
