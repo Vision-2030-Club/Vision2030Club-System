@@ -204,6 +204,13 @@ export default async function AppLayout({
     const items: NavItem[] = (
       [
         { href: base, label: tQuroosh('tabs.overview'), icon: 'dashboard', show: true },
+        // Applications hold founders' personal data: managers only.
+        {
+          href: `${base}/applications`,
+          label: tQuroosh('tabs.applications'),
+          icon: 'register',
+          show: component.role === 'manager',
+        },
         {
           href: `/projects/${component.project_id}?details=1`,
           label: tQuroosh('tabs.projectDetails'),

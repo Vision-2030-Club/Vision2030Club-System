@@ -62,7 +62,7 @@ export default async function LocaleLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){var p=location.pathname;if(/^\\/(ar|en)\\/(projects\\/[^/]+\\/interviews|interviews)(\\/|$)/.test(p)){document.documentElement.setAttribute('data-theme','interviews')}else if(/^\\/(ar|en)\\/projects\\/[^/]+\\/quroosh(\\/|$)/.test(p)){document.documentElement.setAttribute('data-theme','quroosh')}})();",
+              "(function(){var p=location.pathname;if(/^\\/(ar|en)\\/(projects\\/[^/]+\\/interviews|interviews)(\\/|$)/.test(p)){document.documentElement.setAttribute('data-theme','interviews')}else if(/^\\/(ar|en)\\/(projects\\/[^/]+\\/quroosh|quroosh)(\\/|$)/.test(p)){document.documentElement.setAttribute('data-theme','quroosh')}})();",
           }}
         />
         <NextIntlClientProvider>{children}</NextIntlClientProvider>

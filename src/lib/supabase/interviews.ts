@@ -11,8 +11,9 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
  * a key for it, and every write goes through a Postgres function that records
  * WHO did it (see supabase/interviews/migrations).
  *
- * This is therefore the fourth — and last — place the service role is used in
- * this app (see lib/supabase/admin.ts for the other three). It is not a
+ * This is therefore the fourth place the service role is used in this app
+ * (see lib/supabase/admin.ts for the other three, and lib/supabase/quroosh.ts
+ * for the fifth, the Quroosh database, built the same way). It is not a
  * loophole in the club's permission model: the club database decides who may
  * enter the interviews system at all (`my_component_access`), and this client
  * is only reached after that answer.

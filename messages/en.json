@@ -1434,7 +1434,8 @@
   "quroosh": {
     "tabs": {
       "overview": "Overview",
-      "projectDetails": "Project details"
+      "projectDetails": "Project details",
+      "applications": "Applications"
     },
     "role": {
       "manager": "Manager",
@@ -1445,6 +1446,194 @@
       "title": "Quroosh’s home in the system",
       "body": "This is where the Quroosh project’s work will live. Its sections are being built and will appear in the menu as each one is ready.",
       "managerNote": "The project’s tasks, people and KPIs are still under Project details in the menu."
+    },
+    "name": "Quroosh",
+    "apply": {
+      "title": "Apply to Quroosh",
+      "intro": "Applications for Quroosh 2026. Questions marked * are required.",
+      "optional": "(optional)",
+      "choose": "Choose…",
+      "privacyLink": "Privacy notice",
+      "sections": {
+        "founder": "The lead founder",
+        "startup": "The startup",
+        "team": "The team",
+        "market": "Customers and evidence",
+        "quroosh": "You and Quroosh",
+        "consent": "Declaration and consent"
+      },
+      "q": {
+        "founder_name": "Name of the lead founder, who will attend the programme",
+        "email": "Email",
+        "phone": "Mobile number",
+        "university_relation": "The lead founder's relation to university study",
+        "university": "University name",
+        "age_band": "How old is the lead founder?",
+        "stage": "Which best describes where your startup is today?",
+        "commitment": "Will the lead founder attend all of Quroosh?",
+        "venture_name": "Startup name",
+        "problem": "What problem are you solving?",
+        "pitch": "Give your elevator pitch, in under 100 seconds",
+        "sector": "Which Vision 2030 sector does the startup serve directly?",
+        "has_team": "Are other people working on the startup with you?",
+        "team_experience": "What work experience does the team have, if any?",
+        "link_url": "A link that shows the startup",
+        "customer": "Who exactly is your customer?",
+        "customer_problem": "What problem does this customer face, and how do they deal with it today?",
+        "competitor": "What is the closest competitor or alternative your customer uses today, and why would they choose you instead?",
+        "evidence": "What is your strongest evidence that customers need your solution?",
+        "research": "Share details of any market research, user testing or pilot programmes you have run for your startup so far that support the business opportunity",
+        "revenue_model": "How does the startup make money, or how will it?",
+        "funding": "Have you raised funding before? Choose all that apply",
+        "wants": "What are the two things you most want from Quroosh?",
+        "heard_from": "How did you hear about Quroosh?",
+        "conflict_of_interest": "Is anyone on your team related to, working with, or in partnership with a Quroosh organiser, judge or sponsor?",
+        "declaration": "Declaration",
+        "data_consent": "Consent to use your data",
+        "filming_consent": "Do you agree to be filmed or photographed during Quroosh events?"
+      },
+      "hint": {
+        "phone": "In the form 05XXXXXXXX",
+        "university_relation": "Every answer is accepted, and it does not affect your evaluation.",
+        "university": "The lead founder's university. If this does not apply, write “Not applicable”.",
+        "age_band": "The lead founder is the one who attends the programme and talks to us.",
+        "stage": "Choose where you are now, not the plan. If more than one applies, choose the most advanced.",
+        "commitment": "Workshops run 21–24 November; if you qualify, the parallel market on 25 November or the final face-off on 26 November.",
+        "problem": "In short: what does not work today, and for whom.",
+        "pitch": "Write what you would tell an investor if you had under 100 seconds: the problem, the solution, the customer, and why you. About 250 words or fewer.",
+        "sector": "Choose the closest to what you actually do, not the broadest.",
+        "team_experience": "Previous jobs, projects, or experience in the startup's sector. Leave it empty if there is none.",
+        "link_url": "A website, video, deck or photos of the product. Make sure anyone can open it. No link? That is fine; it does not lower your evaluation.",
+        "customer": "For example “small restaurant owners in Riyadh”, not “everyone”.",
+        "customer_problem": "Two or three sentences. If a customer described the problem to you, use their words.",
+        "competitor": "Indirect alternatives count, such as paper or WhatsApp.",
+        "evidence": "Give a number or an example that fits your stage, such as customer interview results, product trials, real usage or purchases.",
+        "research": "Say what you did, with how many people, and what you found. If you have not done any yet, say so.",
+        "revenue_model": "For example “a monthly subscription of 49 riyals per restaurant”.",
+        "funding": "If you choose “No, we have not raised funding”, choose nothing else.",
+        "wants": "Choose at most two.",
+        "conflict_of_interest": "Disclosing does not exclude you; it helps us assign reviewers fairly."
+      },
+      "consent": {
+        "declaration": "I confirm the information is correct and that the team has the right to submit this startup, and I understand that incorrect information may get the application excluded.",
+        "data_consent": "I agree that the data in this application is used to evaluate it and to contact me about Quroosh 2026, and that only the Quroosh team (Vision 2030 Club and Raya) and the reviewers see it, under the privacy notice."
+      },
+      "options": {
+        "university_relation": {
+          "current_student": "Current university student, bachelor's or diploma.",
+          "postgraduate": "Postgraduate student.",
+          "graduate": "Graduate.",
+          "left_university": "Studied at university and did not finish.",
+          "no_university": "Did not study at university.",
+          "faculty": "Faculty member or researcher."
+        },
+        "age_band": {
+          "under_18": "Under 18.",
+          "18_30": "18 to 30.",
+          "over_30": "Over 30."
+        },
+        "stage": {
+          "idea": "We have an idea and have not talked to potential customers yet.",
+          "prototype": "We have talked to potential customers and built a prototype or tried the service informally.",
+          "users": "The product or service works and people outside the team use it, free or on trial.",
+          "paying": "We sell, and have customers who have paid.",
+          "recurring": "We have had recurring sales every month for the last 3 months."
+        },
+        "commitment": {
+          "all_days": "Yes, we commit to every day.",
+          "limited_conflict": "We commit, with a small conflict we will explain later.",
+          "cannot": "We cannot commit."
+        },
+        "sector": {
+          "fintech": "Financial technology.",
+          "health": "Health and quality of life.",
+          "education": "Education and skills.",
+          "tourism": "Tourism, culture and entertainment.",
+          "energy": "Energy, sustainability and water.",
+          "industry": "Industry and logistics.",
+          "retail": "Trade and retail.",
+          "housing": "Housing and smart cities.",
+          "agriculture": "Agriculture and food security.",
+          "none": "Not tied to a particular sector."
+        },
+        "has_team": {
+          "yes": "Yes, there are other members.",
+          "no": "No, it is only the lead founder."
+        },
+        "funding": {
+          "none": "No, we have not raised funding.",
+          "founders_family": "From the founders or family.",
+          "grant": "A grant, prize or support programme.",
+          "investors_under_1m": "Investment of under one million riyals.",
+          "investors_1m_plus": "Investment of one million riyals or more."
+        },
+        "wants": {
+          "investor_prep": "Getting ready for investors' questions and valuation.",
+          "customers_pilot": "Reaching customers, or a commercial pilot with an organisation.",
+          "partners_suppliers": "Partnerships or suppliers.",
+          "non_dilutive": "Non-equity funding, such as support programmes, loans and grants.",
+          "go_to_market": "Guidance on pricing, marketing and reaching the market.",
+          "exposure": "Being seen by investors and partners."
+        },
+        "heard_from": {
+          "social": "Quroosh's or the club's social media",
+          "event": "An event or exhibition",
+          "whatsapp": "A WhatsApp message or group",
+          "creator": "A content creator",
+          "referral": "Someone recommended it",
+          "search": "An internet search",
+          "partner": "A partner, incubator or accelerator",
+          "other": "Other",
+          "university": "The university or college"
+        },
+        "conflict_of_interest": {
+          "yes": "Yes; we will be in touch for the details.",
+          "no": "No."
+        },
+        "filming_consent": {
+          "yes": "Yes, I agree to be filmed.",
+          "no": "No, I do not agree to be filmed."
+        }
+      },
+      "membersIntro": "Add the rest of the team, apart from the lead founder. Every field is required.",
+      "memberN": "Member {n}",
+      "memberName": "Name",
+      "memberPhone": "Mobile number",
+      "memberEmail": "Email",
+      "addMember": "Add a member",
+      "removeMember": "Remove",
+      "submit": "Send the application",
+      "thanks": "Your application is in. Thank you!",
+      "whatNext": "We will review the applications and contact you by phone or email.",
+      "errors": {
+        "not_found": "This application form does not exist.",
+        "applications_closed": "Applications to Quroosh are closed at the moment.",
+        "already_applied": "We already have an application from this mobile number. To change it, get in touch with us.",
+        "invalid": "Some answers are missing or not valid. Check the fields marked * and try again.",
+        "team_members_missing": "Add at least one member, or answer that it is only the lead founder.",
+        "too_many_members": "At most 10 other members.",
+        "phone_invalid": "A mobile number is not valid. Use the form 05XXXXXXXX.",
+        "funding_missing": "Choose at least one answer to the funding question.",
+        "wants_missing": "Choose at least one thing you want from Quroosh.",
+        "network": "The application could not be sent. Check your connection and try again; your answers are still in the form."
+      }
+    },
+    "applications": {
+      "title": "Applications",
+      "open": "Open",
+      "closed": "Closed",
+      "openAction": "Open applications",
+      "closeAction": "Close applications",
+      "link": "Application link",
+      "linkHint": "Share it as it is, or point a short link at it from the Links page. It only takes applications while they are open.",
+      "privacyUrl": "Privacy notice link",
+      "privacyHint": "Shown with the data-consent question. Leave it empty until the notice is ready.",
+      "save": "Save",
+      "empty": "No applications yet.",
+      "count": "{count, plural, =0 {No applications} one {# application} other {# applications}}",
+      "yes": "Yes",
+      "no": "No",
+      "notConfigured": "The Quroosh database is not configured on this deployment (QUROOSH_SUPABASE_URL and QUROOSH_SUPABASE_SECRET_KEY in Vercel)."
     }
   }
 }

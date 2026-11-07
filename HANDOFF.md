@@ -36,7 +36,9 @@ docs/                 how each part works
   Mock Interviews migrations** (`supabase/interviews/migrations/`, up to
   `0021`) are in the repository. Whether each is applied is recorded in the
   `schema_migrations` table of its database; `npm run db:push` and
-  `npm run db:push:interviews` apply what is missing.
+  `npm run db:push:interviews` apply what is missing. Quroosh has a third
+  database of its own (`supabase/quroosh/migrations`, `npm run
+  db:push:quroosh`); see `docs/quroosh.md`.
 - The real club is in the database (98 active members when it was loaded on
   2026-09-16). The management team has tested it in rounds since; what each
   round changed is in `docs/data-and-testing.md`.
