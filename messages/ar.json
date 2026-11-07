@@ -1449,7 +1449,7 @@
     },
     "name": "قروش",
     "apply": {
-      "title": "التسجيل في {project}",
+      "title": "التسجيل في قروش",
       "intro": "أسئلة التسجيل في قروش 2026. الأسئلة المعلّمة بـ * إلزامية.",
       "optional": "(اختياري)",
       "choose": "اختاروا…",
@@ -1632,7 +1632,8 @@
       "empty": "لا توجد طلبات بعد.",
       "count": "{count, plural, =0 {لا توجد طلبات} one {طلب واحد} two {طلبان} few {# طلبات} many {# طلبًا} other {# طلب}}",
       "yes": "نعم",
-      "no": "لا"
+      "no": "لا",
+      "notConfigured": "قاعدة بيانات قروش غير مهيأة في هذا النشر (QUROOSH_SUPABASE_URL وQUROOSH_SUPABASE_SECRET_KEY في Vercel)."
     }
   }
 }

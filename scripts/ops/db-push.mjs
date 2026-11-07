@@ -4,14 +4,17 @@
  *   npm run db:push                          the club database (supabase/migrations)
  *   npm run db:push -- --target interviews   the Mock Interviews database
  *                                            (supabase/interviews/migrations)
+ *   npm run db:push -- --target quroosh      the Quroosh database
+ *                                            (supabase/quroosh/migrations)
  *
  * Each file runs inside its own transaction and is recorded in the
  * `schema_migrations` table of THAT database, so re-running only applies what
  * is new. Pass --redo <name> to re-run one file (useful for the seed files,
  * which are written to be safe to repeat).
  *
- * The two targets are two Supabase projects with two connection strings —
- * SUPABASE_DB_URL and INTERVIEWS_SUPABASE_DB_URL — and nothing here can apply
+ * The targets are separate Supabase projects with their own connection
+ * strings — SUPABASE_DB_URL, INTERVIEWS_SUPABASE_DB_URL and
+ * QUROOSH_SUPABASE_DB_URL — and nothing here can apply
  * one folder to the other project's database: the folder and the variable are
  * chosen together from TARGETS below.
  */
@@ -32,6 +35,11 @@ const TARGETS = {
     dir: join(ROOT, 'supabase', 'interviews', 'migrations'),
     env: 'INTERVIEWS_SUPABASE_DB_URL',
     hint: 'the Mock Interviews project → Connect → Session pooler URI.',
+  },
+  quroosh: {
+    dir: join(ROOT, 'supabase', 'quroosh', 'migrations'),
+    env: 'QUROOSH_SUPABASE_DB_URL',
+    hint: 'the Quroosh project → Connect → Session pooler URI.',
   },
 };
 

@@ -1449,7 +1449,7 @@
     },
     "name": "Quroosh",
     "apply": {
-      "title": "Apply to {project}",
+      "title": "Apply to Quroosh",
       "intro": "Applications for Quroosh 2026. Questions marked * are required.",
       "optional": "(optional)",
       "choose": "Choose…",
@@ -1632,7 +1632,8 @@
       "empty": "No applications yet.",
       "count": "{count, plural, =0 {No applications} one {# application} other {# applications}}",
       "yes": "Yes",
-      "no": "No"
+      "no": "No",
+      "notConfigured": "The Quroosh database is not configured on this deployment (QUROOSH_SUPABASE_URL and QUROOSH_SUPABASE_SECRET_KEY in Vercel)."
     }
   }
 }

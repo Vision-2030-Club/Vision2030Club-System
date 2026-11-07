@@ -1,22 +1,26 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { ActionForm } from '@/components/ActionForm';
-import { Badge, Card, EmptyState, Input, Label, PageHeader } from '@/components/ui';
+import { Alert, Badge, Card, EmptyState, Input, Label, PageHeader } from '@/components/ui';
 import { formatDateTime, localized } from '@/lib/format';
 import { can, getQurooshAccess } from '@/lib/quroosh/access';
 import { QUESTIONS, type Question } from '@/lib/quroosh/questions';
 import { siteUrl } from '@/lib/site';
 import type { QurooshApplication } from '@/lib/quroosh/types';
-import { createClient } from '@/lib/supabase/server';
+import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 import { savePrivacyUrlAction, setApplicationsOpenAction } from './actions';
 
 type Application = QurooshApplication;
 
 /**
- * Quroosh's applications (0075), for the project's managers only: they hold
+ * Quroosh's applications, for the project's managers only: they hold
  * founders' phones, emails and ages. The form is opened and closed here, and
  * its public address shown to share. Each application unfolds to every
  * answer, in the form's own order.
+ *
+ * The club database says who manages the project (getQurooshAccess); the
+ * applications themselves are in the Quroosh database (supabase/quroosh),
+ * read with its secret key only after that answer.
  */
 export default async function QurooshApplicationsPage({
   params,
@@ -30,12 +34,20 @@ export default async function QurooshApplicationsPage({
   if (!access || !can.manage(access.role)) notFound();
 
   const t = await getTranslations('quroosh');
-  const supabase = await createClient();
+  if (!isQurooshConfigured()) {
+    return (
+      <>
+        <PageHeader title={t('applications.title')} description={localized(access.project, 'name', locale)} />
+        <Alert tone="warn">{t('applications.notConfigured')}</Alert>
+      </>
+    );
+  }
+  const quroosh = createQurooshClient();
   const [{ data: settings }, { data: rows }] = await Promise.all([
-    supabase.from('quroosh_settings').select('applications_open, privacy_url').eq('project_id', id).maybeSingle(),
-    supabase
-      .from('quroosh_applications')
-      .select('*, quroosh_application_members(name, phone, email, sort_order)')
+    quroosh.from('settings').select('applications_open, privacy_url').eq('project_id', id).maybeSingle(),
+    quroosh
+      .from('applications')
+      .select('*, application_members(name, phone, email, sort_order)')
       .eq('project_id', id)
       .order('created_at', { ascending: false }),
   ]);
@@ -139,9 +151,9 @@ export default async function QurooshApplicationsPage({
                     <dt className="text-sm font-medium text-ink-muted">{t(`apply.q.${question.name}`)}</dt>
                     <dd className="text-sm text-ink">
                       {answer(question, row)}
-                      {question.name === 'has_team' && row.quroosh_application_members.length > 0 ? (
+                      {question.name === 'has_team' && row.application_members.length > 0 ? (
                         <ul className="mt-2 space-y-1">
-                          {[...row.quroosh_application_members]
+                          {[...row.application_members]
                             .sort((a, b) => a.sort_order - b.sort_order)
                             .map((member) => (
                               <li key={`${member.phone}-${member.sort_order}`}>

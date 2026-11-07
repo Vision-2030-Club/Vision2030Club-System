@@ -21,6 +21,7 @@
     "db:load-club": "node --env-file=.env.local scripts/data/load-club.mjs",
     "db:round1": "node --env-file=.env.local scripts/tests/round1-tests.mjs",
     "db:push:interviews": "node --env-file=.env.local scripts/ops/db-push.mjs --target interviews",
+    "db:push:quroosh": "node --env-file=.env.local scripts/ops/db-push.mjs --target quroosh",
     "db:interviews": "node --env-file=.env.local scripts/tests/interviews-tests.mjs",
     "db:components": "node --env-file=.env.local scripts/tests/component-tests.mjs",
     "interviews:import": "node --env-file=.env.local scripts/data/import-mock-interviews.mjs",

@@ -1,43 +1,42 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getMyMember } from '@/lib/auth/session';
-import { createClient } from '@/lib/supabase/server';
 import { fail, fromPostgrest, requiredText, text, type ActionResult } from '@/lib/actions';
+import { can, getQurooshAccess } from '@/lib/quroosh/access';
+import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 
 /**
- * The managers' side of the Quroosh form (0075): open or close it, and the
- * privacy notice it links to. The policies on quroosh_settings refuse anyone
- * who does not manage the project.
+ * The managers' side of the Quroosh form: open or close it, and the privacy
+ * notice it links to. The club database answers whether this person manages
+ * the project (`getQurooshAccess`); only then is the Quroosh database
+ * written, recording who (`save_settings`, supabase/quroosh).
  */
 async function saveSettings(
-  projectId: string,
-  locale: string,
-  values: { applications_open?: boolean; privacy_url?: string | null },
+  formData: FormData,
+  values: { p_open?: boolean; p_privacy_url?: string },
 ): Promise<ActionResult> {
-  const me = await getMyMember();
-  if (!me) return fail('Not signed in');
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from('quroosh_settings')
-    .upsert(
-      { project_id: projectId, ...values, updated_at: new Date().toISOString(), updated_by: me.id },
-      { onConflict: 'project_id' },
-    );
+  const projectId = requiredText(formData, 'project_id');
+  const locale = requiredText(formData, 'locale');
+  const access = await getQurooshAccess(projectId);
+  if (!access || !can.manage(access.role)) return fail('Only the project’s managers can change this.');
+  if (!isQurooshConfigured()) return fail('The Quroosh database is not configured on this deployment.');
+
+  const { error } = await createQurooshClient().rpc('save_settings', {
+    p_project: projectId,
+    p_actor: access.me.id,
+    ...values,
+  });
   revalidatePath(`/${locale}/projects/${projectId}/quroosh/applications`);
   return fromPostgrest(error);
 }
 
 export async function setApplicationsOpenAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
-  return saveSettings(requiredText(formData, 'project_id'), requiredText(formData, 'locale'), {
-    applications_open: formData.get('open') === 'true',
-  });
+  return saveSettings(formData, { p_open: formData.get('open') === 'true' });
 }
 
 export async function savePrivacyUrlAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   const url = text(formData, 'privacy_url');
   if (url !== null && !/^https?:\/\//.test(url)) return fail('The link must start with https://');
-  return saveSettings(requiredText(formData, 'project_id'), requiredText(formData, 'locale'), {
-    privacy_url: url,
-  });
+  // An empty field clears the link.
+  return saveSettings(formData, { p_privacy_url: url ?? '' });
 }

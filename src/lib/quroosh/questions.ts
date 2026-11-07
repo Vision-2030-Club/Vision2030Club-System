@@ -1,13 +1,13 @@
 /**
  * The Quroosh application, question by question, in the order the form asks
  * them (the club's "أسئلة التسجيل في قروش 2026", with the 2026-11-07 changes;
- * see migration 0075). One list drives the public form, the server action
+ * see supabase/quroosh/migrations). One list drives the public form, the server action
  * and the managers' view, so a question is added in one place.
  *
- * `name` is the column in `quroosh_applications`; the wording lives in the
+ * `name` is the column in the Quroosh database's `applications`; the wording lives in the
  * catalogs under `quroosh.apply.q.<name>` (question), `quroosh.apply.hint.<name>`
  * (help line, optional) and `quroosh.apply.options.<name>.<value>` (choices).
- * The option values must match the CHECK constraints in 0075.
+ * The option values must match the CHECK constraints in supabase/quroosh/migrations.
  */
 
 export type QuestionKind =
@@ -127,7 +127,7 @@ export const QUESTIONS: Question[] = SECTIONS.flatMap((section) => section.quest
 export const MAX_WANTS = 2;
 /** `funding`: this one excludes the others. */
 export const FUNDING_NONE = 'none';
-/** Other team members, besides the lead founder (0075 has the same cap). */
+/** Other team members, besides the lead founder (apply() in the Quroosh database has the same cap). */
 export const MAX_MEMBERS = 10;
 
 /**

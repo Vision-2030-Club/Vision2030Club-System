@@ -1,4 +1,4 @@
-/** Rows of the Quroosh tables (club migration 0075). */
+/** Rows of the Quroosh database's tables (supabase/quroosh/migrations). */
 
 export type QurooshSettings = {
   project_id: string;
@@ -30,5 +30,5 @@ export type QurooshApplication = Record<string, unknown> & {
   has_team: boolean;
   funding: string[];
   wants: string[];
-  quroosh_application_members: QurooshApplicationMember[];
+  application_members: QurooshApplicationMember[];
 };

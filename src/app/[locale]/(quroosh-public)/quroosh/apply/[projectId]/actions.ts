@@ -1,19 +1,21 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 import { fail, fromPostgrest, ok, type ActionResult } from '@/lib/actions';
 import { MAX_MEMBERS, QUESTIONS } from '@/lib/quroosh/questions';
 
 /**
- * Submits a Quroosh application from the public form (0075).
+ * Submits a Quroosh application from the public form.
  *
- * The answers go to `quroosh_apply()` as they were typed, keyed by column;
+ * The answers go to the Quroosh database's `apply()` (supabase/quroosh) as
+ * they were typed, keyed by column;
  * the database decides what is valid (required answers, the options, the
  * phone and email shapes, one application per phone) and whether the form
  * is open. Refusals come back with a hint the form translates.
  *
- * No account is needed: the call is made with whatever session the visitor
- * has, usually none, and the function is granted to anonymous visitors.
+ * No account is needed. The call is made by this server with the Quroosh
+ * database's secret key, and `apply()` is the only write it can reach from
+ * here: it checks the form is open, and the project id comes from the page.
  */
 export async function applyAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   // A field no person sees; anything in it means a bot filled the form.
@@ -47,8 +49,8 @@ export async function applyAction(_previous: ActionResult, formData: FormData): 
       ? names.slice(0, MAX_MEMBERS + 1).map((name, i) => ({ name, phone: phones[i] ?? '', email: emails[i] ?? '' }))
       : [];
 
-  const supabase = await createClient();
-  const { error } = await supabase.rpc('quroosh_apply', {
+  if (!isQurooshConfigured()) return fail('Quroosh is not configured.', 'not_found');
+  const { error } = await createQurooshClient().rpc('apply', {
     p_project: projectId,
     p_application: application,
     p_members: members,
