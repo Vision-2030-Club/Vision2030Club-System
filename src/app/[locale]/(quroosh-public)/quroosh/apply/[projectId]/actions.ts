@@ -33,6 +33,9 @@ export async function applyAction(_previous: ActionResult, formData: FormData): 
     } else if (kind === 'yesno') {
       const value = formData.get(name);
       application[name] = value === 'yes' ? true : value === 'no' ? false : null;
+    } else if (kind === 'number') {
+      const value = String(formData.get(name) ?? '').trim();
+      application[name] = /^[0-9]+$/.test(value) ? Number(value) : null;
     } else if (kind === 'consent') {
       application[name] = formData.get(name) === 'on';
     } else {

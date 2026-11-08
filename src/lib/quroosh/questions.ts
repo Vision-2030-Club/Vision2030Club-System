@@ -15,6 +15,7 @@ export type QuestionKind =
   | 'email'
   | 'tel'
   | 'url'
+  | 'number' // a whole number between `min` and `max`
   | 'textarea' // several lines
   | 'radio' // one of `options`
   | 'select' // one of `options`, as a drop-down
@@ -27,8 +28,10 @@ export type Question = {
   kind: QuestionKind;
   required: boolean;
   options?: readonly string[];
-  /** Longest answer accepted, for text kinds (the CHECK has the same). */
+  /** Longest answer for text kinds, largest value for `number` (the CHECK has the same). */
   max?: number;
+  /** Smallest value, for `number`. */
+  min?: number;
 };
 
 export type Section = { key: string; questions: Question[] };
@@ -71,6 +74,9 @@ export const SECTIONS: Section[] = [
     questions: [
       // The other members are asked under this one when the answer is yes.
       { name: 'has_team', kind: 'yesno', required: true },
+      // Quroosh 0002: the lead founder counts; no more than the founder and
+      // the members named (apply() checks the same).
+      { name: 'attendees', kind: 'number', required: true, min: 1, max: 11 },
       { name: 'team_experience', kind: 'textarea', required: false, max: 3000 },
     ],
   },
