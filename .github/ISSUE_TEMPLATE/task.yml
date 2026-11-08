@@ -1,0 +1,58 @@
+name: Task
+description: A piece of work one person can finish in a day or two.
+title: "Short name of the work"
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should be different when this is done, and why it matters.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Quroosh
+        - Mock Interviews
+        - Outreach
+        - Requests, meetings, rooms, calendar
+        - Tasks and KPI
+        - Members, teams, admin
+        - Shared UI, text, design
+        - Docs or tooling
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: What a reviewer checks on the preview link. One line each.
+      placeholder: |
+        - On the Applications page, a manager can download the applications as a CSV
+        - The file opens in Excel with Arabic shown correctly
+    validations:
+      required: true
+  - type: dropdown
+    id: migration
+    attributes:
+      label: Database change
+      description: The lead assigns the migration number and applies it.
+      options:
+        - "No"
+        - Yes, club database (supabase/migrations)
+        - Yes, Mock Interviews database (supabase/interviews/migrations)
+        - Yes, Quroosh database (supabase/quroosh/migrations)
+    validations:
+      required: true
+  - type: input
+    id: migration_number
+    attributes:
+      label: Migration number (filled in by the lead)
+      placeholder: e.g. Quroosh 0003
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Files to start from, screenshots of the design, anything else useful. No real people's data.

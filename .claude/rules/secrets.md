@@ -6,9 +6,10 @@
   NAMES are fine; values are not.
 - Never commit a file that holds a key. `.env.example` lists the variable
   names with empty values and is the only env file that belongs in git.
-- Environment values come from Vercel. A teammate who needs them locally
-  runs `npx vercel env pull .env.local` after an admin adds them to the
-  Vercel project. Do not ask for keys in chat.
+- Environment values live in Vercel, and only the project lead holds them.
+  Teammates have no keys and no Vercel access: they check their work on the
+  pull request's preview link, not on a local copy with data. Do not ask
+  for keys in chat, and do not suggest a workaround that hands one out.
 - Real people's data (members, applicants, phone numbers, CVs, emails)
   stays in the databases and the private storage buckets. Never copy it
   into the repository, a public Google Sheet, a test fixture, a screenshot,

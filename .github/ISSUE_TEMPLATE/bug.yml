@@ -1,0 +1,41 @@
+name: Bug
+description: Something on the site that does not work as it should.
+title: "What is wrong, in a few words"
+body:
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: The page address, without any personal link or token in it.
+      placeholder: /ar/projects/…/quroosh/applications
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did
+      placeholder: |
+        1. Opened the page in Arabic on a phone
+        2. Pressed …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+    validations:
+      required: true
+  - type: checkboxes
+    id: context
+    attributes:
+      label: Seen in
+      options:
+        - label: Arabic
+        - label: English
+        - label: Phone
+        - label: Computer
+  - type: markdown
+    attributes:
+      value: >-
+        Screenshots help, but crop out real people's names, phone numbers and
+        emails first. This repository is not the place for personal data.
