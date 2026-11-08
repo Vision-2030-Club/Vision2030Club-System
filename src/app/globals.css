@@ -166,7 +166,8 @@ html[data-theme="quroosh"] {
   /* قروش: the identity's purple #542f90 at 600, its lavenders #cbc1db and
      #9b91c0 at 200 and 400, #3e3661 at 800 and the navy #1e1338 at 950. The
      app stays light (see html above), so the navy is the ink and the hero
-     band, not the page. The mints and the teal are the accents: the logo on
+     band; the page behind the cards is the identity's lavender, lightened
+     so navy text written straight on it keeps its contrast. The mints and the teal are the accents: the logo on
      the band, and the waves. */
   --color-brand-50: #f5f3fa;
   --color-brand-100: #e9e4f2;
@@ -179,10 +180,10 @@ html[data-theme="quroosh"] {
   --color-brand-800: #3e3661;
   --color-brand-900: #1b2b50;
   --color-brand-950: #1e1338;
-  --color-canvas: #f5f8fa;
+  --color-canvas: #e9e4f2;
   --color-surface: #ffffff;
   --color-surface-muted: #f1eef7;
-  --color-line: #ded8ea;
+  --color-line: #d6cee6;
   --color-ink: #1e1338;
   --color-ink-muted: #5b5378;
   --color-accent: #90d4d6;
