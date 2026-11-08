@@ -64,7 +64,8 @@ docs/                 how each part works
 
 Nothing is blocked. To get running from a fresh clone:
 
-1. Get the environment values. An admin adds you to the Vercel project, then
+1. Get the environment values (the project lead only; teammates have no
+   keys, see `CONTRIBUTING.md`). An admin adds you to the Vercel project, then
    `npx vercel env pull .env.local`. `.env.example` lists every variable name
    with an empty value. Never paste a value into chat or a commit.
    - `SUPABASE_SERVICE_ROLE_KEY` is the `sb_secret_…` value from Project
