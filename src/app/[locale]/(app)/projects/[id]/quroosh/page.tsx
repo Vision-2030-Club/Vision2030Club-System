@@ -32,11 +32,11 @@ export default async function QurooshPage({
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-2xl bg-brand-950">
-        <div className="flex flex-col items-start gap-4 px-6 pt-8 pb-28 sm:px-10 sm:pt-10 sm:pb-36">
+        <div className="flex flex-col items-start gap-4 px-6 pt-6 pb-20 sm:px-10 sm:pt-8 sm:pb-24">
           <Badge tone="brand">{t(`role.${access.role}`)}</Badge>
           <QurooshLogo name={name} className="h-20 text-accent-2 sm:h-28" />
         </div>
-        <QurooshWaves className="absolute inset-x-0 bottom-0 h-24 sm:h-32" />
+        <QurooshWaves className="absolute inset-x-0 bottom-0 h-16 sm:h-20" />
       </section>
 
       <Card>
