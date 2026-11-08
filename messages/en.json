@@ -1490,7 +1490,8 @@
         "conflict_of_interest": "Is anyone on your team related to, working with, or in partnership with a Quroosh organiser, judge or sponsor?",
         "declaration": "Declaration",
         "data_consent": "Consent to use your data",
-        "filming_consent": "Do you agree to be filmed or photographed during Quroosh events?"
+        "filming_consent": "Do you agree to be filmed or photographed during Quroosh events?",
+        "attendees": "How many of your team will attend Quroosh, including the lead founder?"
       },
       "hint": {
         "phone": "In the form 05XXXXXXXX",
@@ -1512,7 +1513,8 @@
         "revenue_model": "For example “a monthly subscription of 49 riyals per restaurant”.",
         "funding": "If you choose “No, we have not raised funding”, choose nothing else.",
         "wants": "Choose at most two.",
-        "conflict_of_interest": "Disclosing does not exclude you; it helps us assign reviewers fairly."
+        "conflict_of_interest": "Disclosing does not exclude you; it helps us assign reviewers fairly.",
+        "attendees": "Count the lead founder. If only the lead founder will attend, write 1."
       },
       "consent": {
         "declaration": "I confirm the information is correct and that the team has the right to submit this startup, and I understand that incorrect information may get the application excluded.",
@@ -1615,7 +1617,8 @@
         "phone_invalid": "A mobile number is not valid. Use the form 05XXXXXXXX.",
         "funding_missing": "Choose at least one answer to the funding question.",
         "wants_missing": "Choose at least one thing you want from Quroosh.",
-        "network": "The application could not be sent. Check your connection and try again; your answers are still in the form."
+        "network": "The application could not be sent. Check your connection and try again; your answers are still in the form.",
+        "attendees_too_many": "That is more people than the lead founder and the members you added. Add the other members, or correct the number."
       }
     },
     "applications": {

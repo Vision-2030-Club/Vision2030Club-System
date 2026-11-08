@@ -55,6 +55,8 @@ export function ApplyForm({ projectId, privacyUrl }: { projectId: string; privac
     const phones = [formData.get('phone'), ...formData.getAll('member_phone')].map((v) => String(v ?? ''));
     let found: string | null = null;
     if (phones.some((phone) => phone.trim() !== '' && normalizeSaudiMobile(phone) === null)) found = 'phone_invalid';
+    else if (Number(formData.get('attendees')) > 1 + (hasTeam ? formData.getAll('member_name').length : 0))
+      found = 'attendees_too_many';
     else if (funding.length === 0) found = 'funding_missing';
     else if (wants.length === 0) found = 'wants_missing';
     setProblem(found);
@@ -195,6 +197,27 @@ export function ApplyForm({ projectId, privacyUrl }: { projectId: string; privac
               </option>
             ))}
           </Select>
+          {help(name)}
+        </div>
+      );
+    }
+
+    if (kind === 'number') {
+      return (
+        <div key={name}>
+          <Label htmlFor={id}>{label(question)}</Label>
+          <Input
+            id={id}
+            name={name}
+            type="number"
+            inputMode="numeric"
+            min={question.min}
+            max={question.max}
+            step={1}
+            dir="ltr"
+            required={required}
+            className="w-28"
+          />
           {help(name)}
         </div>
       );

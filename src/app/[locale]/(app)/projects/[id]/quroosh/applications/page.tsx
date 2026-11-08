@@ -71,7 +71,7 @@ export default async function QurooshApplicationsPage({
     if (question.kind === 'radio' || question.kind === 'select') {
       return t(`apply.options.${question.name}.${String(value)}`);
     }
-    if (question.kind === 'tel' || question.kind === 'email' || question.kind === 'url') {
+    if (question.kind === 'tel' || question.kind === 'email' || question.kind === 'url' || question.kind === 'number') {
       return (
         <span dir="ltr" className="ltr-nums">
           {String(value)}

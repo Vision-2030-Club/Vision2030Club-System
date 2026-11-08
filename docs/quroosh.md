@@ -62,6 +62,9 @@ privacy-notice link, and read the applications on the component's
   elevator pitch in under 100 seconds* (written, about 250 words), and
   *market research, user testing or pilots to date* is asked (required; "none
   yet" is an answer).
+  Since Quroosh `0002` (2026-11-08) it also asks *how many of the team will
+  attend, the lead founder included*: 1 to 11, and no more than the founder
+  plus the members named. Applications sent before `0002` have it empty.
 - **One list drives everything:** `src/lib/quroosh/questions.ts`. The form,
   the server action and the managers' view all read it. To add a question:
   a column (with its CHECK) in a new Quroosh migration, an entry in `SECTIONS`, and
