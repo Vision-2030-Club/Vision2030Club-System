@@ -8,7 +8,7 @@ import { QUESTIONS, type Question } from '@/lib/quroosh/questions';
 import { siteUrl } from '@/lib/site';
 import type { QurooshApplication } from '@/lib/quroosh/types';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
-import { savePrivacyUrlAction, setApplicationsOpenAction } from './actions';
+import { savePrivacyUrlAction, setApplicationsOpenAction, syncApplicationSheetAction } from './actions';
 
 type Application = QurooshApplication;
 
@@ -43,14 +43,18 @@ export default async function QurooshApplicationsPage({
     );
   }
   const quroosh = createQurooshClient();
-  const [{ data: settings }, { data: rows }] = await Promise.all([
+  const [{ data: settings }, { data: rows }, { data: sheet }] = await Promise.all([
     quroosh.from('settings').select('applications_open, privacy_url').eq('project_id', id).maybeSingle(),
     quroosh
       .from('applications')
       .select('*, application_members(name, phone, email, sort_order)')
       .eq('project_id', id)
       .order('created_at', { ascending: false }),
+    // Its own read: before Quroosh 0003 the column is missing, and the page
+    // must still load (it then shows no sheet).
+    quroosh.from('settings').select('sheet_url').eq('project_id', id).maybeSingle(),
   ]);
+  const sheetUrl = (sheet as { sheet_url: string | null } | null)?.sheet_url ?? null;
   const open = settings?.applications_open ?? false;
   const applications = (rows ?? []) as Application[];
   const publicUrl = `${siteUrl()}/${locale}/quroosh/apply/${id}`;
@@ -125,6 +129,26 @@ export default async function QurooshApplicationsPage({
             />
             <p className="mt-1 text-xs text-ink-muted">{t('applications.privacyHint')}</p>
           </div>
+        </ActionForm>
+      </Card>
+
+      <Card className="space-y-3">
+        <div>
+          <p className="text-sm font-medium text-ink">{t('applications.sheet')}</p>
+          {sheetUrl ? (
+            <p className="mt-1 break-all text-sm" dir="ltr">
+              <a href={sheetUrl} target="_blank" rel="noreferrer" className="text-brand-700 underline">
+                {sheetUrl}
+              </a>
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-ink-muted">{t('applications.sheetNone')}</p>
+          )}
+          <p className="mt-1 text-xs text-ink-muted">{t('applications.sheetHint')}</p>
+        </div>
+        <ActionForm action={syncApplicationSheetAction} submitLabel={t('applications.sheetSync')} variant="secondary">
+          <input type="hidden" name="project_id" value={id} />
+          <input type="hidden" name="locale" value={locale} />
         </ActionForm>
       </Card>
 

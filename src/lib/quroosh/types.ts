@@ -4,6 +4,9 @@ export type QurooshSettings = {
   project_id: string;
   applications_open: boolean;
   privacy_url: string | null;
+  /** The applications Google Sheet (0003; absent before it is applied). */
+  sheet_id?: string | null;
+  sheet_url?: string | null;
   updated_at: string;
   updated_by: string | null;
 };
