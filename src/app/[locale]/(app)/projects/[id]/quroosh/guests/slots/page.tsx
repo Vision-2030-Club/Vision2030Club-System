@@ -33,7 +33,11 @@ export default async function QurooshGuestSlotsPage({
 
   const t = await getTranslations('quroosh');
   const header = (
-    <PageHeader title={t('guests.slots.title')} description={localized(access.project, 'name', locale)} />
+    <PageHeader
+      title={t('guests.slots.title')}
+      description={localized(access.project, 'name', locale)}
+      back={{ href: `/projects/${id}/quroosh/guests`, label: t('guests.title') }}
+    />
   );
   if (!isQurooshConfigured()) {
     return (

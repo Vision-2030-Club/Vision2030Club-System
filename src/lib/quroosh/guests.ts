@@ -1,5 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { formatTime } from '@/lib/format';
+import { siteUrl } from '@/lib/site';
 import { CLUB_TIME_ZONE, toDateInput } from '@/lib/time';
 import type { QurooshGuestInvitation, QurooshGuestSlot } from './types';
 
@@ -18,11 +20,84 @@ export const GUEST_SESSION_MINUTES = 45;
 
 export type GuestStatus = 'invited' | 'booked' | 'cancelled';
 
+/** The badge colour of each status, the same on every page. */
+export const GUEST_STATUS_TONE: Record<GuestStatus, 'brand' | 'ok' | 'neutral'> = {
+  invited: 'brand',
+  booked: 'ok',
+  cancelled: 'neutral',
+};
+
 /** The status is read from the row, not stored (0005). */
 export function invitationStatus(row: Pick<QurooshGuestInvitation, 'slot_id' | 'cancelled_at'>): GuestStatus {
   if (row.cancelled_at) return 'cancelled';
   if (row.slot_id) return 'booked';
   return 'invited';
+}
+
+/**
+ * A guest's personal link: the public booking page (/quroosh/invite/<token>),
+ * in the manager's language; the page has a language switch. Anyone holding
+ * it can open it, so it is shown to managers to copy, never linked.
+ */
+export function invitationUrl(locale: string, token: string): string {
+  return `${siteUrl()}/${locale}/quroosh/invite/${token}`;
+}
+
+/** An invitation with the start of the slot it holds (null when not booked). */
+export type GuestWithSlot<T> = T & { slot_starts_at: string | null };
+
+/** The embedded slot (`guest_slots(starts_at)`, through slot_id) flattened. */
+function withSlot<T extends Record<string, unknown>>(row: T): GuestWithSlot<Omit<T, 'guest_slots'>> {
+  const { guest_slots: slot, ...rest } = row as T & { guest_slots?: { starts_at: string } | null };
+  return { ...rest, slot_starts_at: slot?.starts_at ?? null };
+}
+
+/** What the guests list shows of an invitation: no token, no note. */
+export type GuestListRow = GuestWithSlot<
+  Pick<
+    QurooshGuestInvitation,
+    'id' | 'name' | 'role' | 'slot_id' | 'phone' | 'needs_transport' | 'cancelled_at' | 'created_at'
+  >
+>;
+
+/**
+ * A project's invited guests, newest first, each with their booked slot's
+ * start. `ready` is false before Quroosh 0005 is applied.
+ */
+export async function loadInvitations(
+  db: SupabaseClient,
+  projectId: string,
+): Promise<{ ready: boolean; invitations: GuestListRow[] }> {
+  const { data, error } = await db
+    .from('guest_invitations')
+    .select('id, name, role, slot_id, phone, needs_transport, cancelled_at, created_at, guest_slots(starts_at)')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false });
+  if (error) return { ready: false, invitations: [] };
+  return { ready: true, invitations: ((data ?? []) as Record<string, unknown>[]).map(withSlot) as GuestListRow[] };
+}
+
+/**
+ * One invitation of the project with its booked slot's start, or null when
+ * there is none by that id in this project. `ready` is false before Quroosh
+ * 0005 is applied.
+ */
+export async function loadInvitation(
+  db: SupabaseClient,
+  projectId: string,
+  invitationId: string,
+): Promise<{ ready: boolean; invitation: GuestWithSlot<QurooshGuestInvitation> | null }> {
+  const { data, error } = await db
+    .from('guest_invitations')
+    .select('*, guest_slots(starts_at)')
+    .eq('project_id', projectId)
+    .eq('id', invitationId)
+    .maybeSingle();
+  if (error) return { ready: false, invitation: null };
+  return {
+    ready: true,
+    invitation: data ? (withSlot(data as Record<string, unknown>) as GuestWithSlot<QurooshGuestInvitation>) : null,
+  };
 }
 
 /** A slot and the guest holding it, if any. */
@@ -99,4 +174,16 @@ export function formatSlotDay(day: string, locale: string): string {
     month: 'long',
     year: 'numeric',
   }).format(new Date(`${day}T12:00:00Z`));
+}
+
+/**
+ * A slot as people read it, on the club's clock: its day ("Saturday 21
+ * November 2026") and its time ("14:00–14:45"). The one way every guests
+ * page, public or not, writes a slot.
+ */
+export function slotLabel(startsAt: string, locale: string): { day: string; time: string } {
+  return {
+    day: formatSlotDay(toDateInput(new Date(startsAt)), locale),
+    time: `${formatTime(startsAt, locale)}–${formatTime(slotEnd(startsAt), locale)}`,
+  };
 }
