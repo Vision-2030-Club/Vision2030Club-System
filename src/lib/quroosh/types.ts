@@ -44,7 +44,10 @@ export type QurooshApplication = Record<string, unknown> & {
 /** A row of the Quroosh database's `questions` (0004): see QuestionRow in src/lib/quroosh/form.ts. */
 export type { QuestionRow as QurooshQuestion } from './form';
 
-/** A time a guest can book (Quroosh 0005, `guest_slots`). Sessions are 45 minutes. */
+/**
+ * A day a guest can book (Quroosh 0005, `guest_slots`). Slots are days:
+ * `starts_at` is that day at 00:00 Riyadh time, and only the day is shown.
+ */
 export type QurooshGuestSlot = {
   id: string;
   project_id: string;

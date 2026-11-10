@@ -13,7 +13,7 @@ import {
   invitationUrl,
   loadInvitation,
   loadSlots,
-  slotLabel,
+  slotDay,
 } from '@/lib/quroosh/guests';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 // The interviews' copy field: a secret link shown to copy, never linked.
@@ -69,8 +69,8 @@ export default async function QurooshGuestPage({
   const status = invitationStatus(invitation);
   const link = status === 'cancelled' ? null : invitationUrl(locale, invitation.token);
   const qr = link ? await qrDataUrls(link) : null;
-  const booked = status === 'booked' && invitation.slot_starts_at ? slotLabel(invitation.slot_starts_at, locale) : null;
-  // Where a booking can move: on, not started, nobody's.
+  const bookedDay = status === 'booked' && invitation.slot_starts_at ? slotDay(invitation.slot_starts_at, locale) : null;
+  // Where a booking can move: on, still offered (its day not yet begun), nobody's.
   const freeSlots = slots.filter((slot) => slot.active && !slot.past && !slot.guest);
   const hidden = (
     <>
@@ -128,14 +128,11 @@ export default async function QurooshGuestPage({
         </dl>
       </Card>
 
-      {booked ? (
+      {bookedDay ? (
         <Card className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold text-ink">{t('guests.booking.title')}</h2>
-            <p className="mt-2 text-ink">{booked.day}</p>
-            <p className="ltr-nums text-lg font-semibold text-ink" dir="ltr">
-              {booked.time}
-            </p>
+            <p className="mt-2 text-lg font-semibold text-ink">{bookedDay}</p>
             {invitation.booked_at ? (
               <p className="mt-1 text-xs text-ink-muted">
                 {t('guests.booking.bookedAt', { date: formatDateTime(invitation.booked_at, locale) })}
@@ -152,14 +149,11 @@ export default async function QurooshGuestPage({
                   <option value="" disabled>
                     {t('guests.booking.choose')}
                   </option>
-                  {freeSlots.map((slot) => {
-                    const label = slotLabel(slot.starts_at, locale);
-                    return (
-                      <option key={slot.id} value={slot.id}>
-                        {`${label.day} · ⁦${label.time}⁩`}
-                      </option>
-                    );
-                  })}
+                  {freeSlots.map((slot) => (
+                    <option key={slot.id} value={slot.id}>
+                      {slotDay(slot.starts_at, locale)}
+                    </option>
+                  ))}
                 </Select>
               </div>
             </ActionForm>

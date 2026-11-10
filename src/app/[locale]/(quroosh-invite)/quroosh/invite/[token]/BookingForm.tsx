@@ -1,29 +1,54 @@
 'use client';
 
-import { startTransition, useActionState, useState, type FormEvent } from 'react';
+import { startTransition, useActionState, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
-import { Alert, Button, Card, Input, Label, Select } from '@/components/ui';
+import { Alert, Button, Input, Label, Select } from '@/components/ui';
 import { useRouter } from '@/i18n/navigation';
 import type { ActionResult } from '@/lib/actions';
 import { DEFAULT_COUNTRY, internationalPhone } from '@/lib/quroosh/phones';
 import { bookAction } from './actions';
+import { BookedNotice } from './InvitationCard';
 
-export type SlotDayOption = { day: string; slots: { id: string; time: string }[] };
+/** A free day as the invitation writes it: "الأحد 22 نوفمبر". */
+export type SlotOption = { id: string; day: string };
 export type CountryOption = { iso: string; dial: string; name: string };
 
-/** The hints after which the list of free times is out of date. */
+/** The hints after which the list of free days is out of date. */
 const STALE = new Set(['slot_taken', 'slot_unavailable']);
 
 /**
- * The guest's booking form (Quroosh 0005): one of the free times, their
- * mobile number with a country picker, and whether they need transport (then
- * the number of their driver or office manager).
+ * One choice in the invitation: a full-width row with a lavender border,
+ * mint when chosen, as on the printed cards.
+ */
+const OPTION =
+  'flex cursor-pointer items-center gap-3 rounded-xl border border-brand-200 bg-surface px-4 py-3 ' +
+  'transition-colors hover:border-brand-400 has-[:checked]:border-accent-3 has-[:checked]:bg-accent-2 ' +
+  'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent-3';
+
+/** A section of the invitation: a navy heading over a thin mint rule. */
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="space-y-4">
+      <div className="space-y-2">
+        <h2 className="text-base font-semibold text-brand-950">{title}</h2>
+        <div className="h-px w-12 bg-accent" aria-hidden="true" />
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * The guest's choice of day and contact details, inside their invitation
+ * card (Quroosh 0005): one of the free days, their mobile number with a
+ * country picker, whether they need transport (then the number of their
+ * driver or office manager). After confirming, a formal acknowledgement.
  *
  * As on the application form, whatever goes wrong the guest keeps what they
  * typed: the submit is sent from onSubmit rather than by the form's own
  * action (React resets a form after its action runs, refusals included), and
- * a request that fails outright becomes a translated message. When the time
- * they chose was just taken, the page's free times are reloaded, so it drops
+ * a request that fails outright becomes a translated message. When the day
+ * they chose was just taken, the page's free days are reloaded, so it drops
  * out of the list.
  *
  * The phone numbers are checked here first only so the message can name the
@@ -32,16 +57,15 @@ const STALE = new Set(['slot_taken', 'slot_unavailable']);
 export function BookingForm({
   token,
   locale,
-  days,
+  slots,
   countries,
 }: {
   token: string;
   locale: string;
-  days: SlotDayOption[];
+  slots: SlotOption[];
   countries: CountryOption[];
 }) {
   const t = useTranslations('quroosh.invite');
-  const tCommon = useTranslations('common');
   const router = useRouter();
   const [state, formAction, pending] = useActionState<ActionResult, FormData>(
     async (previous, formData) => {
@@ -77,16 +101,13 @@ export function BookingForm({
 
   if (state.ok) {
     return (
-      <Card className="space-y-2">
-        <h2 className="text-lg font-semibold text-ink">{t('booked.title')}</h2>
-        {state.data?.day ? <p className="text-ink">{state.data.day}</p> : null}
-        {state.data?.time ? (
-          <p className="ltr-nums text-lg font-semibold text-ink" dir="ltr">
-            {state.data.time}
-          </p>
-        ) : null}
-        <p className="text-sm text-ink-muted">{t('booked.next')}</p>
-      </Card>
+      <div className="border-t border-brand-200 pt-8">
+        <BookedNotice
+          title={t('booked.title')}
+          day={state.data?.day}
+          thanks={t('booked.next')}
+        />
+      </div>
     );
   }
 
@@ -97,13 +118,13 @@ export function BookingForm({
   const phoneField = (name: string, label: string, help: string) => (
     <div>
       <Label htmlFor={`${name}-number`}>{label}</Label>
-      <div className="flex flex-wrap gap-2 sm:flex-nowrap">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Select
           id={`${name}-country`}
           name={`${name}_country`}
           defaultValue={DEFAULT_COUNTRY}
           aria-label={t('country')}
-          className="sm:w-56"
+          className="sm:w-60"
         >
           {countries.map(({ iso, dial, name: country }) => (
             <option key={iso} value={iso}>
@@ -129,7 +150,7 @@ export function BookingForm({
   );
 
   return (
-    <form action={formAction} onSubmit={onSubmit} className="space-y-6">
+    <form action={formAction} onSubmit={onSubmit} className="space-y-8 border-t border-brand-200 pt-8">
       <input type="hidden" name="token" value={token} />
       <input type="hidden" name="locale" value={locale} />
       <div className="hidden" aria-hidden="true">
@@ -138,58 +159,48 @@ export function BookingForm({
         </label>
       </div>
 
-      <fieldset className="space-y-4 rounded-xl border border-line bg-surface p-5 shadow-sm">
-        <legend className="px-1 text-base font-semibold text-brand-700">{t('chooseSlot')}</legend>
-        {days.map(({ day, slots }) => (
-          <div key={day} className="space-y-2">
-            <p className="text-sm font-semibold text-ink-muted">{day}</p>
-            <div className="flex flex-wrap gap-2">
-              {slots.map((slot) => (
-                <label
-                  key={slot.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-ink has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50"
-                >
-                  <input type="radio" name="slot_id" value={slot.id} required className="accent-brand-600" />
-                  <span className="ltr-nums" dir="ltr">
-                    {slot.time}
-                  </span>
+      <Section title={t('chooseSlot')}>
+        <div className="space-y-2">
+          {slots.map((slot) => (
+            <label key={slot.id} className={OPTION}>
+              <input type="radio" name="slot_id" value={slot.id} required className="size-4 shrink-0 accent-accent-3" />
+              <span className="min-w-0 flex-1 font-semibold text-brand-950">{slot.day}</span>
+            </label>
+          ))}
+        </div>
+      </Section>
+
+      <Section title={t('contactTitle')}>
+        <div className="space-y-6">
+          {phoneField('phone', t('phone'), t('phoneHint'))}
+
+          <fieldset className="space-y-3">
+            <legend className="text-sm font-medium text-brand-950">{t('transport')}</legend>
+            <div className="grid grid-cols-2 gap-2">
+              {(['yes', 'no'] as const).map((value) => (
+                <label key={value} className={OPTION}>
+                  <input
+                    type="radio"
+                    name="needs_transport"
+                    value={value}
+                    required
+                    className="size-4 shrink-0 accent-accent-3"
+                    onChange={() => setTransport(value === 'yes')}
+                  />
+                  <span className="text-sm text-brand-950">{t(value)}</span>
                 </label>
               ))}
             </div>
-          </div>
-        ))}
-      </fieldset>
+          </fieldset>
 
-      <fieldset className="space-y-5 rounded-xl border border-line bg-surface p-5 shadow-sm">
-        <legend className="px-1 text-base font-semibold text-brand-700">{t('contactTitle')}</legend>
-        {phoneField('phone', t('phone'), t('phoneHint'))}
-
-        <fieldset>
-          <legend className="text-sm font-medium text-ink">{t('transport')}</legend>
-          <div className="mt-2 space-y-2">
-            {(['yes', 'no'] as const).map((value) => (
-              <label key={value} className="flex items-start gap-2 text-sm text-ink">
-                <input
-                  type="radio"
-                  name="needs_transport"
-                  value={value}
-                  required
-                  className="mt-1 accent-brand-600"
-                  onChange={() => setTransport(value === 'yes')}
-                />
-                <span>{t(value)}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        {transport ? phoneField('transport_phone', t('transportPhone'), t('transportPhoneHint')) : null}
-      </fieldset>
+          {transport ? phoneField('transport_phone', t('transportPhone'), t('transportPhoneHint')) : null}
+        </div>
+      </Section>
 
       {errorText ? <Alert tone="danger">{errorText}</Alert> : null}
 
-      <Button type="submit" disabled={pending} className="w-full sm:w-auto">
-        {pending ? tCommon('loading') : t('submit')}
+      <Button type="submit" disabled={pending} className="w-full py-3 text-base">
+        {pending ? t('submitting') : t('submit')}
       </Button>
     </form>
   );

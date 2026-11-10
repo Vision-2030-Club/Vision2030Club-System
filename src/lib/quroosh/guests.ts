@@ -1,22 +1,20 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { formatTime } from '@/lib/format';
 import { siteUrl } from '@/lib/site';
-import { CLUB_TIME_ZONE, toDateInput } from '@/lib/time';
+import { CLUB_TIME_ZONE } from '@/lib/time';
 import type { QurooshGuestInvitation, QurooshGuestSlot } from './types';
 
 /**
  * Guest invitations and their bookings (Quroosh 0005): the project's managers
- * offer times (slots), invite guests, and each guest books one slot on their
- * own link. One guest per slot; the database makes that so.
+ * offer days (slots), invite guests, and each guest books one day on their
+ * own link. One guest per day; the database makes that so.
  *
- * Every time is shown on the club's clock (Asia/Riyadh), never the viewer's:
- * guests may open their link from abroad. The formatters in src/lib/format.ts
- * and the helpers below are all pinned to CLUB_TIME_ZONE.
+ * A slot is a day: saved as that day at 00:00 Riyadh time (`starts_at`), and
+ * shown as the day only (slotDay), never a time, on the club's clock whatever
+ * the viewer's time zone: guests may open their link from abroad. Because
+ * the database offers a slot while `starts_at` is still ahead, a day is
+ * offered until the day before, and not on the day itself.
  */
-
-/** Every guest session is this long; slots store only their start. */
-export const GUEST_SESSION_MINUTES = 45;
 
 export type GuestStatus = 'invited' | 'booked' | 'cancelled';
 
@@ -103,7 +101,7 @@ export async function loadInvitation(
 /** A slot and the guest holding it, if any. */
 export type GuestSlotRow = QurooshGuestSlot & {
   guest: { id: string; name: string } | null;
-  /** Already started: no longer offered to guests. */
+  /** Its day has begun (00:00 Riyadh): no longer offered to guests. */
   past: boolean;
 };
 
@@ -145,45 +143,35 @@ export async function loadSlots(
   return { ready: true, slots };
 }
 
-/** When a session that starts at `startsAt` ends. */
-export function slotEnd(startsAt: string | Date): Date {
-  return new Date(new Date(startsAt).getTime() + GUEST_SESSION_MINUTES * 60_000);
-}
-
-/** Slots grouped by their day on the club's clock (`YYYY-MM-DD`), in order. */
-export function groupSlotsByDay<T extends { starts_at: string }>(slots: T[]): { day: string; slots: T[] }[] {
-  const days = new Map<string, T[]>();
-  for (const slot of slots) {
-    const day = toDateInput(new Date(slot.starts_at));
-    const list = days.get(day) ?? [];
-    list.push(slot);
-    days.set(day, list);
-  }
-  return [...days.entries()].map(([day, list]) => ({ day, slots: list }));
-}
-
 /**
- * A club-clock day (`YYYY-MM-DD`) as a heading: "Saturday 21 November 2026".
- * Read at noon UTC, which is the same day in Riyadh, so no clock can move it.
+ * A slot as everyone reads it: its day only, never a time. Slots are days
+ * (the managers add a date; the app saves it as 00:00 Riyadh time through
+ * save_slot), so the time is always midnight and means nothing to anyone.
+ * Written as on the printed invitation cards: the full day name and date,
+ * no year, Latin digits ("الأحد 22 نوفمبر", "Sunday 22 November"), on the
+ * club's clock whatever the viewer's own time zone.
  */
-export function formatSlotDay(day: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-u-ca-gregory-nu-latn' : 'en-GB', {
+export function slotDay(startsAt: string, locale: string): string {
+  // Built from its parts: Arabic's own format puts a comma after the day name.
+  const parts = new Intl.DateTimeFormat(locale === 'ar' ? 'ar-u-ca-gregory-nu-latn' : 'en-GB', {
     timeZone: CLUB_TIME_ZONE,
     weekday: 'long',
     day: 'numeric',
     month: 'long',
-    year: 'numeric',
-  }).format(new Date(`${day}T12:00:00Z`));
+  }).formatToParts(new Date(startsAt));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('weekday')} ${part('day')} ${part('month')}`;
 }
 
 /**
- * A slot as people read it, on the club's clock: its day ("Saturday 21
- * November 2026") and its time ("14:00–14:45"). The one way every guests
- * page, public or not, writes a slot.
+ * The span of days on offer, as the invitation's info row writes it, like
+ * the printed cards: "21–26 نوفمبر", "21 November – 2 December", or one day
+ * alone. Latin digits, on the club's clock.
  */
-export function slotLabel(startsAt: string, locale: string): { day: string; time: string } {
-  return {
-    day: formatSlotDay(toDateInput(new Date(startsAt)), locale),
-    time: `${formatTime(startsAt, locale)}–${formatTime(slotEnd(startsAt), locale)}`,
-  };
+export function slotDayRange(first: string, last: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-u-ca-gregory-nu-latn' : 'en-GB', {
+    timeZone: CLUB_TIME_ZONE,
+    day: 'numeric',
+    month: 'long',
+  }).formatRange(new Date(first), new Date(last));
 }

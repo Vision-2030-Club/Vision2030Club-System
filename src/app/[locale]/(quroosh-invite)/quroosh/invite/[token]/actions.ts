@@ -3,7 +3,7 @@
 import { fail, fromPostgrest, ok, type ActionResult } from '@/lib/actions';
 import { isToken } from '@/lib/interviews/tokens';
 import { UUID } from '@/lib/quroosh/guestActions';
-import { slotLabel } from '@/lib/quroosh/guests';
+import { slotDay } from '@/lib/quroosh/guests';
 import { internationalPhone } from '@/lib/quroosh/phones';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 
@@ -18,8 +18,8 @@ import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh
  * the same slot race on its unique index; the second gets `slot_taken`.
  * Refusals come back with a hint the form translates.
  *
- * On success the slot's day and time come back, on the club's clock, for
- * the confirmation.
+ * On success the booked day comes back, on the club's clock, for the
+ * confirmation.
  */
 export async function bookAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   // A field no person sees; anything in it means a bot filled the form.
@@ -60,5 +60,5 @@ export async function bookAction(_previous: ActionResult, formData: FormData): P
     // Anything the database refused without naming why is "check your answers".
     return result.hint ? result : { ...result, hint: 'invalid' };
   }
-  return ok('booked', typeof startsAt === 'string' ? slotLabel(startsAt, locale) : undefined);
+  return ok('booked', typeof startsAt === 'string' ? { day: slotDay(startsAt, locale) } : undefined);
 }
