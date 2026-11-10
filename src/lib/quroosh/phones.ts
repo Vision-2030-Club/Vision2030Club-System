@@ -57,8 +57,22 @@ export function internationalPhone(iso: string, typed: string): string | null {
   else {
     const dial = dialCode(iso);
     if (!dial) return null;
-    const national = dial === '39' ? digits : digits.replace(/^0+/, '');
-    phone = `+${dial}${national}`;
+    // A Saudi number written with its code but no + (966501234567), as it
+    // often is here: without this it became +966966501234567, which E.164
+    // still accepts (15 digits), so a wrong number would be stored.
+    if (dial === SAUDI && SAUDI_WITH_CODE.test(digits)) phone = `+${digits}`;
+    else phone = `+${dial}${dial === '39' ? digits : digits.replace(/^0+/, '')}`;
+  }
+  // Saudi numbers are exactly nine digits after +966 (5XXXXXXXX for a
+  // mobile), whichever way they were typed; a home 0 after the code
+  // (+966 05…) is dropped.
+  if (phone.startsWith(`+${SAUDI}`)) {
+    const national = phone.slice(SAUDI.length + 1).replace(/^0+/, '');
+    return SAUDI_NATIONAL.test(national) ? `+${SAUDI}${national}` : null;
   }
   return E164.test(phone) ? phone : null;
 }
+
+const SAUDI = '966';
+const SAUDI_WITH_CODE = /^9660?[1-9][0-9]{8}$/;
+const SAUDI_NATIONAL = /^[1-9][0-9]{8}$/;

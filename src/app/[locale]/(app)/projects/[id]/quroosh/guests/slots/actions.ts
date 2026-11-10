@@ -6,30 +6,34 @@ import { createQurooshClient } from '@/lib/supabase/quroosh';
 import { clubTimestamp } from '@/lib/time';
 
 /**
- * The managers' side of the guest slots (Quroosh 0005): add a slot, change
- * a free slot's time, turn a slot off or on. Slots are never deleted.
+ * The managers' side of the guest days (Quroosh 0005): add a day, change a
+ * free day, turn a day off or on. Slots are never deleted.
+ *
+ * A slot is a day: the managers type a date only, saved through the
+ * existing save_slot as that day at 00:00 Riyadh time. So the same day twice
+ * is the same starts_at, which the database refuses (`slot_exists`), and a
+ * day stops being offered when it begins, so guests can book it until the
+ * day before.
  *
  * managerContext checks the caller manages the project before anything is
- * written. The database refuses what the rules forbid (a booked slot moved or
- * turned off, the same time twice) with a hint, translated by `finish`.
+ * written. The database refuses what the rules forbid (a booked day moved or
+ * turned off, the same day twice) with a hint, translated by `finish`.
  */
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const TIME = /^\d{2}:\d{2}/;
 
-/** The day and time typed, as an instant on the club's clock (Asia/Riyadh), or null. */
+/** The day typed, as 00:00 of that day on the club's clock (Asia/Riyadh), or null. */
 function startsAt(formData: FormData): string | null {
   const day = text(formData, 'day');
-  const time = text(formData, 'time');
-  if (!day || !time || !DAY.test(day) || !TIME.test(time)) return null;
-  return clubTimestamp(day, time.slice(0, 5));
+  if (!day || !DAY.test(day)) return null;
+  return clubTimestamp(day, '00:00');
 }
 
 export async function addSlotAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
   const ctx = await managerContext(formData);
   if ('ok' in ctx) return ctx;
   const starts = startsAt(formData);
-  if (!starts) return refusal(ctx.locale, 'invalid', 'Choose a day and a time.');
+  if (!starts) return refusal(ctx.locale, 'invalid', 'Choose a day.');
 
   const { error } = await createQurooshClient().rpc('save_slot', {
     p_project: ctx.projectId,
@@ -46,7 +50,7 @@ export async function editSlotAction(_previous: ActionResult, formData: FormData
   const slotId = text(formData, 'slot_id');
   if (!slotId || !UUID.test(slotId)) return refusal(ctx.locale, 'not_found', 'This slot does not exist.');
   const starts = startsAt(formData);
-  if (!starts) return refusal(ctx.locale, 'invalid', 'Choose a day and a time.');
+  if (!starts) return refusal(ctx.locale, 'invalid', 'Choose a day.');
 
   const { error } = await createQurooshClient().rpc('save_slot', {
     p_project: ctx.projectId,

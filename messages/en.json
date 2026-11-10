@@ -1716,8 +1716,8 @@
     "guests": {
       "title": "Guests",
       "notReady": "Guest invitations need Quroosh database migration 0005, which has not been applied yet.",
-      "slotsCardHint": "The times guests can book.",
-      "manageSlots": "Manage slots",
+      "slotsCardHint": "The days guests can book.",
+      "manageSlots": "Manage days",
       "count": "{count, plural, =0 {No guests invited} one {# guest invited} other {# guests invited}}",
       "empty": "No guests invited yet.",
       "invitedOn": "Invited {date}",
@@ -1734,7 +1734,39 @@
         "label": "New invitation",
         "title": "Invite a guest",
         "intro": "Guests are invited as speakers. Once saved, the guest’s page shows their personal link and QR code to send them.",
+        "titleLabel": "Title",
+        "titleChoose": "Choose a title…",
+        "titles": {
+          "ustadh": {
+            "option": "Mr.",
+            "text": "Mr."
+          },
+          "ustadha": {
+            "option": "Ms.",
+            "text": "Ms."
+          },
+          "doctor_m": {
+            "option": "Dr. (man)",
+            "text": "Dr."
+          },
+          "doctor_f": {
+            "option": "Dr. (woman)",
+            "text": "Dr."
+          },
+          "maali": {
+            "option": "H.E.",
+            "text": "H.E."
+          },
+          "other": {
+            "option": "Other"
+          },
+          "none": {
+            "option": "No title"
+          }
+        },
         "name": "Guest’s name",
+        "nameHint": "The full name only, without the title: the title chosen above is added in front of it, and the invitation shows both exactly as written.",
+        "titleCustom": "Title",
         "note": "Note (optional)",
         "noteHint": "For the managers only; the guest never sees it.",
         "submit": "Create invitation"
@@ -1756,16 +1788,16 @@
         "transportPhone": "Driver or office manager"
       },
       "booking": {
-        "title": "Booked session",
+        "title": "Booked day",
         "bookedAt": "Booked by the guest on {date}",
-        "moveTo": "Move to another free time",
-        "choose": "Choose a time…",
+        "moveTo": "Move to another free day",
+        "choose": "Choose a day…",
         "move": "Move the booking",
-        "noFree": "There is no other free time to move to.",
+        "noFree": "There is no other free day to move to.",
         "cancel": {
           "trigger": "Cancel the booking",
           "title": "Cancel this booking?",
-          "body": "{name}’s time becomes free for other guests, and their link offers the free times again so they can book once more. The invitation stays.",
+          "body": "{name}’s day becomes free for other guests, and their link offers the free days again so they can book once more. The invitation stays.",
           "confirm": "Cancel the booking"
         }
       },
@@ -1776,80 +1808,83 @@
         "confirm": "Cancel invitation"
       },
       "slots": {
-        "title": "Guest slots",
-        "intro": "The times guests can book. Each session is 45 minutes, and each slot takes one guest.",
-        "addTitle": "Add a slot",
+        "title": "Guest days",
+        "intro": "The days guests can book. Each day takes one guest, and a day is offered until the day before.",
+        "addTitle": "Add a day",
         "day": "Day",
-        "time": "Start time",
-        "add": "Add slot",
-        "count": "{count, plural, =0 {No slots} one {# slot} other {# slots}}",
-        "empty": "No slots yet. Add the first one above.",
+        "add": "Add day",
+        "count": "{count, plural, =0 {No days} one {# day} other {# days}}",
+        "empty": "No days yet. Add the first one above.",
         "status": {
           "free": "Free",
           "booked": "Booked",
           "off": "Off"
         },
-        "past": "Past",
+        "past": "Closed to booking",
         "bookedBy": "Booked by {name}",
-        "bookedLocked": "A booked slot cannot be moved or turned off. Cancel or move the booking first.",
+        "bookedLocked": "A booked day cannot be changed or turned off. Cancel or move the booking first.",
         "turnOff": "Turn off",
         "turnOn": "Turn on",
-        "edit": "Change the time",
+        "edit": "Change the day",
         "save": "Save"
       },
       "errors": {
         "forbidden": "Only the project’s managers can change the guest slots.",
         "not_configured": "The Quroosh database is not configured on this deployment.",
-        "invalid": "Choose a day and a start time.",
+        "invalid": "Choose a day.",
         "not_found": "It no longer exists. Reload the page.",
-        "slot_exists": "There is already a slot at that time.",
-        "slot_booked": "This slot is booked. Cancel or move the booking first.",
+        "slot_exists": "That day has already been added.",
+        "slot_booked": "This day is booked. Cancel or move the booking first.",
         "name_invalid": "Write the guest’s name (200 characters at most).",
         "note_too_long": "The note is too long (2000 characters at most).",
-        "slot_missing": "Choose a time.",
-        "slot_taken": "Another guest has booked that time. Choose another.",
-        "slot_unavailable": "That time is turned off or has already started. Choose another.",
+        "slot_missing": "Choose a day.",
+        "slot_taken": "Another guest has booked that day. Choose another.",
+        "slot_unavailable": "That day is turned off or no longer open to booking. Choose another.",
         "not_booked": "This guest has not booked a time.",
-        "invitation_cancelled": "This invitation was cancelled."
+        "invitation_cancelled": "This invitation was cancelled.",
+        "title_missing": "Choose a title, or write one under “Other”."
       }
     },
     "invite": {
-      "title": "Your invitation to Quroosh",
-      "greeting": "{name}, you are invited to speak at Quroosh.",
-      "intro": "Choose the time that suits you for your session. Each session is 45 minutes.",
-      "notFound": "This invitation link is not valid. Check that you opened the whole link you were sent.",
-      "cancelled": "This invitation has been cancelled. If you think this is a mistake, contact the Quroosh team.",
-      "noSlots": "There are no free times at the moment. The Quroosh team will contact you.",
-      "chooseSlot": "Choose a time",
-      "contactTitle": "Your details",
-      "phone": "Your mobile number",
-      "phoneHint": "To coordinate with you and confirm your booking.",
+      "title": "Invitation to speak",
+      "greeting": "Welcome",
+      "intro": "It is our pleasure to invite you to speak at Quroosh 2026. We would be honoured by your presence and participation.",
+      "place": "Riyadh",
+      "notFound": "We were unable to open this invitation. Please make sure the full link was opened as it was sent to you, or contact the Quroosh team.",
+      "cancelled": "We regret that this invitation is no longer active. For any enquiry, please contact the Quroosh team.",
+      "noSlots": "There are no days available at present. Our coordination team will be in touch with you shortly.",
+      "chooseSlot": "Please choose a suitable day.",
+      "contactTitle": "Contact details",
+      "phone": "Mobile number",
+      "phoneHint": "For coordination and to confirm your attendance.",
       "country": "Country code",
-      "transport": "Do you need transport?",
-      "yes": "Yes",
-      "no": "No",
-      "transportPhone": "Your driver’s or office manager’s number",
-      "transportPhoneHint": "We will coordinate the transport with them.",
-      "submit": "Book this time",
+      "transport": "Do you need transport from your place to the Quroosh venue?",
+      "yes": "Yes, please",
+      "no": "No, thank you",
+      "transportPhone": "Number of your driver or office manager",
+      "transportPhoneHint": "Our coordination team will contact them to arrange your transport.",
+      "submit": "Confirm attendance",
+      "submitting": "Confirming…",
       "booked": {
-        "title": "Your session is booked",
-        "next": "Thank you. The Quroosh team will contact you to confirm.",
-        "change": "To change it, contact the Quroosh team."
+        "title": "Your attendance is confirmed",
+        "next": "Thank you for confirming your attendance. We look forward to welcoming you at Quroosh 2026, and our coordination team will be in touch with you shortly.",
+        "change": "Should you need to change the date, please contact the Quroosh team."
       },
       "errors": {
-        "not_found": "This invitation link is not valid.",
-        "invitation_cancelled": "This invitation has been cancelled.",
-        "already_booked": "You have already booked a time. To change it, contact the Quroosh team.",
-        "slot_missing": "Choose a time.",
-        "slot_taken": "This time was just taken by another guest. Pick another time.",
-        "slot_unavailable": "This time is no longer available. Pick another time.",
-        "phone_invalid": "Your mobile number is not valid. Check the country code and the number.",
-        "transport_missing": "Say whether you need transport.",
-        "transport_phone_missing": "Give your driver’s or office manager’s number.",
-        "transport_phone_invalid": "The driver’s or office manager’s number is not valid. Check the country code and the number.",
-        "invalid": "Something is missing or not valid. Check the form and try again.",
-        "network": "Your booking could not be sent. Check your connection and try again; your answers are still in the form."
-      }
+        "not_found": "We were unable to find this invitation.",
+        "invitation_cancelled": "We regret that this invitation is no longer active.",
+        "already_booked": "Your attendance has already been confirmed. Should you need any change, please contact the Quroosh team.",
+        "slot_missing": "Please choose a suitable day.",
+        "slot_taken": "We regret that this day has just been reserved. Please choose another.",
+        "slot_unavailable": "We regret that this day is no longer available. Please choose another.",
+        "phone_invalid": "Please check the mobile number and the country code.",
+        "transport_missing": "Please let us know whether you require transport.",
+        "transport_phone_missing": "Please provide the number of your driver or office manager.",
+        "transport_phone_invalid": "Please check the number of your driver or office manager and the country code.",
+        "invalid": "Please review the details and try again.",
+        "network": "We were unable to send your confirmation. Please check your connection and try again; the details you entered have been kept."
+      },
+      "footer": "Quroosh | Where expertise meets the horizons of the future"
     }
   }
 }

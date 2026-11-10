@@ -169,7 +169,7 @@ registrations sheet.
 ## Guest invitations (Quroosh 0005)
 
 The project's managers invite guests (speakers, for now) to the Quroosh
-event, and each guest books **one 45-minute slot** on a personal link,
+event, and each guest books **one day** on a personal link,
 without an account. It is separate from the founders' applications: its
 tables have no link to `settings`, so offering slots never makes an
 application form exist.
@@ -179,12 +179,12 @@ feature needs), the types (`QurooshGuestSlot`, `QurooshGuestInvitation` in
 `src/lib/quroosh/types.ts`), the loaders in `src/lib/quroosh/guests.ts`, the
 **Guests** sidebar item (managers only), the **slots page**
 (`projects/[id]/quroosh/guests/slots`), the **guests list**
-(`guests/`: each guest's name and status, a booked guest's time, phone and
+(`guests/`: each guest's name and status, a booked guest's day, phone and
 whether they need transport, and "New invitation": a name and an optional
 note), **one guest's page** (`guests/[guestId]`: the link to copy, its QR
 code, the booking and the phones, moving or cancelling the booking,
 cancelling the invitation), and the guest's **booking page**
-(`(quroosh-public)/quroosh/invite/[token]`, public through `/quroosh` in the
+(`(quroosh-invite)/quroosh/invite/[token]`, public through `/quroosh` in the
 proxy).
 
 - **Inviting.** `createInvitationAction` makes the token (`newToken`, 48 hex
@@ -206,36 +206,82 @@ proxy).
   by search engines). It reads `invitation()` and `open_slots()` only, so it
   never shows another guest or anyone's phone. An unknown link says it is
   not valid; a cancelled invitation says so; a booked guest sees their day
-  and time and no form. Otherwise: the free times by day, the guest's mobile
+  and no form. Otherwise: the free days, the guest's mobile
   with a country picker, "do you need transport?", and if so the number of
   their driver or office manager. `BookingForm` copies `ApplyForm`: the
   hidden `website` field for bots, submitting from `onSubmit` so a refusal
   keeps what was typed, and the hints translated from
   `quroosh.invite.errors` (through `fromPostgrest`). On `slot_taken` or
-  `slot_unavailable` it says "pick another" and reloads the free times, so
+  `slot_unavailable` it says "pick another" and reloads the free days, so
   the taken one drops out.
+- **A formal invitation, not a form.** The guests are senior figures, so the
+  page follows the printed invitation cards and is worded formally in both
+  languages ("نرجو"، "يسعدنا"، "نتشرف بحضوركم"; no exclamation marks). It has
+  **its own route group and frame**, `(quroosh-invite)`, apart from the
+  application form's `(quroosh-public)`: the whole page is the Quroosh navy,
+  full width, with a small language switch, and the tagline "قروش | حيث
+  تلتقي الخبرات بآفاق المستقبل" in mint above the waves at the bottom. The
+  pieces are in `InvitationCard.tsx`: `InviteHero` (the logo with its
+  tagline, the lavender "دعوة للمشاركة كمتحدث", "مرحباً بك", the title small
+  with a slash, the name large in mint, and an info row with small icons:
+  the span of days on offer, `slotDayRange`, and الرياض, separated by thin
+  lines), `InviteCard` (the white card with a lavender border holding the
+  form or the message) and `BookedNotice` (the day in a mint box). Chosen
+  options are mint. The order is the greeting and name, a line about the
+  invitation, the choice of day, then the contact details. The name is the
+  one the manager saved, **never shortened**: when it starts with one of the
+  form's titles (`splitTitle`, both languages, longest first) the title is
+  shown small above it; otherwise the whole name is shown large. A custom
+  title ("أخرى") cannot be told from the name, so it stays in the large
+  line. The **title** is picked on the New invitation form, before the
+  name (`TitleField`): سعادة الأستاذ، سعادة الأستاذة، سعادة الدكتور، سعادة
+  الدكتورة، معالي، أخرى (a small field for the manager's own) or بدون لقب.
+  There is no title column: `createInvitationAction` puts the title in front
+  of the name with a space and saves that as the name. The list is
+  `src/lib/quroosh/guestTitles.ts`; the words are in
+  `quroosh.guests.new.titles` (`option` for the dropdown, `text` for what is
+  written), in the language of the form, so an English form writes "Mr.",
+  "Ms.", "Dr.", "H.E.". A name saved earlier keeps whatever title was typed
+  into it (and is split off too, if it is one of the listed titles). Keep
+  the tone when adding text to `quroosh.invite`; the greeting ("مرحباً بك")
+  and the transport question keep the club's exact wording, in the
+  singular.
 - **The country picker** (`src/lib/quroosh/phones.ts`): a list of ISO codes
   and calling codes, Saudi Arabia first, with country names from
   `Intl.DisplayNames` in the page's language (no translations to keep).
   `internationalPhone` builds E.164 from the code picked and the number
   typed (Arabic digits read, the home 0 dropped except for Italy; a number
-  typed in full with `+` or `00` is taken as it is). The form checks it to
+  typed in full with `+` or `00` is taken as it is). Saudi numbers get one
+  more rule: exactly nine digits after `+966`, and `966501234567` typed
+  without the `+` is read as the full number, not as `+966966…` (which the
+  database's E.164 CHECK would accept). The form checks it to
   name the field, the action decides, and the database's CHECK has the last
   word. To add a country, add its pair to `COUNTRIES`.
-- **Managers and bookings.** The guest's page shows the booked day and time,
+- **Managers and bookings.** The guest's page shows the booked day,
   when the guest booked, their mobile, transport and the driver's number
   (the phones stay after a booking is cancelled). **Move** offers the free
-  slots (on, not started, nobody's; `move_booking`, `slot_taken` if someone
-  takes it first). **Cancel the booking** (`cancel_booking`) frees the slot
-  and the guest's link offers the free times again; the invitation stays.
+  days (on, not yet begun, nobody's; `move_booking`, `slot_taken` if someone
+  takes it first). **Cancel the booking** (`cancel_booking`) frees the day
+  and the guest's link offers the free days again; the invitation stays.
 
-- **Slots** (`guest_slots`): a start time per slot, `active` on or off.
-  Sessions are fixed at 45 minutes (`GUEST_SESSION_MINUTES`), so there is no
-  end column. Managers add them with the browser's own date and time inputs;
-  the page lists them by day, each free, booked (and by whom) or off.
-  **Never deleted, only turned off.** A booked slot cannot be turned off or
-  have its time changed (`slot_booked`): the booking is cancelled or moved
-  first. The same time twice in one project is refused (`slot_exists`).
+- **Slots are days** (`guest_slots`), with no migration: the table still has
+  `starts_at`, and the app saves a day as **that day at 00:00 Riyadh time**
+  through the existing `save_slot` (`clubTimestamp(day, '00:00')`). Managers
+  add a date only (the browser's own date input); every page shows **the
+  day only, never a time** (`slotDay`: the full day name and date, no year,
+  Latin digits, as on the printed cards: "الأحد 22 نوفمبر"). `active` turns a
+  day on or off. **Never deleted, only turned off.** A booked day cannot be
+  turned off or changed (`slot_booked`): the booking is cancelled or moved
+  first. The same day twice is the same `starts_at`, refused by the unique
+  constraint (`slot_exists`).
+- **Offered until the day before.** `open_slots` and `book_slot` take a
+  slot only while `starts_at` is ahead, and a day's `starts_at` is its
+  midnight, so a day stops being offered as it begins. The slots page marks
+  it "closed to booking". A slot saved before days (with a real time, say
+  14:00) would still be offered on its own day until that hour, and would
+  show as a second entry for its day: turn such slots off and add the day.
+  The managers' history ("Invited on", "Booked on", "Cancelled on") keeps
+  its times.
 - **Invitations** (`guest_invitations`): one per guest, holding the booking
   too (the slot, the guest's phone, transport, the driver's or office
   manager's phone). The link's `token` is the only key to it, made by the
@@ -243,8 +289,8 @@ proxy).
   new migration and its wording in both catalogs. The status is **not
   stored**: `cancelled_at` set is cancelled, `slot_id` set is booked,
   otherwise invited (`invitationStatus`).
-- **One guest per slot** is the database's: a unique index on
-  `guest_invitations.slot_id`. Two guests choosing the same time race on it
+- **One guest per day** is the database's: a unique index on
+  `guest_invitations.slot_id`. Two guests choosing the same day race on it
   and the second is refused with `slot_taken`. `book_slot` checks the slot is
   on, in the project and not yet started under a shared lock, so a manager
   cannot turn it off in between.
@@ -256,15 +302,14 @@ proxy).
 - **Phones are international** (E.164, `+` and the country code), not the
   Saudi-only shape of the application form. Mock Interviews has no country
   picker to reuse; the booking page will bring one.
-- **Riyadh time, always.** Guests may open their link from abroad. Times are
-  written with the zone name in the literal (`clubTimestamp`, so a manager's
-  typed 14:00 is Riyadh's 14:00 wherever they are) and shown with the
-  formatters pinned to `CLUB_TIME_ZONE` (`formatTime`, `formatSlotDay`),
-  never the browser's zone. The pages do not name the time zone in their
-  text (the club's decision); the times are Riyadh's all the same.
+- **Riyadh's calendar, always.** Guests may open their link from abroad. A
+  day is written with the zone name in the literal (`clubTimestamp`) and read
+  back on `CLUB_TIME_ZONE` (`slotDay`, `toDateInput`), never the browser's
+  zone, so a guest in London sees the same day as a manager in Riyadh. The
+  pages do not name the time zone (the club's decision).
 - **Personal data.** Guests' names, phones and bookings are for the project's
   **managers only**; the public functions (`invitation`, `open_slots`)
-  return the guest's own name and booking and the free times, never a phone
+  return the guest's own name and booking and the free days, never a phone
   or the managers' note.
 - **Before 0005 is applied** the slots page says the migration is needed,
   and nothing else changes.
@@ -315,10 +360,12 @@ Drive, it is 10 MB).
   new column added later must be nullable too, or hiding it breaks applying.
 - The dates in the commitment question's help line (21–26 November) are
   in the catalogs; change them for the next edition.
-- Guest slot times shown with `new Date().toLocale…()` or a formatter
-  without `timeZone` follow the viewer's clock, which is wrong for a guest
-  abroad. Use `formatTime` / `formatSlotDay` / `toDateInput` (all on
-  `CLUB_TIME_ZONE`), and write times with `clubTimestamp`.
+- A guest day shown with `new Date().toLocale…()` or a formatter without
+  `timeZone` follows the viewer's clock: 00:00 Riyadh is still the day before
+  in London. Use `slotDay` / `toDateInput` (both on `CLUB_TIME_ZONE`), and
+  write days with `clubTimestamp(day, '00:00')`. Never show a slot's time.
+- A slot must be saved at 00:00: "offered until the day before" depends on
+  it (the database offers a slot while `starts_at` is ahead).
 - Never "check the slot is free, then book it" in the app: the unique index
   on `guest_invitations.slot_id` is the claim, and a check first only widens
   the race. Keep that index if the table is ever changed.

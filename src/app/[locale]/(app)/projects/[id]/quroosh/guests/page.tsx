@@ -6,9 +6,10 @@ import { Alert, Badge, Card, EmptyState, Input, Label, PageHeader, Textarea } fr
 import { Link } from '@/i18n/navigation';
 import { formatDate, localized } from '@/lib/format';
 import { can, getQurooshAccess } from '@/lib/quroosh/access';
-import { GUEST_STATUS_TONE, invitationStatus, loadInvitations, slotLabel } from '@/lib/quroosh/guests';
+import { GUEST_STATUS_TONE, invitationStatus, loadInvitations, slotDay } from '@/lib/quroosh/guests';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 import { createInvitationAction } from './actions';
+import { TitleField } from './TitleField';
 
 /**
  * The guests invited to the project's Quroosh event (Quroosh 0005), for its
@@ -71,9 +72,11 @@ export default async function QurooshGuestsPage({
           <input type="hidden" name="project_id" value={id} />
           <input type="hidden" name="locale" value={locale} />
           <p className="text-sm text-ink-muted">{t('guests.new.intro')}</p>
+          <TitleField />
           <div>
             <Label htmlFor="guest-name">{t('guests.new.name')}</Label>
             <Input id="guest-name" name="name" required maxLength={200} autoComplete="off" />
+            <p className="mt-1 text-xs text-ink-muted">{t('guests.new.nameHint')}</p>
           </div>
           <div>
             <Label htmlFor="guest-note">{t('guests.new.note')}</Label>
@@ -91,7 +94,7 @@ export default async function QurooshGuestsPage({
           <ul className="divide-y divide-line rounded-xl border border-line bg-surface shadow-sm">
             {invitations.map((guest) => {
               const status = invitationStatus(guest);
-              const booked = status === 'booked' && guest.slot_starts_at ? slotLabel(guest.slot_starts_at, locale) : null;
+              const bookedDay = status === 'booked' && guest.slot_starts_at ? slotDay(guest.slot_starts_at, locale) : null;
               return (
                 <li key={guest.id}>
                   <Link
@@ -104,14 +107,9 @@ export default async function QurooshGuestsPage({
                     <span className="ms-auto text-xs text-ink-muted">
                       {t('guests.invitedOn', { date: formatDate(guest.created_at, locale) })}
                     </span>
-                    {booked ? (
+                    {bookedDay ? (
                       <span className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink">
-                        <span>
-                          {booked.day} ·{' '}
-                          <span className="ltr-nums" dir="ltr">
-                            {booked.time}
-                          </span>
-                        </span>
+                        <span>{bookedDay}</span>
                         {guest.phone ? (
                           <span className="ltr-nums text-ink-muted" dir="ltr">
                             {guest.phone}
