@@ -43,3 +43,44 @@ export type QurooshApplication = Record<string, unknown> & {
 
 /** A row of the Quroosh database's `questions` (0004): see QuestionRow in src/lib/quroosh/form.ts. */
 export type { QuestionRow as QurooshQuestion } from './form';
+
+/** A time a guest can book (Quroosh 0005, `guest_slots`). Sessions are 45 minutes. */
+export type QurooshGuestSlot = {
+  id: string;
+  project_id: string;
+  starts_at: string;
+  /** Off: not offered to guests. Slots are never deleted. */
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+};
+
+/** Speakers only for now; a new role needs a migration (the CHECK in 0005) and its wording. */
+export type QurooshGuestRole = 'speaker';
+
+/**
+ * An invited guest and their booking (Quroosh 0005, `guest_invitations`).
+ * The status is not stored: see `invitationStatus` in src/lib/quroosh/guests.ts.
+ */
+export type QurooshGuestInvitation = {
+  id: string;
+  project_id: string;
+  /** The guest's link, /quroosh/invite/<token>: the only key to it. */
+  token: string;
+  role: QurooshGuestRole;
+  name: string;
+  /** The managers' own note; never shown to the guest. */
+  note: string | null;
+  slot_id: string | null;
+  /** E.164, `+` and the country code. */
+  phone: string | null;
+  needs_transport: boolean | null;
+  transport_phone: string | null;
+  booked_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
+  updated_by: string | null;
+};

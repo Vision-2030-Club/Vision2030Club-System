@@ -8,8 +8,10 @@ own, like Mock Interviews and Outreach: a project carries it, and its pages
 wear the Quroosh identity instead of the club's.
 
 **State:** the overview page, the identity, the access rule (`0074`),
-**applying** (below), stored in the Quroosh database, and the managers
-**editing the questions** (Quroosh `0004`). Further screens become pages under
+**applying** (below), stored in the Quroosh database, the managers
+**editing the questions** (Quroosh `0004`), and the first part of **guest
+invitations** (Quroosh `0005`: the whole database side, and the managers'
+slots page; inviting guests and their booking page come next). Further screens become pages under
 `projects/[id]/quroosh/` and items in the Quroosh sidebar.
 
 ## Two databases
@@ -164,6 +166,62 @@ registrations sheet.
 - Before 0003 is applied the page shows no sheet, *Sync now* says 0003 is
   needed, and applying still works (no row is written, and no sheet is made).
 
+## Guest invitations (Quroosh 0005)
+
+The project's managers invite guests (speakers, for now) to the Quroosh
+event, and each guest books **one 45-minute slot** on a personal link,
+without an account. It is separate from the founders' applications: its
+tables have no link to `settings`, so offering slots never makes an
+application form exist.
+
+**Built so far:** migration `0005` (both tables and every function the
+feature needs), the types (`QurooshGuestSlot`, `QurooshGuestInvitation` in
+`src/lib/quroosh/types.ts`), the loaders in `src/lib/quroosh/guests.ts`, the
+**Guests** sidebar item (managers only), and the **slots page**
+(`projects/[id]/quroosh/guests/slots`). `guests/` itself redirects there
+until the list of invited guests is built. Still to come: inviting guests
+(the link and its QR code), and the guest's booking page
+(`/quroosh/invite/<token>`, already public through `/quroosh` in the proxy).
+
+- **Slots** (`guest_slots`): a start time per slot, `active` on or off.
+  Sessions are fixed at 45 minutes (`GUEST_SESSION_MINUTES`), so there is no
+  end column. Managers add them with the browser's own date and time inputs;
+  the page lists them by day, each free, booked (and by whom) or off.
+  **Never deleted, only turned off.** A booked slot cannot be turned off or
+  have its time changed (`slot_booked`): the booking is cancelled or moved
+  first. The same time twice in one project is refused (`slot_exists`).
+- **Invitations** (`guest_invitations`): one per guest, holding the booking
+  too (the slot, the guest's phone, transport, the driver's or office
+  manager's phone). The link's `token` is the only key to it, made by the
+  app (`newToken`). `role` is `speaker` only, by a CHECK, so another role is a
+  new migration and its wording in both catalogs. The status is **not
+  stored**: `cancelled_at` set is cancelled, `slot_id` set is booked,
+  otherwise invited (`invitationStatus`).
+- **One guest per slot** is the database's: a unique index on
+  `guest_invitations.slot_id`. Two guests choosing the same time race on it
+  and the second is refused with `slot_taken`. `book_slot` checks the slot is
+  on, in the project and not yet started under a shared lock, so a manager
+  cannot turn it off in between.
+- **Only managers change a booking.** A guest books once (`already_booked`
+  after that); `move_booking` and `cancel_booking` are the managers'.
+  Cancelling a booking frees the slot and the guest's link offers slots
+  again; cancelling the invitation frees it too and the link says so. The
+  guest's phones stay on the row either way.
+- **Phones are international** (E.164, `+` and the country code), not the
+  Saudi-only shape of the application form. Mock Interviews has no country
+  picker to reuse; the booking page will bring one.
+- **Riyadh time, always.** Guests may open their link from abroad. Times are
+  written with the zone name in the literal (`clubTimestamp`, so a manager's
+  typed 14:00 is Riyadh's 14:00 wherever they are) and shown with the
+  formatters pinned to `CLUB_TIME_ZONE` (`formatTime`, `formatSlotDay`),
+  never the browser's zone. The pages say "Riyadh time" next to them.
+- **Personal data.** Guests' names, phones and bookings are for the project's
+  **managers only**; the public functions (`invitation`, `open_slots`)
+  return the guest's own name and booking and the free times, never a phone
+  or the managers' note.
+- **Before 0005 is applied** the slots page says the migration is needed,
+  and nothing else changes.
+
 ## The identity
 
 From the club's identity guide (an Illustrator file; the original stays in
@@ -210,5 +268,14 @@ Drive, it is 10 MB).
   new column added later must be nullable too, or hiding it breaks applying.
 - The dates in the commitment question's help line (21–26 November) are
   in the catalogs; change them for the next edition.
+- Guest slot times shown with `new Date().toLocale…()` or a formatter
+  without `timeZone` follow the viewer's clock, which is wrong for a guest
+  abroad. Use `formatTime` / `formatSlotDay` / `toDateInput` (all on
+  `CLUB_TIME_ZONE`), and write times with `clubTimestamp`.
+- Never "check the slot is free, then book it" in the app: the unique index
+  on `guest_invitations.slot_id` is the claim, and a check first only widens
+  the race. Keep that index if the table is ever changed.
+- A new column on `guest_invitations` or `guest_slots` must be nullable (or
+  have a default): rows already exist without it.
 - `0074` replaces `my_component_access()` with 0072's version plus two lines.
   A later migration that changes the function must start from 0074's.
