@@ -1716,7 +1716,7 @@
     "guests": {
       "title": "Guests",
       "notReady": "Guest invitations need Quroosh database migration 0005, which has not been applied yet.",
-      "slotsCardHint": "The times guests can book, in Riyadh time.",
+      "slotsCardHint": "The times guests can book.",
       "manageSlots": "Manage slots",
       "count": "{count, plural, =0 {No guests invited} one {# guest invited} other {# guests invited}}",
       "empty": "No guests invited yet.",
@@ -1757,10 +1757,10 @@
       },
       "slots": {
         "title": "Guest slots",
-        "intro": "The times guests can book. Each session is 45 minutes, and each slot takes one guest. All times are Riyadh time (GMT+3), whatever your own time zone.",
+        "intro": "The times guests can book. Each session is 45 minutes, and each slot takes one guest.",
         "addTitle": "Add a slot",
         "day": "Day",
-        "time": "Start time (Riyadh time)",
+        "time": "Start time",
         "add": "Add slot",
         "count": "{count, plural, =0 {No slots} one {# slot} other {# slots}}",
         "empty": "No slots yet. Add the first one above.",

@@ -233,7 +233,8 @@ and the managers seeing and changing bookings.
   written with the zone name in the literal (`clubTimestamp`, so a manager's
   typed 14:00 is Riyadh's 14:00 wherever they are) and shown with the
   formatters pinned to `CLUB_TIME_ZONE` (`formatTime`, `formatSlotDay`),
-  never the browser's zone. The pages say "Riyadh time" next to them.
+  never the browser's zone. The pages do not name the time zone in their
+  text (the club's decision); the times are Riyadh's all the same.
 - **Personal data.** Guests' names, phones and bookings are for the project's
   **managers only**; the public functions (`invitation`, `open_slots`)
   return the guest's own name and booking and the free times, never a phone
