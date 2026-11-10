@@ -1435,7 +1435,8 @@
     "tabs": {
       "overview": "Overview",
       "projectDetails": "Project details",
-      "applications": "Applications"
+      "applications": "Applications",
+      "guests": "Guests"
     },
     "role": {
       "manager": "Manager",
@@ -1710,6 +1711,39 @@
         "range_invalid": "Check the numbers: the smallest must not be more than the largest, and the most choices is 1 or more.",
         "locked": "This question is always asked and cannot be hidden.",
         "invalid": "The question could not be saved. Check its fields and try again."
+      }
+    },
+    "guests": {
+      "notReady": "Guest slots need Quroosh database migration 0005, which has not been applied yet.",
+      "slots": {
+        "title": "Guest slots",
+        "intro": "The times guests can book. Each session is 45 minutes, and each slot takes one guest. All times are Riyadh time (GMT+3), whatever your own time zone.",
+        "addTitle": "Add a slot",
+        "day": "Day",
+        "time": "Start time (Riyadh time)",
+        "add": "Add slot",
+        "count": "{count, plural, =0 {No slots} one {# slot} other {# slots}}",
+        "empty": "No slots yet. Add the first one above.",
+        "status": {
+          "free": "Free",
+          "booked": "Booked",
+          "off": "Off"
+        },
+        "past": "Past",
+        "bookedBy": "Booked by {name}",
+        "bookedLocked": "A booked slot cannot be moved or turned off. Cancel or move the booking first.",
+        "turnOff": "Turn off",
+        "turnOn": "Turn on",
+        "edit": "Change the time",
+        "save": "Save"
+      },
+      "errors": {
+        "forbidden": "Only the project’s managers can change the guest slots.",
+        "not_configured": "The Quroosh database is not configured on this deployment.",
+        "invalid": "Choose a day and a start time.",
+        "not_found": "This slot no longer exists. Reload the page.",
+        "slot_exists": "There is already a slot at that time.",
+        "slot_booked": "This slot is booked. Cancel or move the booking first."
       }
     }
   }

@@ -211,6 +211,13 @@ export default async function AppLayout({
           icon: 'register',
           show: component.role === 'manager',
         },
+        // Guests' phones and bookings (Quroosh 0005): managers only.
+        {
+          href: `${base}/guests`,
+          label: tQuroosh('tabs.guests'),
+          icon: 'calendar',
+          show: component.role === 'manager',
+        },
         {
           href: `/projects/${component.project_id}?details=1`,
           label: tQuroosh('tabs.projectDetails'),
