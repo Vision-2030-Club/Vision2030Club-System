@@ -1,5 +1,6 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { siteUrl } from '@/lib/site';
 import { CLUB_TIME_ZONE, toDateInput } from '@/lib/time';
 import type { QurooshGuestInvitation, QurooshGuestSlot } from './types';
 
@@ -18,11 +19,69 @@ export const GUEST_SESSION_MINUTES = 45;
 
 export type GuestStatus = 'invited' | 'booked' | 'cancelled';
 
+/** The badge colour of each status, the same on every page. */
+export const GUEST_STATUS_TONE: Record<GuestStatus, 'brand' | 'ok' | 'neutral'> = {
+  invited: 'brand',
+  booked: 'ok',
+  cancelled: 'neutral',
+};
+
 /** The status is read from the row, not stored (0005). */
 export function invitationStatus(row: Pick<QurooshGuestInvitation, 'slot_id' | 'cancelled_at'>): GuestStatus {
   if (row.cancelled_at) return 'cancelled';
   if (row.slot_id) return 'booked';
   return 'invited';
+}
+
+/**
+ * A guest's personal link: the public booking page (/quroosh/invite/<token>),
+ * in the manager's language; the page has a language switch. Anyone holding
+ * it can open it, so it is shown to managers to copy, never linked.
+ */
+export function invitationUrl(locale: string, token: string): string {
+  return `${siteUrl()}/${locale}/quroosh/invite/${token}`;
+}
+
+/** What the guests list shows of an invitation. */
+export type GuestListRow = Pick<
+  QurooshGuestInvitation,
+  'id' | 'name' | 'role' | 'slot_id' | 'cancelled_at' | 'created_at'
+>;
+
+/**
+ * A project's invited guests, newest first. `ready` is false before Quroosh
+ * 0005 is applied.
+ */
+export async function loadInvitations(
+  db: SupabaseClient,
+  projectId: string,
+): Promise<{ ready: boolean; invitations: GuestListRow[] }> {
+  const { data, error } = await db
+    .from('guest_invitations')
+    .select('id, name, role, slot_id, cancelled_at, created_at')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false });
+  if (error) return { ready: false, invitations: [] };
+  return { ready: true, invitations: (data ?? []) as GuestListRow[] };
+}
+
+/**
+ * One invitation of the project, or null when there is none by that id in
+ * this project. `ready` is false before Quroosh 0005 is applied.
+ */
+export async function loadInvitation(
+  db: SupabaseClient,
+  projectId: string,
+  invitationId: string,
+): Promise<{ ready: boolean; invitation: QurooshGuestInvitation | null }> {
+  const { data, error } = await db
+    .from('guest_invitations')
+    .select('*')
+    .eq('project_id', projectId)
+    .eq('id', invitationId)
+    .maybeSingle();
+  if (error) return { ready: false, invitation: null };
+  return { ready: true, invitation: (data as QurooshGuestInvitation | null) ?? null };
 }
 
 /** A slot and the guest holding it, if any. */

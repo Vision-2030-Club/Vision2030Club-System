@@ -10,8 +10,9 @@ wear the Quroosh identity instead of the club's.
 **State:** the overview page, the identity, the access rule (`0074`),
 **applying** (below), stored in the Quroosh database, the managers
 **editing the questions** (Quroosh `0004`), and the first part of **guest
-invitations** (Quroosh `0005`: the whole database side, and the managers'
-slots page; inviting guests and their booking page come next). Further screens become pages under
+invitations** (Quroosh `0005`: the whole database side, the managers'
+slots page, and inviting guests with their link and QR code; the guests'
+booking page comes next). Further screens become pages under
 `projects/[id]/quroosh/` and items in the Quroosh sidebar.
 
 ## Two databases
@@ -177,11 +178,29 @@ application form exist.
 **Built so far:** migration `0005` (both tables and every function the
 feature needs), the types (`QurooshGuestSlot`, `QurooshGuestInvitation` in
 `src/lib/quroosh/types.ts`), the loaders in `src/lib/quroosh/guests.ts`, the
-**Guests** sidebar item (managers only), and the **slots page**
-(`projects/[id]/quroosh/guests/slots`). `guests/` itself redirects there
-until the list of invited guests is built. Still to come: inviting guests
-(the link and its QR code), and the guest's booking page
-(`/quroosh/invite/<token>`, already public through `/quroosh` in the proxy).
+**Guests** sidebar item (managers only), the **slots page**
+(`projects/[id]/quroosh/guests/slots`), the **guests list**
+(`guests/`: each guest's name and status, and "New invitation": a name and
+an optional note), and **one guest's page** (`guests/[guestId]`: the link to
+copy, its QR code, cancelling). Still to come: the guest's booking page
+(`/quroosh/invite/<token>`, already public through `/quroosh` in the proxy),
+and the managers seeing and changing bookings.
+
+- **Inviting.** `createInvitationAction` makes the token (`newToken`, 48 hex
+  characters), calls `create_invitation` with the manager as `p_actor`, and
+  opens the guest's page. No role is sent: the column's default is
+  `speaker`. The managers' actions share `src/lib/quroosh/guestActions.ts`
+  (`managerContext` checks `getQurooshAccess` / `can.manage` first; `finish`
+  translates the database's hint from `quroosh.guests.errors`).
+- **The link and its QR code.** `invitationUrl` is
+  `siteUrl()/<the manager's language>/quroosh/invite/<token>`; the page has a
+  language switch. It is shown in the interviews' `CopyField` (a secret link
+  is shown to copy, never linked), with `qrDataUrls` from `src/lib/links.ts`:
+  the SVG on the page, the PNG to download. Both are hidden once the
+  invitation is cancelled. **`siteUrl()` is the production address even on
+  a Vercel preview**, so a link copied from a preview opens on the live site.
+- **Cancelling** (`cancel_invitation`, behind a confirmation) cannot be
+  undone: there is no un-cancel. It frees any slot the guest booked.
 
 - **Slots** (`guest_slots`): a start time per slot, `active` on or off.
   Sessions are fixed at 45 minutes (`GUEST_SESSION_MINUTES`), so there is no
