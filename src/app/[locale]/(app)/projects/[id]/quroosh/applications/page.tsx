@@ -2,9 +2,19 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { ActionForm } from '@/components/ActionForm';
 import { Alert, Badge, Card, EmptyState, Input, Label, PageHeader } from '@/components/ui';
+import { Link } from '@/i18n/navigation';
 import { formatDateTime, localized } from '@/lib/format';
 import { can, getQurooshAccess } from '@/lib/quroosh/access';
-import { QUESTIONS, type Question } from '@/lib/quroosh/questions';
+import {
+  answerOf,
+  asLocale,
+  isEmptyAnswer,
+  optionLabel,
+  questionLabel,
+  yesNoValue,
+  type FormQuestion,
+} from '@/lib/quroosh/form';
+import { loadForm, requestCatalog } from '@/lib/quroosh/loadForm';
 import { siteUrl } from '@/lib/site';
 import type { QurooshApplication } from '@/lib/quroosh/types';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
@@ -15,8 +25,12 @@ type Application = QurooshApplication;
 /**
  * Quroosh's applications, for the project's managers only: they hold
  * founders' phones, emails and ages. The form is opened and closed here, and
- * its public address shown to share. Each application unfolds to every
- * answer, in the form's own order.
+ * its public address shown to share, and its questions edited (the
+ * Questions page beside this one, Quroosh 0004). Each application unfolds to
+ * every answer, in the form's order and in its current wording: answers are
+ * stored by question and choice, so an edited question reads the new way on
+ * every past application. A hidden question still shows where it was
+ * answered.
  *
  * The club database says who manages the project (getQurooshAccess); the
  * applications themselves are in the Quroosh database (supabase/quroosh),
@@ -43,7 +57,7 @@ export default async function QurooshApplicationsPage({
     );
   }
   const quroosh = createQurooshClient();
-  const [{ data: settings }, { data: rows }, { data: sheet }] = await Promise.all([
+  const [{ data: settings }, { data: rows }, { data: sheet }, { form }, catalog] = await Promise.all([
     quroosh.from('settings').select('applications_open, privacy_url').eq('project_id', id).maybeSingle(),
     quroosh
       .from('applications')
@@ -53,27 +67,25 @@ export default async function QurooshApplicationsPage({
     // Its own read: before Quroosh 0003 the column is missing, and the page
     // must still load (it then shows no sheet).
     quroosh.from('settings').select('sheet_url').eq('project_id', id).maybeSingle(),
+    loadForm(quroosh, id),
+    requestCatalog(locale),
   ]);
+  const lang = asLocale(locale);
   const sheetUrl = (sheet as { sheet_url: string | null } | null)?.sheet_url ?? null;
   const open = settings?.applications_open ?? false;
   const applications = (rows ?? []) as Application[];
   const publicUrl = `${siteUrl()}/${locale}/quroosh/apply/${id}`;
 
-  const answer = (question: Question, row: Application) => {
-    const value = row[question.name];
-    if (value === null || value === undefined || value === '') return <span className="text-ink-muted">—</span>;
-    if (question.kind === 'yesno' || question.kind === 'consent') {
-      return question.kind === 'yesno'
-        ? t(`apply.options.${question.name}.${value ? 'yes' : 'no'}`)
-        : value
-          ? t('applications.yes')
-          : t('applications.no');
-    }
+  const answer = (question: FormQuestion, row: Application) => {
+    const value = answerOf(question, row);
+    if (isEmptyAnswer(value)) return <span className="text-ink-muted">—</span>;
+    if (question.kind === 'yesno') return optionLabel(question, yesNoValue(value), lang, catalog);
+    if (question.kind === 'consent') return value ? t('applications.yes') : t('applications.no');
     if (question.kind === 'checkboxes' && Array.isArray(value)) {
-      return value.map((v) => t(`apply.options.${question.name}.${v}`)).join(locale === 'ar' ? '، ' : ', ');
+      return value.map((v) => optionLabel(question, String(v), lang, catalog)).join(locale === 'ar' ? '، ' : ', ');
     }
     if (question.kind === 'radio' || question.kind === 'select') {
-      return t(`apply.options.${question.name}.${String(value)}`);
+      return optionLabel(question, String(value), lang, catalog);
     }
     if (question.kind === 'tel' || question.kind === 'email' || question.kind === 'url' || question.kind === 'number') {
       return (
@@ -132,6 +144,19 @@ export default async function QurooshApplicationsPage({
         </ActionForm>
       </Card>
 
+      <Card className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-ink">{t('questions.title')}</p>
+          <p className="mt-1 text-xs text-ink-muted">{t('questions.cardHint')}</p>
+        </div>
+        <Link
+          href={`/projects/${id}/quroosh/applications/questions`}
+          className="inline-flex items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+        >
+          {t('questions.edit')}
+        </Link>
+      </Card>
+
       <Card className="space-y-3">
         <div>
           <p className="text-sm font-medium text-ink">{t('applications.sheet')}</p>
@@ -162,7 +187,7 @@ export default async function QurooshApplicationsPage({
           applications.map((row) => (
             <details key={row.id} className="rounded-xl border border-line bg-surface shadow-sm">
               <summary className="flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-1 p-4">
-                <span className="font-semibold text-ink">{row.venture_name}</span>
+                <span className="font-semibold text-ink">{row.venture_name ?? row.founder_name}</span>
                 <span className="text-sm text-ink-muted">{row.founder_name}</span>
                 <span className="ltr-nums text-sm text-ink-muted" dir="ltr">
                   {row.phone}
@@ -170,12 +195,14 @@ export default async function QurooshApplicationsPage({
                 <span className="ms-auto text-xs text-ink-muted">{formatDateTime(row.created_at, locale)}</span>
               </summary>
               <dl className="grid gap-x-6 gap-y-3 border-t border-line p-4 sm:grid-cols-[minmax(0,14rem)_1fr]">
-                {QUESTIONS.map((question) => (
-                  <div key={question.name} className="contents">
-                    <dt className="text-sm font-medium text-ink-muted">{t(`apply.q.${question.name}`)}</dt>
+                {form
+                  .filter((question) => !question.hidden || !isEmptyAnswer(answerOf(question, row)))
+                  .map((question) => (
+                  <div key={question.key} className="contents">
+                    <dt className="text-sm font-medium text-ink-muted">{questionLabel(question, lang, catalog)}</dt>
                     <dd className="text-sm text-ink">
                       {answer(question, row)}
-                      {question.name === 'has_team' && row.application_members.length > 0 ? (
+                      {question.key === 'has_team' && row.application_members.length > 0 ? (
                         <ul className="mt-2 space-y-1">
                           {[...row.application_members]
                             .sort((a, b) => a.sort_order - b.sort_order)

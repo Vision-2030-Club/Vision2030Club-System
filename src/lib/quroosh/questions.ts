@@ -1,13 +1,19 @@
 /**
- * The Quroosh application, question by question, in the order the form asks
- * them (the club's "أسئلة التسجيل في قروش 2026", with the 2026-11-07 changes;
- * see supabase/quroosh/migrations). One list drives the public form, the server action
- * and the managers' view, so a question is added in one place.
+ * The Quroosh application's OWN questions, in the order the form asks them
+ * (the club's "أسئلة التسجيل في قروش 2026", with the 2026-11-07 changes; see
+ * supabase/quroosh/migrations). They are the starting point of every
+ * project's form: since Quroosh 0004 a project's managers edit them and add
+ * their own on the Applications page, and `buildForm` below merges those
+ * edits (the Quroosh database's `questions` rows) over this list. The public
+ * form, the server action, the managers' view and the Google Sheet all read
+ * the merged list.
  *
- * `name` is the column in the Quroosh database's `applications`; the wording lives in the
- * catalogs under `quroosh.apply.q.<name>` (question), `quroosh.apply.hint.<name>`
- * (help line, optional) and `quroosh.apply.options.<name>.<value>` (choices).
- * The option values must match the CHECK constraints in supabase/quroosh/migrations.
+ * `name` is the column in the Quroosh database's `applications`; the default
+ * wording lives in the catalogs under `quroosh.apply.q.<name>` (question),
+ * `quroosh.apply.hint.<name>` (help line, optional), `quroosh.apply.consent.<name>`
+ * (the statement a consent question ticks) and
+ * `quroosh.apply.options.<name>.<value>` (choices). A manager's wording,
+ * when there is one, replaces the catalog's.
  */
 
 export type QuestionKind =
@@ -34,7 +40,10 @@ export type Question = {
   min?: number;
 };
 
-export type Section = { key: string; questions: Question[] };
+export const SECTION_KEYS = ['founder', 'startup', 'team', 'market', 'quroosh', 'consent'] as const;
+export type SectionKey = (typeof SECTION_KEYS)[number];
+
+export type Section = { key: SectionKey; questions: Question[] };
 
 export const SECTIONS: Section[] = [
   {
@@ -106,6 +115,8 @@ export const SECTIONS: Section[] = [
         kind: 'checkboxes',
         required: true,
         options: ['investor_prep', 'customers_pilot', 'partners_suppliers', 'non_dilutive', 'go_to_market', 'exposure'],
+        // At most this many choices (a manager may change it).
+        max: 2,
       },
       {
         name: 'heard_from',
@@ -129,8 +140,6 @@ export const SECTIONS: Section[] = [
 
 export const QUESTIONS: Question[] = SECTIONS.flatMap((section) => section.questions);
 
-/** `wants`: at most this many. */
-export const MAX_WANTS = 2;
 /** `funding`: this one excludes the others. */
 export const FUNDING_NONE = 'none';
 /** Other team members, besides the lead founder (apply() in the Quroosh database has the same cap). */

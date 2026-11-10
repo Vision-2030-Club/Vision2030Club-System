@@ -11,21 +11,24 @@ import {
   writeTab,
 } from '@/lib/google/sheets';
 import { headerRowFormat, pages, plain, stamp, yesNo } from '@/lib/interviews/sheetFormat';
-import { QUESTIONS, type Question } from '@/lib/quroosh/questions';
+import { answerOf, optionLabel, questionLabel, yesNoValue, type FormQuestion } from '@/lib/quroosh/form';
+import { fileCatalog, loadForm } from '@/lib/quroosh/loadForm';
 import type { QurooshApplication, QurooshApplicationMember } from '@/lib/quroosh/types';
 import { createQurooshClient } from '@/lib/supabase/quroosh';
 import { CLUB_TIME_ZONE } from '@/lib/time';
-import en from '../../../messages/en.json';
 
 /**
  * The applications sheet: one Google Sheet per club project running
  * Quroosh, with a row for every application from the public form. Modelled
  * on Mock Interviews' registrations sheet (lib/interviews/registrationSheet.ts).
  *
- * Columns: submitted, then every question in the form's own order
- * (QUESTIONS, so a question added there gets its column here with no other
- * change), the other team members under "Are other people working…", and
- * the application id. Headers and choices are the English form's labels.
+ * Columns: submitted, then every question of the project's form in its
+ * order, hidden ones included (their past answers stay), as its managers
+ * edited it (Quroosh 0004, loadForm), the other team members under "Are
+ * other people working…", and the application id. Headers and choices are
+ * the English wording: a manager's, else the catalog's. Answers are stored
+ * by key and value, so after a question is edited the sheet is rewritten
+ * (kickApplicationSheetSync) and every past row reads the new wording.
  *
  * Two ways in:
  *   - kickApplicationAppend, after each submission: appends ONE row. With no
@@ -48,37 +51,37 @@ import en from '../../../messages/en.json';
 const TAB = 'Applications';
 const DEFAULT_TITLE = 'Quroosh — Applications';
 
-const QUESTION_LABELS: Record<string, string> = en.quroosh.apply.q;
-const OPTION_LABELS = en.quroosh.apply.options as Record<string, Record<string, string>>;
+const CATALOG = fileCatalog('en');
 
 type Row = QurooshApplication;
 
 /** Every question's own column, with the other team members right after "has_team". */
-const TITLES: string[] = [
-  'Submitted',
-  ...QUESTIONS.flatMap((q) => {
-    const title = QUESTION_LABELS[q.name] ?? q.name;
-    return q.name === 'has_team' ? [title, 'Team members'] : [title];
-  }),
-  'Application ID',
-];
-
-function optionLabel(question: Question, value: string): string {
-  return OPTION_LABELS[question.name]?.[value] ?? value;
+function titles(form: FormQuestion[]): string[] {
+  return [
+    'Submitted',
+    ...form.flatMap((q) => {
+      const title = questionLabel(q, 'en', CATALOG);
+      return q.key === 'has_team' ? [title, 'Team members'] : [title];
+    }),
+    'Application ID',
+  ];
 }
 
-function answerCell(question: Question, row: Row): string {
-  const value = row[question.name];
+function answerCell(question: FormQuestion, row: Row): string {
+  const value = answerOf(question, row);
   if (value === null || value === undefined || value === '') return '';
   switch (question.kind) {
     case 'yesno':
+      return plain(optionLabel(question, yesNoValue(value), 'en', CATALOG));
     case 'consent':
       return yesNo(Boolean(value));
     case 'radio':
     case 'select':
-      return plain(optionLabel(question, String(value)));
+      return plain(optionLabel(question, String(value), 'en', CATALOG));
     case 'checkboxes':
-      return Array.isArray(value) ? plain(value.map((v) => optionLabel(question, String(v))).join(' · ')) : '';
+      return Array.isArray(value)
+        ? plain(value.map((v) => optionLabel(question, String(v), 'en', CATALOG)).join(' · '))
+        : '';
     default:
       // Text as typed: the apostrophe keeps "+966…" and a leading "=" as text.
       return plain(String(value));
@@ -95,11 +98,11 @@ function membersCell(members: QurooshApplicationMember[] | undefined): string {
   );
 }
 
-function toRow(row: Row): string[] {
+function toRow(form: FormQuestion[], row: Row): string[] {
   const cells = [stamp(row.created_at, CLUB_TIME_ZONE)];
-  for (const question of QUESTIONS) {
+  for (const question of form) {
     cells.push(answerCell(question, row));
-    if (question.name === 'has_team') cells.push(membersCell(row.application_members));
+    if (question.key === 'has_team') cells.push(membersCell(row.application_members));
   }
   cells.push(row.id);
   return cells;
@@ -157,12 +160,14 @@ export async function syncApplicationSheet(projectId: string, title: string = DE
       .order('id')
       .range(from, to),
   );
-  const rows = [TITLES, ...applications.map(toRow)];
+  const { form } = await loadForm(db, projectId);
+  const header = titles(form);
+  const rows = [header, ...applications.map((row) => toRow(form, row))];
 
   const spreadsheetId = await ensureSheet(db, projectId, title);
   await revokeLinkSharing(spreadsheetId);
   const tab = await tabOf(spreadsheetId);
-  await ensureColumns(spreadsheetId, tab.sheetId, TITLES.length);
+  await ensureColumns(spreadsheetId, tab.sheetId, header.length);
   await writeTab(spreadsheetId, tab.sheetId, tab.title, rows, headerRowFormat(tab.sheetId));
 }
 
@@ -184,8 +189,9 @@ async function appendApplication(projectId: string, applicationId: string): Prom
 
   const { data } = await db.from('applications').select(SELECT).eq('id', applicationId).maybeSingle();
   if (!data) return;
+  const { form } = await loadForm(db, projectId);
   const tab = await tabOf(sheetId);
-  await appendRows(sheetId, tab.title, [toRow(data as Row)]);
+  await appendRows(sheetId, tab.title, [toRow(form, data as Row)]);
 }
 
 /**
@@ -199,6 +205,26 @@ export function kickApplicationAppend(projectId: string, applicationId: string):
     } catch (error) {
       if (error instanceof GoogleNotConnectedError) return;
       console.error('[quroosh/applicationSheet] append failed', error);
+    }
+  });
+}
+
+/**
+ * After a manager edits the questions: the sheet rewritten in the new
+ * wording and columns, past rows included. Only a sheet that exists already
+ * (a project with no sheet gets one with its first application, or Sync
+ * now); Google being down or not connected never fails the edit.
+ */
+export function kickApplicationSheetSync(projectId: string): void {
+  after(async () => {
+    try {
+      if (!isGoogleConfigured()) return;
+      const db = createQurooshClient();
+      if (!(await savedSheet(db, projectId))) return;
+      await syncApplicationSheet(projectId);
+    } catch (error) {
+      if (error instanceof GoogleNotConnectedError) return;
+      console.error('[quroosh/applicationSheet] sync after a question edit failed', error);
     }
   });
 }
