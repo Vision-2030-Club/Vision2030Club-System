@@ -1766,7 +1766,8 @@
         },
         "name": "Guest’s name",
         "nameHint": "The full name only, without the title: the title chosen above is added in front of it, and the invitation shows both exactly as written.",
-        "titleCustom": "Title",
+        "titleCustom": "Title (optional)",
+        "titleCustomHint": "Leave it empty to save the name with no title.",
         "note": "Note (optional)",
         "noteHint": "For the managers only; the guest never sees it.",
         "submit": "Create invitation"
@@ -1842,7 +1843,7 @@
         "slot_unavailable": "That day is turned off or no longer open to booking. Choose another.",
         "not_booked": "This guest has not booked a time.",
         "invitation_cancelled": "This invitation was cancelled.",
-        "title_missing": "Choose a title, or write one under “Other”."
+        "title_missing": "Choose a title from the list. A title of your own is 60 characters at most."
       }
     },
     "invite": {

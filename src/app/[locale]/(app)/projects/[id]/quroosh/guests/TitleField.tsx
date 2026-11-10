@@ -7,10 +7,11 @@ import { GUEST_TITLES, MAX_CUSTOM_TITLE } from '@/lib/quroosh/guestTitles';
 
 /**
  * The guest's title on the New invitation form, before the name: a dropdown
- * of the usual titles, "Other" (a small field for the manager's own) and "No
- * title". The action puts the title in front of the name and saves it as the
- * name (guestTitles.ts). A choice is required, so nobody is invited without
- * the managers deciding how they are addressed.
+ * of the usual titles, "Other" (a small field for the manager's own, optional:
+ * left empty, the name is saved with no title) and "No title". The action
+ * puts the title in front of the name and saves it as the name
+ * (guestTitles.ts). A choice in the dropdown is required, so nobody is
+ * invited without the managers deciding how they are addressed.
  */
 export function TitleField() {
   const t = useTranslations('quroosh.guests.new');
@@ -43,10 +44,10 @@ export function TitleField() {
           <Input
             id="guest-title-custom"
             name="title_custom"
-            required
             maxLength={MAX_CUSTOM_TITLE}
             autoComplete="off"
           />
+          <p className="mt-1 text-xs text-ink-muted">{t('titleCustomHint')}</p>
         </div>
       ) : null}
     </div>

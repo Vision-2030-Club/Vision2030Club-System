@@ -23,15 +23,16 @@ const MAX_NOTE = 2000;
 /**
  * The title chosen on the form, as written before the name (in the form's
  * language, from `quroosh.guests.new.titles`), '' for none, or null when the
- * choice is missing or a custom title is empty or too long.
+ * choice is missing or a custom title is too long. "Other" with its field
+ * left empty is no title, the same as "No title".
  */
 async function chosenTitle(formData: FormData, locale: string): Promise<string | null> {
   const key = text(formData, 'title') ?? '';
   if (!isGuestTitle(key)) return null;
   if (key === 'none') return '';
   if (key === 'other') {
-    const custom = text(formData, 'title_custom');
-    return custom && custom.length <= MAX_CUSTOM_TITLE ? custom : null;
+    const custom = text(formData, 'title_custom') ?? '';
+    return custom.length <= MAX_CUSTOM_TITLE ? custom : null;
   }
   const t = await getTranslations({ locale, namespace: 'quroosh.guests.new.titles' });
   return t(`${key}.text`);

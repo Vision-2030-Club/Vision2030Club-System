@@ -235,7 +235,8 @@ proxy).
   title ("أخرى") cannot be told from the name, so it stays in the large
   line. The **title** is picked on the New invitation form, before the
   name (`TitleField`): سعادة الأستاذ، سعادة الأستاذة، سعادة الدكتور، سعادة
-  الدكتورة، معالي، أخرى (a small field for the manager's own) or بدون لقب.
+  الدكتورة، معالي، أخرى (a small field for the manager's own, optional: left
+  empty, the name is saved with no title, as with بدون لقب) or بدون لقب.
   There is no title column: `createInvitationAction` puts the title in front
   of the name with a space and saves that as the name. The list is
   `src/lib/quroosh/guestTitles.ts`; the words are in
