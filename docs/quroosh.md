@@ -9,10 +9,9 @@ wear the Quroosh identity instead of the club's.
 
 **State:** the overview page, the identity, the access rule (`0074`),
 **applying** (below), stored in the Quroosh database, the managers
-**editing the questions** (Quroosh `0004`), and the first part of **guest
-invitations** (Quroosh `0005`: the whole database side, the managers'
-slots page, and inviting guests with their link and QR code; the guests'
-booking page comes next). Further screens become pages under
+**editing the questions** (Quroosh `0004`), and **guest invitations**
+(Quroosh `0005`: slots, inviting guests with a link and QR code, the guests'
+own booking page, and the managers moving or cancelling bookings). Further screens become pages under
 `projects/[id]/quroosh/` and items in the Quroosh sidebar.
 
 ## Two databases
@@ -180,11 +179,13 @@ feature needs), the types (`QurooshGuestSlot`, `QurooshGuestInvitation` in
 `src/lib/quroosh/types.ts`), the loaders in `src/lib/quroosh/guests.ts`, the
 **Guests** sidebar item (managers only), the **slots page**
 (`projects/[id]/quroosh/guests/slots`), the **guests list**
-(`guests/`: each guest's name and status, and "New invitation": a name and
-an optional note), and **one guest's page** (`guests/[guestId]`: the link to
-copy, its QR code, cancelling). Still to come: the guest's booking page
-(`/quroosh/invite/<token>`, already public through `/quroosh` in the proxy),
-and the managers seeing and changing bookings.
+(`guests/`: each guest's name and status, a booked guest's time, phone and
+whether they need transport, and "New invitation": a name and an optional
+note), **one guest's page** (`guests/[guestId]`: the link to copy, its QR
+code, the booking and the phones, moving or cancelling the booking,
+cancelling the invitation), and the guest's **booking page**
+(`(quroosh-public)/quroosh/invite/[token]`, public through `/quroosh` in the
+proxy).
 
 - **Inviting.** `createInvitationAction` makes the token (`newToken`, 48 hex
   characters), calls `create_invitation` with the manager as `p_actor`, and
@@ -201,6 +202,32 @@ and the managers seeing and changing bookings.
   a Vercel preview**, so a link copied from a preview opens on the live site.
 - **Cancelling** (`cancel_invitation`, behind a confirmation) cannot be
   undone: there is no un-cancel. It frees any slot the guest booked.
+- **The booking page** (`/quroosh/invite/<token>`, no account, not indexed
+  by search engines). It reads `invitation()` and `open_slots()` only, so it
+  never shows another guest or anyone's phone. An unknown link says it is
+  not valid; a cancelled invitation says so; a booked guest sees their day
+  and time and no form. Otherwise: the free times by day, the guest's mobile
+  with a country picker, "do you need transport?", and if so the number of
+  their driver or office manager. `BookingForm` copies `ApplyForm`: the
+  hidden `website` field for bots, submitting from `onSubmit` so a refusal
+  keeps what was typed, and the hints translated from
+  `quroosh.invite.errors` (through `fromPostgrest`). On `slot_taken` or
+  `slot_unavailable` it says "pick another" and reloads the free times, so
+  the taken one drops out.
+- **The country picker** (`src/lib/quroosh/phones.ts`): a list of ISO codes
+  and calling codes, Saudi Arabia first, with country names from
+  `Intl.DisplayNames` in the page's language (no translations to keep).
+  `internationalPhone` builds E.164 from the code picked and the number
+  typed (Arabic digits read, the home 0 dropped except for Italy; a number
+  typed in full with `+` or `00` is taken as it is). The form checks it to
+  name the field, the action decides, and the database's CHECK has the last
+  word. To add a country, add its pair to `COUNTRIES`.
+- **Managers and bookings.** The guest's page shows the booked day and time,
+  when the guest booked, their mobile, transport and the driver's number
+  (the phones stay after a booking is cancelled). **Move** offers the free
+  slots (on, not started, nobody's; `move_booking`, `slot_taken` if someone
+  takes it first). **Cancel the booking** (`cancel_booking`) frees the slot
+  and the guest's link offers the free times again; the invitation stays.
 
 - **Slots** (`guest_slots`): a start time per slot, `active` on or off.
   Sessions are fixed at 45 minutes (`GUEST_SESSION_MINUTES`), so there is no

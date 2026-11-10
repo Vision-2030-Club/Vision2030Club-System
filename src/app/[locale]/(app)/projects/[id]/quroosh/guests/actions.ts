@@ -60,3 +60,43 @@ export async function cancelInvitationAction(_previous: ActionResult, formData: 
   });
   return finish(ctx, error);
 }
+
+/**
+ * Moves a guest's booking to another free slot (`move_booking`). Two people
+ * taking the same slot race on its unique index; the second gets
+ * `slot_taken`. Guests cannot change their own booking; managers can.
+ */
+export async function moveBookingAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+  const ctx = await managerContext(formData);
+  if ('ok' in ctx) return ctx;
+  const invitationId = text(formData, 'invitation_id');
+  const slotId = text(formData, 'slot_id');
+  if (!invitationId || !UUID.test(invitationId)) return refusal(ctx.locale, 'not_found', 'This invitation does not exist.');
+  if (!slotId || !UUID.test(slotId)) return refusal(ctx.locale, 'slot_missing', 'Choose a time.');
+
+  const { error } = await createQurooshClient().rpc('move_booking', {
+    p_project: ctx.projectId,
+    p_actor: ctx.actor,
+    p_invitation: invitationId,
+    p_slot: slotId,
+  });
+  return finish(ctx, error);
+}
+
+/**
+ * Cancels a guest's booking but not their invitation (`cancel_booking`): the
+ * slot is free again, and their link offers the free times again.
+ */
+export async function cancelBookingAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+  const ctx = await managerContext(formData);
+  if ('ok' in ctx) return ctx;
+  const invitationId = text(formData, 'invitation_id');
+  if (!invitationId || !UUID.test(invitationId)) return refusal(ctx.locale, 'not_found', 'This invitation does not exist.');
+
+  const { error } = await createQurooshClient().rpc('cancel_booking', {
+    p_project: ctx.projectId,
+    p_actor: ctx.actor,
+    p_invitation: invitationId,
+  });
+  return finish(ctx, error);
+}

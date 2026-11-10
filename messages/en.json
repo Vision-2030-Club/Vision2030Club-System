@@ -1721,6 +1721,7 @@
       "count": "{count, plural, =0 {No guests invited} one {# guest invited} other {# guests invited}}",
       "empty": "No guests invited yet.",
       "invitedOn": "Invited {date}",
+      "needsTransport": "Needs transport",
       "role": {
         "speaker": "Speaker"
       },
@@ -1747,7 +1748,26 @@
         "link": "Invitation link",
         "qrAlt": "QR code of {name}’s invitation link",
         "downloadQr": "Download the QR code (PNG)",
-        "cancelledNote": "This invitation was cancelled. Its link now says so, and it can no longer be used to book."
+        "cancelledNote": "This invitation was cancelled. Its link now says so, and it can no longer be used to book.",
+        "phone": "Mobile number",
+        "transport": "Transport",
+        "transportYes": "Needed",
+        "transportNo": "Not needed",
+        "transportPhone": "Driver or office manager"
+      },
+      "booking": {
+        "title": "Booked session",
+        "bookedAt": "Booked by the guest on {date}",
+        "moveTo": "Move to another free time",
+        "choose": "Choose a time…",
+        "move": "Move the booking",
+        "noFree": "There is no other free time to move to.",
+        "cancel": {
+          "trigger": "Cancel the booking",
+          "title": "Cancel this booking?",
+          "body": "{name}’s time becomes free for other guests, and their link offers the free times again so they can book once more. The invitation stays.",
+          "confirm": "Cancel the booking"
+        }
       },
       "cancel": {
         "trigger": "Cancel invitation",
@@ -1785,7 +1805,50 @@
         "slot_exists": "There is already a slot at that time.",
         "slot_booked": "This slot is booked. Cancel or move the booking first.",
         "name_invalid": "Write the guest’s name (200 characters at most).",
-        "note_too_long": "The note is too long (2000 characters at most)."
+        "note_too_long": "The note is too long (2000 characters at most).",
+        "slot_missing": "Choose a time.",
+        "slot_taken": "Another guest has booked that time. Choose another.",
+        "slot_unavailable": "That time is turned off or has already started. Choose another.",
+        "not_booked": "This guest has not booked a time.",
+        "invitation_cancelled": "This invitation was cancelled."
+      }
+    },
+    "invite": {
+      "title": "Your invitation to Quroosh",
+      "greeting": "{name}, you are invited to speak at Quroosh.",
+      "intro": "Choose the time that suits you for your session. Each session is 45 minutes.",
+      "notFound": "This invitation link is not valid. Check that you opened the whole link you were sent.",
+      "cancelled": "This invitation has been cancelled. If you think this is a mistake, contact the Quroosh team.",
+      "noSlots": "There are no free times at the moment. The Quroosh team will contact you.",
+      "chooseSlot": "Choose a time",
+      "contactTitle": "Your details",
+      "phone": "Your mobile number",
+      "phoneHint": "To coordinate with you and confirm your booking.",
+      "country": "Country code",
+      "transport": "Do you need transport?",
+      "yes": "Yes",
+      "no": "No",
+      "transportPhone": "Your driver’s or office manager’s number",
+      "transportPhoneHint": "We will coordinate the transport with them.",
+      "submit": "Book this time",
+      "booked": {
+        "title": "Your session is booked",
+        "next": "Thank you. The Quroosh team will contact you to confirm.",
+        "change": "To change it, contact the Quroosh team."
+      },
+      "errors": {
+        "not_found": "This invitation link is not valid.",
+        "invitation_cancelled": "This invitation has been cancelled.",
+        "already_booked": "You have already booked a time. To change it, contact the Quroosh team.",
+        "slot_missing": "Choose a time.",
+        "slot_taken": "This time was just taken by another guest. Pick another time.",
+        "slot_unavailable": "This time is no longer available. Pick another time.",
+        "phone_invalid": "Your mobile number is not valid. Check the country code and the number.",
+        "transport_missing": "Say whether you need transport.",
+        "transport_phone_missing": "Give your driver’s or office manager’s number.",
+        "transport_phone_invalid": "The driver’s or office manager’s number is not valid. Check the country code and the number.",
+        "invalid": "Something is missing or not valid. Check the form and try again.",
+        "network": "Your booking could not be sent. Check your connection and try again; your answers are still in the form."
       }
     }
   }

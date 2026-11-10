@@ -6,7 +6,7 @@ import { Alert, Badge, Card, EmptyState, Input, Label, PageHeader, Textarea } fr
 import { Link } from '@/i18n/navigation';
 import { formatDate, localized } from '@/lib/format';
 import { can, getQurooshAccess } from '@/lib/quroosh/access';
-import { GUEST_STATUS_TONE, invitationStatus, loadInvitations } from '@/lib/quroosh/guests';
+import { GUEST_STATUS_TONE, invitationStatus, loadInvitations, slotLabel } from '@/lib/quroosh/guests';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 import { createInvitationAction } from './actions';
 
@@ -91,6 +91,7 @@ export default async function QurooshGuestsPage({
           <ul className="divide-y divide-line rounded-xl border border-line bg-surface shadow-sm">
             {invitations.map((guest) => {
               const status = invitationStatus(guest);
+              const booked = status === 'booked' && guest.slot_starts_at ? slotLabel(guest.slot_starts_at, locale) : null;
               return (
                 <li key={guest.id}>
                   <Link
@@ -103,6 +104,22 @@ export default async function QurooshGuestsPage({
                     <span className="ms-auto text-xs text-ink-muted">
                       {t('guests.invitedOn', { date: formatDate(guest.created_at, locale) })}
                     </span>
+                    {booked ? (
+                      <span className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink">
+                        <span>
+                          {booked.day} ·{' '}
+                          <span className="ltr-nums" dir="ltr">
+                            {booked.time}
+                          </span>
+                        </span>
+                        {guest.phone ? (
+                          <span className="ltr-nums text-ink-muted" dir="ltr">
+                            {guest.phone}
+                          </span>
+                        ) : null}
+                        {guest.needs_transport ? <Badge tone="warn">{t('guests.needsTransport')}</Badge> : null}
+                      </span>
+                    ) : null}
                   </Link>
                 </li>
               );
