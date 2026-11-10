@@ -269,6 +269,28 @@ export async function modifiedTimes(): Promise<Map<string, string>> {
   return out;
 }
 
+/**
+ * Makes sure a tab has at least `count` columns. A new sheet has 26 (A to Z),
+ * and writeTab cannot write past the grid; a wide tab (the Quroosh
+ * applications sheet has a column per question) needs more. Columns are only
+ * ever added, so anything someone typed beyond them stays.
+ */
+export async function ensureColumns(spreadsheetId: string, sheetId: number, count: number): Promise<void> {
+  const data = await googleFetch(
+    SHEETS_API,
+    `/spreadsheets/${spreadsheetId}?fields=sheets.properties(sheetId,gridProperties.columnCount)`,
+  );
+  const sheet = ((data.sheets ?? []) as { properties: { sheetId: number; gridProperties?: { columnCount?: number } } }[]).find(
+    (s) => s.properties.sheetId === sheetId,
+  );
+  const have = sheet?.properties.gridProperties?.columnCount ?? 26;
+  if (have >= count) return;
+  await googleFetch(SHEETS_API, `/spreadsheets/${spreadsheetId}:batchUpdate`, {
+    method: 'POST',
+    body: JSON.stringify({ requests: [{ appendDimension: { sheetId, dimension: 'COLUMNS', length: count - have } }] }),
+  });
+}
+
 /** Reads back one tab's cells. */
 export async function readTab(spreadsheetId: string, sheetTitle: string): Promise<string[][]> {
   const range = `${quoted(sheetTitle)}!A1:Z10000`;

@@ -90,6 +90,30 @@ privacy-notice link, and read the applications on the component's
   Interviews form; filled in, the action pretends to succeed and stores
   nothing. There is no rate limit beyond one application per phone.
 
+## The applications Google Sheet (Quroosh 0003)
+
+Every application is also copied, as a row, to one Google Sheet per project:
+`src/lib/quroosh/applicationSheet.ts`, modelled on Mock Interviews'
+registrations sheet.
+
+- **Made by the app**, in the Google account connected under Admin → Google,
+  on the first application or the first *Sync now* on the Applications page.
+  The `drive.file` scope only lets the app write files it made itself, so a
+  sheet made by hand cannot be used. Its id and link are kept in the Quroosh
+  database's `settings` (`sheet_id`, `sheet_url`, saved by `save_sheet()`),
+  and the link is shown on the Applications page.
+- **Each submission appends one row**, after the founder has been answered
+  (`kickApplicationAppend`); Google being down or not connected never fails
+  an application. **Sync now** rewrites the whole sheet from the database,
+  oldest first, and makes a new sheet if the old one was deleted in Drive.
+- **The columns follow `QUESTIONS`**: a question added there gets its column
+  with no change here. Headers and choices are the English form's labels;
+  the other team members sit in one cell after the team question.
+- **Personal data.** Link sharing is switched off on every rebuild. The
+  account's owner shares the sheet with named people only.
+- Before 0003 is applied the page shows no sheet, *Sync now* says 0003 is
+  needed, and applying still works (no row is written, and no sheet is made).
+
 ## The identity
 
 From the club's identity guide (an Illustrator file; the original stays in

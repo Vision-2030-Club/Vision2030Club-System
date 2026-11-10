@@ -2,6 +2,7 @@
 
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 import { fail, fromPostgrest, ok, type ActionResult } from '@/lib/actions';
+import { kickApplicationAppend } from '@/lib/quroosh/applicationSheet';
 import { MAX_MEMBERS, QUESTIONS } from '@/lib/quroosh/questions';
 
 /**
@@ -53,7 +54,7 @@ export async function applyAction(_previous: ActionResult, formData: FormData): 
       : [];
 
   if (!isQurooshConfigured()) return fail('Quroosh is not configured.', 'not_found');
-  const { error } = await createQurooshClient().rpc('apply', {
+  const { data: applicationId, error } = await createQurooshClient().rpc('apply', {
     p_project: projectId,
     p_application: application,
     p_members: members,
@@ -63,5 +64,7 @@ export async function applyAction(_previous: ActionResult, formData: FormData): 
     // Anything the database refused without naming why is "check your answers".
     return result.hint ? result : { ...result, hint: 'invalid' };
   }
+  // A row in the project's Google Sheet, after the founder has their answer.
+  if (typeof applicationId === 'string') kickApplicationAppend(projectId, applicationId);
   return ok('applied');
 }
