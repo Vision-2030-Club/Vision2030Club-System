@@ -7,8 +7,9 @@ club migration `0073`). Since `0074` it is a **project component** of its
 own, like Mock Interviews and Outreach: a project carries it, and its pages
 wear the Quroosh identity instead of the club's.
 
-**State:** the overview page, the identity, the access rule (`0074`), and
-**applying** (below), stored in the Quroosh database. Further screens become pages under
+**State:** the overview page, the identity, the access rule (`0074`),
+**applying** (below), stored in the Quroosh database, and the managers
+**editing the questions** (Quroosh `0004`). Further screens become pages under
 `projects/[id]/quroosh/` and items in the Quroosh sidebar.
 
 ## Two databases
@@ -65,19 +66,28 @@ privacy-notice link, and read the applications on the component's
   Since Quroosh `0002` (2026-11-08) it also asks *how many of the team will
   attend, the lead founder included*: 1 to 11, and no more than the founder
   plus the members named. Applications sent before `0002` have it empty.
-- **One list drives everything:** `src/lib/quroosh/questions.ts`. The form,
-  the server action and the managers' view all read it. To add a question:
-  a column (with its CHECK) in a new Quroosh migration, an entry in `SECTIONS`, and
-  its wording under `quroosh.apply` in both catalogs.
+- **The form's own questions are in one list:** `src/lib/quroosh/questions.ts`.
+  Since Quroosh `0004` a project's managers edit them and add their own (see
+  "Editing the questions" below); the form, the server action, the
+  managers' view and the sheet all read the merged list (`loadForm`). To add
+  a question *to every project's form in code*: a column in a new Quroosh
+  migration, an entry in `SECTIONS`, and its wording under `quroosh.apply` in
+  both catalogs. A one-project question is added on the Questions page
+  instead, with no code.
 - **A project's form exists once a manager saves its settings** on the
   Applications page (the first "Open applications" does it). Until then the
   public link says the form does not exist.
-- **Validation lives in the database.** The Quroosh database's `apply()`,
-  called by the server with the secret key, checks the form is open and
-  inserts the application and its team in one transaction; the table's CHECK constraints decide what is valid, and a
-  refusal comes back with a hint the page translates (`already_applied`,
-  `applications_closed`, `invalid`, …). The page checks phones and the
-  multi-choice questions first only so it can say which field is wrong.
+- **Validation is split since `0004`.** The server action checks the answers
+  against the project's questions (which are shown, which are required,
+  which choices are offered, how many may be ticked), because those now
+  depend on the managers' edits. The Quroosh database's `apply()`, called by
+  the server with the secret key, checks the form is open, the shapes
+  (phones, emails, lengths, one application per phone, the team and the
+  attendees cap) and inserts the application and its team in one
+  transaction. A refusal comes back with a hint the page translates
+  (`already_applied`, `applications_closed`, `invalid`, …). The page checks
+  phones and the multi-choice questions first only so it can say which
+  field is wrong.
 - **One application per founder phone per project.** A second one is
   refused; there is no editing by the applicant yet.
 - **Personal data.** Applications (names, phones, emails, ages, the team's
@@ -89,6 +99,44 @@ privacy-notice link, and read the applications on the component's
 - **Bots.** The form has the same hidden "website" field as the Mock
   Interviews form; filled in, the action pretends to succeed and stores
   nothing. There is no rate limit beyond one application per phone.
+
+## Editing the questions (Quroosh 0004)
+
+The project's managers edit the application on the **Questions** page,
+opened from the Applications page (`projects/[id]/quroosh/applications/questions`).
+
+- **What can be changed:** add a question (short or long answer, number,
+  email, mobile, link, one choice, one choice from a drop-down, several
+  choices, yes or no, tick to agree), and for every question its wording in
+  Arabic and English, its help line (for a tick-to-agree question, the
+  statement ticked), whether it is required, its choices (wording, add one,
+  hide one), the most choices for a several-choices question, the range of
+  an added number question, its section and its place in the section.
+- **Nothing is removed.** There is no delete for a question or a choice, on
+  purpose: they are **hidden**, so every past answer keeps its question and
+  its label. A hidden question is off the public form but still shows on the
+  Applications page wherever it was answered, and keeps its column in the
+  sheet. Hide and show are one press.
+- **Always asked:** the lead founder's name, email and mobile number (the
+  phone is how one application per founder is kept) and the data consent
+  cannot be hidden or made optional (`LOCKED_KEYS` in `form.ts`).
+- **The kind of answer is fixed** once a question exists (its past answers
+  are of that kind). To change it, hide the question and add a new one.
+- **Edits change past applications.** Answers are stored by question key and
+  choice value, never by wording, so a reworded question or choice reads the
+  new way on every past application, and after every edit the Google Sheet
+  is rewritten from the database in the new wording
+  (`kickApplicationSheetSync`, only when the project already has a sheet).
+- **How it is stored.** The Quroosh database's `questions` table holds one row
+  per question a manager touched. A row whose `key` is one of the form's own
+  columns changes that question (an empty wording means "the catalog's
+  text", so the catalogs still drive the untouched parts); any other row is
+  an added question (`c_…`), whose answers go into `applications.answers`
+  (jsonb, by key). Choices a manager adds get values `o_…`. `buildForm` in
+  `src/lib/quroosh/form.ts` merges the rows over `SECTIONS`; `loadForm` reads
+  them; `save_questions()` writes them, recording who.
+- **Before 0004 is applied** the page says the migration is needed, shows the
+  form read-only, and applying keeps working with the usual questions.
 
 ## The applications Google Sheet (Quroosh 0003)
 
@@ -106,9 +154,11 @@ registrations sheet.
   (`kickApplicationAppend`); Google being down or not connected never fails
   an application. **Sync now** rewrites the whole sheet from the database,
   oldest first, and makes a new sheet if the old one was deleted in Drive.
-- **The columns follow `QUESTIONS`**: a question added there gets its column
-  with no change here. Headers and choices are the English form's labels;
-  the other team members sit in one cell after the team question.
+- **The columns follow the project's questions** (`loadForm`), hidden ones
+  included, in the form's order. Headers and choices are the English
+  wording, a manager's if they wrote one; the other team members sit in one
+  cell after the team question. After a question is edited the whole sheet
+  is rewritten, so the columns and past rows follow the edit.
 - **Personal data.** Link sharing is switched off on every rebuild. The
   account's owner shares the sheet with named people only.
 - Before 0003 is applied the page shows no sheet, *Sync now* says 0003 is
@@ -150,10 +200,14 @@ Drive, it is 10 MB).
   as everywhere else in the app.
 - `AppShell` decides the world from `base`. A Quroosh page outside
   `projects/[id]/quroosh/` will not get the Quroosh header or colours.
-- The option values in `questions.ts` must match the CHECK lists in
-  `supabase/quroosh/migrations/0001_applications.sql`.
-  A value in one and not the other makes every answer with it fail as
-  `invalid`.
+- Never rename an option value in `questions.ts` or a question's `name`:
+  past answers, and the managers' edits in `questions`, are stored under
+  them. Since `0004` the database no longer lists the allowed choices (the
+  server action checks them against the merged form), so a renamed value
+  is not caught by a CHECK; it just stops matching.
+- A question a manager can hide must be nullable in `applications`. `0004`
+  dropped the NOT NULLs of every question but the four in `LOCKED_KEYS`; a
+  new column added later must be nullable too, or hiding it breaks applying.
 - The dates in the commitment question's help line (21–26 November) are
   in the catalogs; change them for the next edition.
 - `0074` replaces `my_component_access()` with 0072's version plus two lines.

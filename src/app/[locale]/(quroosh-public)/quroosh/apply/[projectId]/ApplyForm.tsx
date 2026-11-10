@@ -4,20 +4,16 @@ import { startTransition, useActionState, useState, type FormEvent } from 'react
 import { useTranslations } from 'next-intl';
 import { Alert, Button, Input, Label, Select, Textarea } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
-import {
-  FUNDING_NONE,
-  MAX_MEMBERS,
-  MAX_WANTS,
-  SECTIONS,
-  normalizeSaudiMobile,
-  type Question,
-} from '@/lib/quroosh/questions';
+import type { PublicQuestion, PublicSection } from '@/lib/quroosh/form';
+import { FUNDING_NONE, MAX_MEMBERS, normalizeSaudiMobile } from '@/lib/quroosh/questions';
 import { applyAction } from './actions';
 
 type Member = { key: number };
 
 /**
- * The Quroosh application form, drawn from SECTIONS (src/lib/quroosh/questions.ts).
+ * The Quroosh application form, drawn from the project's questions as its
+ * managers edited them (Quroosh 0004): the page resolves their wording in
+ * the visitor's language and leaves hidden questions and choices out.
  *
  * As on the Mock Interviews form, whatever goes wrong the founder keeps what
  * they typed: the submit is sent from onSubmit rather than by the form's own
@@ -25,10 +21,18 @@ type Member = { key: number };
  * a request that fails outright becomes a translated message.
  *
  * Checked here before sending, so the message can name the field: the phone
- * numbers, at least one team member when the answer is "yes", the funding
- * and "what you want" choices. Everything is checked again by the database.
+ * numbers, at least one team member when the answer is "yes", the
+ * multi-choice questions. Everything is checked again on the server.
  */
-export function ApplyForm({ projectId, privacyUrl }: { projectId: string; privacyUrl: string | null }) {
+export function ApplyForm({
+  projectId,
+  privacyUrl,
+  sections,
+}: {
+  projectId: string;
+  privacyUrl: string | null;
+  sections: PublicSection[];
+}) {
   const t = useTranslations('quroosh.apply');
   const tCommon = useTranslations('common');
   const [state, formAction, pending] = useActionState<ActionResult, FormData>(
@@ -45,20 +49,35 @@ export function ApplyForm({ projectId, privacyUrl }: { projectId: string; privac
   const [hasTeam, setHasTeam] = useState<boolean | null>(null);
   const [members, setMembers] = useState<Member[]>([{ key: 0 }]);
   const [nextKey, setNextKey] = useState(1);
-  const [funding, setFunding] = useState<string[]>([]);
-  const [wants, setWants] = useState<string[]>([]);
+  // The ticked choices of every checkbox question, by question key.
+  const [chosen, setChosen] = useState<Record<string, string[]>>({});
+
+  const questions = sections.flatMap((section) => section.questions);
+  const asksTeam = questions.some((q) => q.key === 'has_team');
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending) return;
     const formData = new FormData(event.currentTarget);
-    const phones = [formData.get('phone'), ...formData.getAll('member_phone')].map((v) => String(v ?? ''));
+    const phones = [
+      ...questions.filter((q) => q.kind === 'tel').map((q) => formData.get(q.key)),
+      ...formData.getAll('member_phone'),
+    ].map((v) => String(v ?? ''));
+    const attendees = String(formData.get('attendees') ?? '').trim();
+    const emptyChoice = questions.find(
+      (q) => q.kind === 'checkboxes' && q.required && (chosen[q.key] ?? []).length === 0,
+    );
     let found: string | null = null;
     if (phones.some((phone) => phone.trim() !== '' && normalizeSaudiMobile(phone) === null)) found = 'phone_invalid';
-    else if (Number(formData.get('attendees')) > 1 + (hasTeam ? formData.getAll('member_name').length : 0))
+    else if (
+      asksTeam &&
+      attendees !== '' &&
+      Number(attendees) > 1 + (hasTeam ? formData.getAll('member_name').length : 0)
+    )
       found = 'attendees_too_many';
-    else if (funding.length === 0) found = 'funding_missing';
-    else if (wants.length === 0) found = 'wants_missing';
+    else if (emptyChoice)
+      found =
+        emptyChoice.key === 'funding' ? 'funding_missing' : emptyChoice.key === 'wants' ? 'wants_missing' : 'choices_missing';
     setProblem(found);
     if (found) return;
     startTransition(() => formAction(formData));
@@ -77,19 +96,21 @@ export function ApplyForm({ projectId, privacyUrl }: { projectId: string; privac
   const errorText =
     problem || state.error ? (hint && t.has(`errors.${hint}`) ? t(`errors.${hint}`) : (state.error ?? null)) : null;
 
-  const toggleFunding = (value: string, checked: boolean) =>
-    setFunding((current) => {
-      if (!checked) return current.filter((v) => v !== value);
-      // "We have not raised" excludes every other answer, and the reverse.
-      if (value === FUNDING_NONE) return [FUNDING_NONE];
-      return [...current.filter((v) => v !== FUNDING_NONE), value];
+  const toggle = (question: PublicQuestion, value: string, checked: boolean) =>
+    setChosen((all) => {
+      const current = all[question.key] ?? [];
+      let next: string[];
+      if (!checked) next = current.filter((v) => v !== value);
+      // Funding: "we have not raised" excludes every other answer, and the reverse.
+      else if (question.key === 'funding' && value === FUNDING_NONE) next = [FUNDING_NONE];
+      else if (question.key === 'funding') next = [...current.filter((v) => v !== FUNDING_NONE), value];
+      else next = question.max ? [...current, value].slice(0, question.max) : [...current, value];
+      return { ...all, [question.key]: next };
     });
-  const toggleWant = (value: string, checked: boolean) =>
-    setWants((current) => (checked ? [...current, value].slice(0, MAX_WANTS) : current.filter((v) => v !== value)));
 
-  const label = (question: Question) => (
+  const label = (question: PublicQuestion) => (
     <>
-      {t(`q.${question.name}`)}
+      {question.label}
       {question.required ? (
         <span className="text-danger" aria-hidden="true">
           {' *'}
@@ -99,21 +120,20 @@ export function ApplyForm({ projectId, privacyUrl }: { projectId: string; privac
       )}
     </>
   );
-  const help = (name: string) =>
-    t.has(`hint.${name}`) ? <p className="mt-1 text-xs text-ink-muted">{t(`hint.${name}`)}</p> : null;
+  const help = (question: PublicQuestion) =>
+    question.hint ? <p className="mt-1 whitespace-pre-line text-xs text-ink-muted">{question.hint}</p> : null;
 
-  const field = (question: Question) => {
-    const { name, kind, required, options = [], max } = question;
+  const field = (question: PublicQuestion) => {
+    const { key: name, kind, required, options, max } = question;
     const id = `q-${name}`;
 
     if (kind === 'radio' || kind === 'yesno') {
-      const values = kind === 'yesno' ? ['yes', 'no'] : options;
       return (
         <fieldset key={name}>
           <legend className="text-sm font-medium text-ink">{label(question)}</legend>
-          {help(name)}
+          {help(question)}
           <div className="mt-2 space-y-2">
-            {values.map((value) => (
+            {options.map(({ value, label: text }) => (
               <label key={value} className="flex items-start gap-2 text-sm text-ink">
                 <input
                   type="radio"
@@ -123,7 +143,7 @@ export function ApplyForm({ projectId, privacyUrl }: { projectId: string; privac
                   className="mt-1 accent-brand-600"
                   onChange={name === 'has_team' ? () => setHasTeam(value === 'yes') : undefined}
                 />
-                <span>{t(`options.${name}.${value}`)}</span>
+                <span>{text}</span>
               </label>
             ))}
           </div>
@@ -132,27 +152,26 @@ export function ApplyForm({ projectId, privacyUrl }: { projectId: string; privac
     }
 
     if (kind === 'checkboxes') {
-      const chosen = name === 'funding' ? funding : wants;
-      const toggle = name === 'funding' ? toggleFunding : toggleWant;
+      const ticked = chosen[name] ?? [];
       return (
         <fieldset key={name}>
           <legend className="text-sm font-medium text-ink">{label(question)}</legend>
-          {help(name)}
+          {help(question)}
           <div className="mt-2 space-y-2">
-            {options.map((value) => {
-              const full = name === 'wants' && chosen.length >= MAX_WANTS && !chosen.includes(value);
+            {options.map(({ value, label: text }) => {
+              const full = name !== 'funding' && max !== undefined && ticked.length >= max && !ticked.includes(value);
               return (
                 <label key={value} className={`flex items-start gap-2 text-sm ${full ? 'text-ink-muted' : 'text-ink'}`}>
                   <input
                     type="checkbox"
                     name={name}
                     value={value}
-                    checked={chosen.includes(value)}
+                    checked={ticked.includes(value)}
                     disabled={full}
-                    onChange={(event) => toggle(value, event.target.checked)}
+                    onChange={(event) => toggle(question, value, event.target.checked)}
                     className="mt-1 accent-brand-600"
                   />
-                  <span>{t(`options.${name}.${value}`)}</span>
+                  <span>{text}</span>
                 </label>
               );
             })}
@@ -166,9 +185,9 @@ export function ApplyForm({ projectId, privacyUrl }: { projectId: string; privac
         <div key={name}>
           <p className="text-sm font-medium text-ink">{label(question)}</p>
           <label className="mt-2 flex items-start gap-2 text-sm text-ink">
-            <input type="checkbox" name={name} required className="mt-1 accent-brand-600" />
-            <span>
-              {t(`consent.${name}`)}
+            <input type="checkbox" name={name} required={required} className="mt-1 accent-brand-600" />
+            <span className="whitespace-pre-line">
+              {question.hint ?? question.label}
               {name === 'data_consent' && privacyUrl ? (
                 <>
                   {' '}
@@ -191,13 +210,13 @@ export function ApplyForm({ projectId, privacyUrl }: { projectId: string; privac
             <option value="" disabled>
               {t('choose')}
             </option>
-            {options.map((value) => (
+            {options.map(({ value, label: text }) => (
               <option key={value} value={value}>
-                {t(`options.${name}.${value}`)}
+                {text}
               </option>
             ))}
           </Select>
-          {help(name)}
+          {help(question)}
         </div>
       );
     }
@@ -218,7 +237,7 @@ export function ApplyForm({ projectId, privacyUrl }: { projectId: string; privac
             required={required}
             className="w-28"
           />
-          {help(name)}
+          {help(question)}
         </div>
       );
     }
@@ -228,7 +247,7 @@ export function ApplyForm({ projectId, privacyUrl }: { projectId: string; privac
         <div key={name}>
           <Label htmlFor={id}>{label(question)}</Label>
           <Textarea id={id} name={name} required={required} maxLength={max} rows={4} />
-          {help(name)}
+          {help(question)}
         </div>
       );
     }
@@ -248,7 +267,7 @@ export function ApplyForm({ projectId, privacyUrl }: { projectId: string; privac
           maxLength={max}
           autoComplete={name === 'founder_name' ? 'name' : name === 'email' ? 'email' : name === 'phone' ? 'tel' : undefined}
         />
-        {help(name)}
+        {help(question)}
       </div>
     );
   };
@@ -319,13 +338,13 @@ export function ApplyForm({ projectId, privacyUrl }: { projectId: string; privac
         </label>
       </div>
 
-      {SECTIONS.map((section) => (
+      {sections.map((section) => (
         <fieldset key={section.key} className="space-y-5 rounded-xl border border-line bg-surface p-5 shadow-sm">
-          <legend className="px-1 text-base font-semibold text-brand-700">{t(`sections.${section.key}`)}</legend>
+          <legend className="px-1 text-base font-semibold text-brand-700">{section.title}</legend>
           {section.questions.map((question) => (
-            <div key={question.name} className="space-y-3">
+            <div key={question.key} className="space-y-3">
               {field(question)}
-              {question.name === 'has_team' ? teamMembers : null}
+              {question.key === 'has_team' ? teamMembers : null}
             </div>
           ))}
         </fieldset>

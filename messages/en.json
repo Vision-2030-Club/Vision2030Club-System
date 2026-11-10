@@ -1597,6 +1597,8 @@
           "no": "No, I do not agree to be filmed."
         }
       },
+      "yes": "Yes.",
+      "no": "No.",
       "membersIntro": "Add the rest of the team, apart from the lead founder. Every field is required.",
       "memberN": "Member {n}",
       "memberName": "Name",
@@ -1618,7 +1620,8 @@
         "funding_missing": "Choose at least one answer to the funding question.",
         "wants_missing": "Choose at least one thing you want from Quroosh.",
         "network": "The application could not be sent. Check your connection and try again; your answers are still in the form.",
-        "attendees_too_many": "That is more people than the lead founder and the members you added. Add the other members, or correct the number."
+        "attendees_too_many": "That is more people than the lead founder and the members you added. Add the other members, or correct the number.",
+        "choices_missing": "Choose at least one answer to every required multiple-choice question."
       }
     },
     "applications": {
@@ -1641,6 +1644,73 @@
       "yes": "Yes",
       "no": "No",
       "notConfigured": "The Quroosh database is not configured on this deployment (QUROOSH_SUPABASE_URL and QUROOSH_SUPABASE_SECRET_KEY in Vercel)."
+    },
+    "questions": {
+      "title": "Application questions",
+      "cardHint": "Add questions to the application form, edit their wording and choices, hide them or change their order.",
+      "edit": "Edit",
+      "intro": "Every question on the public form, in its order. Editing a question changes how it reads on every past application too, and the Google Sheet is rewritten in the new wording. Nothing is removed: hide a question or a choice instead, and its past answers stay.",
+      "notReady": "Editing the questions needs Quroosh database migration 0004, which has not been applied yet. Until then the form keeps its usual questions.",
+      "sectionEmpty": "No questions in this section.",
+      "required": "Required",
+      "optional": "Optional",
+      "hidden": "Hidden",
+      "added": "Added",
+      "locked": "Always asked",
+      "kind": {
+        "text": "Short answer",
+        "textarea": "Long answer",
+        "number": "Number",
+        "email": "Email",
+        "tel": "Mobile number",
+        "url": "Link",
+        "radio": "One choice",
+        "select": "One choice, drop-down",
+        "checkboxes": "Several choices",
+        "yesno": "Yes or no",
+        "consent": "Tick to agree"
+      },
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "hide": "Hide",
+      "show": "Show again",
+      "cancel": "Cancel",
+      "save": "Save the question",
+      "add": "Add a question",
+      "addTitle": "Add a question",
+      "addedNote": "The question is added at the end of its section.",
+      "kindLabel": "Kind of answer",
+      "kindHint": "It cannot be changed after the question is added. To change it, hide the question and add a new one.",
+      "builtinNote": "One of the form’s own questions. Emptying a field puts its original wording back.",
+      "labelAr": "The question in Arabic",
+      "labelEn": "The question in English",
+      "hintAr": "Help line in Arabic (optional)",
+      "hintEn": "Help line in English (optional)",
+      "statementAr": "The statement ticked, in Arabic",
+      "statementEn": "The statement ticked, in English",
+      "section": "Section",
+      "requiredLabel": "An answer is required",
+      "lockedNote": "The lead founder’s name, email and mobile number, and the data consent, are always asked and always required.",
+      "choices": "Choices",
+      "yesNoLabels": "The wording of “yes” and “no”",
+      "choiceAr": "Choice {n} in Arabic",
+      "choiceEn": "Choice {n} in English",
+      "hideChoice": "Hide this choice from the form",
+      "addChoice": "Add a choice",
+      "maxChoices": "Most choices allowed",
+      "maxChoicesHint": "Leave it empty for no limit.",
+      "min": "Smallest number",
+      "max": "Largest number",
+      "pastNote": "Saving changes past applications and the Google Sheet to the new wording.",
+      "errors": {
+        "forbidden": "Only the project’s managers can change the questions.",
+        "not_ready": "Editing the questions needs Quroosh database migration 0004.",
+        "label_missing": "Write the question, and every choice, in at least one language.",
+        "choices_missing": "A multiple-choice question needs at least one choice that is shown.",
+        "range_invalid": "Check the numbers: the smallest must not be more than the largest, and the most choices is 1 or more.",
+        "locked": "This question is always asked and cannot be hidden.",
+        "invalid": "The question could not be saved. Check its fields and try again."
+      }
     }
   }
 }
