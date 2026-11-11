@@ -2,13 +2,14 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { ActionForm } from '@/components/ActionForm';
 import { Disclosure } from '@/components/Disclosure';
-import { Alert, Badge, Card, EmptyState, Input, Label, PageHeader, Textarea } from '@/components/ui';
+import { Alert, Badge, Card, EmptyState, Label, PageHeader, Textarea } from '@/components/ui';
 import { Link } from '@/i18n/navigation';
 import { formatDate, localized } from '@/lib/format';
 import { can, getQurooshAccess } from '@/lib/quroosh/access';
 import { GUEST_STATUS_TONE, invitationStatus, loadInvitations, slotDay } from '@/lib/quroosh/guests';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 import { createInvitationAction } from './actions';
+import { RequiredInput } from './RequiredField';
 import { TitleField } from './TitleField';
 
 /**
@@ -75,7 +76,13 @@ export default async function QurooshGuestsPage({
           <TitleField />
           <div>
             <Label htmlFor="guest-name">{t('guests.new.name')}</Label>
-            <Input id="guest-name" name="name" required maxLength={200} autoComplete="off" />
+            <RequiredInput
+              id="guest-name"
+              name="name"
+              maxLength={200}
+              autoComplete="off"
+              message={t('guests.required.name')}
+            />
             <p className="mt-1 text-xs text-ink-muted">{t('guests.new.nameHint')}</p>
           </div>
           <div>

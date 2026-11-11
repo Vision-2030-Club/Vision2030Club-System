@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { ActionForm } from '@/components/ActionForm';
 import { ConfirmForm } from '@/components/ConfirmForm';
-import { Alert, Badge, Card, Label, PageHeader, Select } from '@/components/ui';
+import { Alert, Badge, Card, Label, PageHeader } from '@/components/ui';
 import { Link } from '@/i18n/navigation';
 import { formatDateTime, localized } from '@/lib/format';
 import { qrDataUrls } from '@/lib/links';
@@ -19,6 +19,7 @@ import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh
 // The interviews' copy field: a secret link shown to copy, never linked.
 import { CopyField } from '../../../interviews/CopyField';
 import { cancelBookingAction, cancelInvitationAction, moveBookingAction } from '../actions';
+import { RequiredSelect } from '../RequiredField';
 
 const UUID = /^[0-9a-f-]{36}$/i;
 
@@ -145,7 +146,12 @@ export default async function QurooshGuestPage({
               {hidden}
               <div>
                 <Label htmlFor="move-slot">{t('guests.booking.moveTo')}</Label>
-                <Select id="move-slot" name="slot_id" required defaultValue="">
+                <RequiredSelect
+                  id="move-slot"
+                  name="slot_id"
+                  defaultValue=""
+                  message={t('guests.required.day')}
+                >
                   <option value="" disabled>
                     {t('guests.booking.choose')}
                   </option>
@@ -154,7 +160,7 @@ export default async function QurooshGuestPage({
                       {slotDay(slot.starts_at, locale)}
                     </option>
                   ))}
-                </Select>
+                </RequiredSelect>
               </div>
             </ActionForm>
           ) : (
