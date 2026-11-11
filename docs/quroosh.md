@@ -215,7 +215,7 @@ proxy).
   `quroosh.invite.errors` (through `fromPostgrest`). On `slot_taken` or
   `slot_unavailable` it says "pick another" and reloads the free days, so
   the taken one drops out. What shows before booking only (the intro, the
-  mint box, the info row with the days on offer, the VIP transport panel) is
+  mint box, the info row with the days on offer) is
   built by the page and handed to `BookingForm` as `lead`; on success the
   form drops it and shows the info row with the booked day and the
   confirmation, then reloads the page from the server. So right after
@@ -237,7 +237,9 @@ proxy).
   span of days on offer, `slotDayRange`, and الرياض, thin lines above, below
   and between), then `Panel`s like the card's boxes (thin lavender border,
   translucent lighter fill, a mint fin before a bold mint heading, small
-  light text): "تنقل كبار الضيوف" and the form's own. **No white card**, and
+  light text): the form's own. The mint box is compact, as wide as its
+  text and centred (15px on a phone, so the Arabic line stays on one line).
+  **No white card**, and
   **nothing about the session** (topic, length): it differs per speaker.
   The invitation line is "كمتحدثة" when the saved name starts with سعادة
   الأستاذة or سعادة الدكتورة (the Arabic titles only), "كمتحدث" otherwise;

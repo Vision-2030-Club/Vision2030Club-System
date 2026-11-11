@@ -11,7 +11,7 @@ import { cx } from '@/components/ui';
  *                greeting, the title small and light with a slash, the
  *                name very large in mint
  *   IntroText    the paragraph, light lavender, airy lines
- *   Highlight    the mint box, bold navy (also the booked day)
+ *   Highlight    the compact mint box, bold navy (also the booked day)
  *   InfoRow      the days and الرياض between two thin lines
  *   Panel        the card's boxes: thin lavender border, a lighter
  *                translucent fill, a mint fin before a bold mint heading,
@@ -78,13 +78,21 @@ export function IntroText({ children }: { children: ReactNode }) {
   return <p className="text-center text-base leading-loose text-brand-200 sm:text-lg">{children}</p>;
 }
 
-/** The mint box, like the card's quote: bold navy text. */
-export function Highlight({ children, className }: { children: ReactNode; className?: string }) {
+/**
+ * The mint box, like the card's quote: bold navy text, as wide as its text
+ * and centred. `quote` is the card's compact box: at 15px with small padding
+ * the Arabic line ("مسيرتكم في بناء الأعمال…", about 276px in IBM Plex Sans
+ * Arabic Bold) stays on one line on a 360px phone. `day` is the larger box
+ * of the booked day.
+ */
+export function Highlight({ children, size = 'quote' }: { children: ReactNode; size?: 'quote' | 'day' }) {
   return (
     <p
       className={cx(
-        'mx-auto w-fit max-w-full rounded-sm bg-accent-2 px-6 py-4 text-center text-lg font-bold leading-relaxed text-brand-950',
-        className,
+        'mx-auto w-fit max-w-full text-balance rounded-sm bg-accent-2 text-center font-bold text-brand-950',
+        size === 'quote'
+          ? 'px-4 py-2.5 text-[0.9375rem] leading-normal sm:px-5 sm:text-base'
+          : 'px-6 py-4 text-xl leading-relaxed',
       )}
     >
       {children}
@@ -173,7 +181,7 @@ export function BookedNotice({
   return (
     <div className="space-y-6 text-center">
       <h2 className="text-xl font-bold text-accent-2">{title}</h2>
-      {day ? <Highlight className="text-xl">{day}</Highlight> : null}
+      {day ? <Highlight size="day">{day}</Highlight> : null}
       <p className="text-base leading-loose text-brand-200">{thanks}</p>
       {change ? <p className="text-sm text-brand-300">{change}</p> : null}
     </div>
