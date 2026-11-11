@@ -208,8 +208,8 @@ proxy).
   not valid; a cancelled invitation says so; a booked guest sees their day
   and no form. Otherwise: the free days, the guest's mobile
   with a country picker, "do you need transport?", and if so a contact
-  number ("رقم التواصل": their office manager's; the managers'
-  pages use the same label). `BookingForm` copies `ApplyForm`: the
+  number ("رقم التواصل للتنسيق", no hint, and no mention of who it
+  belongs to; the managers' guest page uses the same label). `BookingForm` copies `ApplyForm`: the
   hidden `website` field for bots, submitting from `onSubmit` so a refusal
   keeps what was typed, and the hints translated from
   `quroosh.invite.errors` (through `fromPostgrest`). On `slot_taken` or
@@ -308,8 +308,8 @@ proxy).
   The managers' history ("Invited on", "Booked on", "Cancelled on") keeps
   its times.
 - **Invitations** (`guest_invitations`): one per guest, holding the booking
-  too (the slot, the guest's phone, transport, the office
-  manager's phone). The link's `token` is the only key to it, made by the
+  too (the slot, the guest's phone, transport, the contact number for
+  coordination). The link's `token` is the only key to it, made by the
   app (`newToken`). `role` is `speaker` only, by a CHECK, so another role is a
   new migration and its wording in both catalogs. The status is **not
   stored**: `cancelled_at` set is cancelled, `slot_id` set is booked,

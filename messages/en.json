@@ -1786,7 +1786,7 @@
         "transport": "Transport",
         "transportYes": "Needed",
         "transportNo": "Not needed",
-        "transportPhone": "Contact number"
+        "transportPhone": "Contact number for coordination"
       },
       "booking": {
         "title": "Booked day",
@@ -1873,8 +1873,7 @@
       "transport": "Do you need transport from your place to the Quroosh venue?",
       "yes": "Yes, please",
       "no": "No, thank you",
-      "transportPhone": "Contact number",
-      "transportPhoneHint": "Your office manager’s number, for coordination",
+      "transportPhone": "Contact number for coordination",
       "submit": "Confirm attendance",
       "submitting": "Confirming…",
       "booked": {
@@ -1891,8 +1890,8 @@
         "slot_unavailable": "We regret that this day is no longer available. Please choose another.",
         "phone_invalid": "Please check the mobile number and the country code.",
         "transport_missing": "Please let us know whether you require transport.",
-        "transport_phone_missing": "Please provide the number of your office manager.",
-        "transport_phone_invalid": "Please check the number of your office manager and the country code.",
+        "transport_phone_missing": "Please provide a contact number for coordination.",
+        "transport_phone_invalid": "Please check the contact number and the country code.",
         "invalid": "Please review the details and try again.",
         "network": "We were unable to send your confirmation. Please check your connection and try again; the details you entered have been kept."
       },

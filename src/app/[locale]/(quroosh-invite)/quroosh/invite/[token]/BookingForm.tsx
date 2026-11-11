@@ -50,8 +50,8 @@ const RADIO =
 /**
  * The guest's choice of day and contact details on their invitation
  * (Quroosh 0005): one of the free days, their mobile number with a country
- * picker, whether they need transport (then a contact number: their office
- * manager's), each in its own panel.
+ * picker, whether they need transport (then a contact number for
+ * coordination), each in its own panel.
  *
  * The page hands it `lead`, what shows before booking only (the intro, the
  * mint box, the info row with the days on offer, the transport panel), and
@@ -135,7 +135,7 @@ export function BookingForm({
   const errorText =
     problem || state.error ? (hint && t.has(`errors.${hint}`) ? t(`errors.${hint}`) : (state.error ?? null)) : null;
 
-  const phoneField = (name: string, label: string, help: string) => (
+  const phoneField = (name: string, label: string, help?: string) => (
     <div>
       <label htmlFor={`${name}-number`} className={LABEL}>
         {label}
@@ -167,7 +167,7 @@ export function BookingForm({
           className={`${FIELD} min-w-0 flex-1`}
         />
       </div>
-      <p className={HINT}>{help}</p>
+      {help ? <p className={HINT}>{help}</p> : null}
     </div>
   );
 
@@ -217,7 +217,7 @@ export function BookingForm({
                 </label>
               ))}
             </div>
-            {transport ? phoneField('transport_phone', t('transportPhone'), t('transportPhoneHint')) : null}
+            {transport ? phoneField('transport_phone', t('transportPhone')) : null}
           </fieldset>
         </div>
 
