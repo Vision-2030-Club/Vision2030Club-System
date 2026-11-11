@@ -1,12 +1,13 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { ActionForm } from '@/components/ActionForm';
-import { Alert, Badge, Card, EmptyState, Input, Label, PageHeader, cx } from '@/components/ui';
+import { Alert, Badge, Card, EmptyState, Label, PageHeader, cx } from '@/components/ui';
 import { localized } from '@/lib/format';
 import { can, getQurooshAccess } from '@/lib/quroosh/access';
 import { loadSlots, slotDay } from '@/lib/quroosh/guests';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 import { toDateInput } from '@/lib/time';
+import { RequiredInput } from '../RequiredField';
 import { addSlotAction, editSlotAction, setSlotActiveAction } from './actions';
 
 /**
@@ -76,7 +77,7 @@ export default async function QurooshGuestSlotsPage({
           {hidden}
           <div className="max-w-xs">
             <Label htmlFor="slot-day">{t('guests.slots.day')}</Label>
-            <Input id="slot-day" name="day" type="date" dir="ltr" required />
+            <RequiredInput id="slot-day" name="day" type="date" dir="ltr" message={t('guests.required.day')} />
           </div>
         </ActionForm>
       </Card>
@@ -125,13 +126,13 @@ export default async function QurooshGuestSlotsPage({
                           <input type="hidden" name="slot_id" value={slot.id} />
                           <div className="max-w-xs">
                             <Label htmlFor={`day-${slot.id}`}>{t('guests.slots.day')}</Label>
-                            <Input
+                            <RequiredInput
                               id={`day-${slot.id}`}
                               name="day"
                               type="date"
                               dir="ltr"
-                              required
                               defaultValue={toDateInput(new Date(slot.starts_at))}
+                              message={t('guests.required.day')}
                             />
                           </div>
                         </ActionForm>

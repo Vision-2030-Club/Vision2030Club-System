@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Input, Label, Select } from '@/components/ui';
+import { Input, Label } from '@/components/ui';
 import { GUEST_TITLES, MAX_CUSTOM_TITLE } from '@/lib/quroosh/guestTitles';
+import { RequiredSelect } from './RequiredField';
 
 /**
  * The guest's title on the New invitation form, before the name: a dropdown
@@ -15,17 +16,18 @@ import { GUEST_TITLES, MAX_CUSTOM_TITLE } from '@/lib/quroosh/guestTitles';
  */
 export function TitleField() {
   const t = useTranslations('quroosh.guests.new');
+  const tRequired = useTranslations('quroosh.guests.required');
   const [title, setTitle] = useState('');
 
   return (
     <div className="space-y-2">
       <div>
         <Label htmlFor="guest-title">{t('titleLabel')}</Label>
-        <Select
+        <RequiredSelect
           id="guest-title"
           name="title"
-          required
           value={title}
+          message={tRequired('title')}
           onChange={(event) => setTitle(event.target.value)}
         >
           <option value="" disabled>
@@ -36,7 +38,7 @@ export function TitleField() {
               {t(`titles.${key}.option`)}
             </option>
           ))}
-        </Select>
+        </RequiredSelect>
       </div>
       {title === 'other' ? (
         <div>

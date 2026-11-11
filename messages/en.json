@@ -1786,7 +1786,7 @@
         "transport": "Transport",
         "transportYes": "Needed",
         "transportNo": "Not needed",
-        "transportPhone": "Contact number"
+        "transportPhone": "Contact number for coordination"
       },
       "booking": {
         "title": "Booked day",
@@ -1829,6 +1829,11 @@
         "edit": "Change the day",
         "save": "Save"
       },
+      "required": {
+        "title": "Choose a title from the list.",
+        "name": "Enter the guest’s name.",
+        "day": "Choose a day."
+      },
       "errors": {
         "forbidden": "Only the project’s managers can change the guest slots.",
         "not_configured": "The Quroosh database is not configured on this deployment.",
@@ -1848,8 +1853,14 @@
     },
     "invite": {
       "title": "Invitation to speak",
+      "titleFemale": "Invitation to speak",
       "greeting": "Welcome",
-      "intro": "It is our pleasure to invite you to speak at Quroosh 2026. We would be honoured by your presence and participation.",
+      "intro": "We are pleased to invite you to take part in a panel discussion at Quroosh 2026, where expertise and ideas meet in an experience that brings together entrepreneurs and investors.",
+      "highlight": "Your journey in building businesses inspires a generation that creates its own opportunities.",
+      "vip": {
+        "title": "VIP transport",
+        "body": "A dedicated Genesis car to take you to the venue, provided by our partner Al-Wa’lan."
+      },
       "place": "Riyadh",
       "notFound": "We were unable to open this invitation. Please make sure the full link was opened as it was sent to you, or contact the Quroosh team.",
       "cancelled": "We regret that this invitation is no longer active. For any enquiry, please contact the Quroosh team.",
@@ -1862,8 +1873,7 @@
       "transport": "Do you need transport from your place to the Quroosh venue?",
       "yes": "Yes, please",
       "no": "No, thank you",
-      "transportPhone": "Contact number",
-      "transportPhoneHint": "Your driver’s or office manager’s number, for coordination",
+      "transportPhone": "Contact number for coordination",
       "submit": "Confirm attendance",
       "submitting": "Confirming…",
       "booked": {
@@ -1880,8 +1890,8 @@
         "slot_unavailable": "We regret that this day is no longer available. Please choose another.",
         "phone_invalid": "Please check the mobile number and the country code.",
         "transport_missing": "Please let us know whether you require transport.",
-        "transport_phone_missing": "Please provide the number of your driver or office manager.",
-        "transport_phone_invalid": "Please check the number of your driver or office manager and the country code.",
+        "transport_phone_missing": "Please provide a contact number for coordination.",
+        "transport_phone_invalid": "Please check the contact number and the country code.",
         "invalid": "Please review the details and try again.",
         "network": "We were unable to send your confirmation. Please check your connection and try again; the details you entered have been kept."
       },

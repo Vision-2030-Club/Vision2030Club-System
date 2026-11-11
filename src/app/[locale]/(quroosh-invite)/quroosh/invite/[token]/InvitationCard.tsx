@@ -3,21 +3,33 @@ import { QurooshFin, QurooshLogo } from '@/components/QurooshLogo';
 import { cx } from '@/components/ui';
 
 /*
- * The guest's invitation, following the printed invitation cards: dark all
- * the way down (the layout's navy), the logo with its tagline, the invitation
- * line in bold lavender, the greeting, the guest's title small and white with
- * a slash and their name large in mint, and an info row between two thin
- * lines. Below it, everything sits straight on the navy: panels like the
- * cards' info boxes (a thin lavender border, a slightly lighter translucent
- * background, a mint fin before the heading), and a mint box like the cards'
- * quote for the one line that matters most (the welcome before booking, the
- * booked day after). Theme tokens only; phone first.
+ * The guest's invitation, built like the printed speaker card: on the deep
+ * navy-purple (the layout, with the fin's large curve behind), everything in
+ * one centred column, top to bottom:
  *
- * No hooks, so the server page and the client form both use these.
+ *   InviteHero   the logo, the invitation line (bold lavender), the
+ *                greeting, the title small and light with a slash, the
+ *                name very large in mint
+ *   IntroText    the paragraph, light lavender, airy lines
+ *   Highlight    the mint box, bold navy (also the booked day)
+ *   InfoRow      the days and الرياض between two thin lines
+ *   Panel        the card's boxes: thin lavender border, a lighter
+ *                translucent fill, a mint fin before a bold mint heading,
+ *                small light text
+ *
+ * The heaviest weight the app's Arabic face has (IBM Plex Sans Arabic) is
+ * bold (700); nothing heavier is asked for, so the browser never fakes one.
+ * Theme tokens only. No hooks, so the server page and the client form both
+ * use these.
  */
 
-/** Body text on the navy: light lavender. */
-export const BODY_TEXT = 'leading-relaxed text-brand-200';
+/** Panel text on the navy: small and light. */
+export const BODY_TEXT = 'text-sm leading-relaxed text-brand-200';
+
+/** The column under the layout's frame; the gaps are the card's. */
+export function InviteColumn({ children }: { children: ReactNode }) {
+  return <div className="mx-auto max-w-xl space-y-9 pt-2">{children}</div>;
+}
 
 /** The top of the invitation. */
 export function InviteHero({
@@ -26,57 +38,83 @@ export function InviteHero({
   greeting,
   title,
   name,
-  info,
 }: {
   /** The logo's accessible name. */
   logoName: string;
-  /** The lavender line: "دعوة للمشاركة كمتحدث". */
+  /** "دعوة للمشاركة كمتحدث" or "كمتحدثة". */
   subtitle: string;
   /** "مرحباً بك", shown with a name only. */
   greeting?: string;
   /** The title split off the name ("سعادة الأستاذة"), shown small with a slash. */
   title?: string | null;
-  /** The name, large in mint; the whole saved name when no title was found. */
+  /** The name; the whole saved name when no title was found. */
   name?: string;
-  /** The info row's items, in order; empty ones are left out. */
-  info?: { icon: 'calendar' | 'place'; text: string }[];
 }) {
   return (
-    <section className="mx-auto max-w-xl pb-8 pt-2 text-center">
+    <section className="text-center">
       <QurooshLogo name={logoName} className="mx-auto h-20 text-accent-2 sm:h-24" />
-      <p className="mt-6 text-lg font-bold text-brand-200">{subtitle}</p>
+      <p className="mt-8 text-2xl font-bold text-brand-300">{subtitle}</p>
 
       {name ? (
-        <div className="mt-6">
+        <div className="mt-5">
           {greeting ? <p className="text-sm text-brand-200">{greeting}</p> : null}
-          {title ? <p className="mt-3 text-sm text-surface">{`${title}/`}</p> : null}
-          <h1 className={`${title ? 'mt-1' : 'mt-3'} text-balance text-4xl font-bold leading-tight text-accent sm:text-5xl`}>
+          {title ? <p className="mt-2 text-base text-brand-100">{`${title}/`}</p> : null}
+          <h1
+            className={cx(
+              title ? 'mt-2' : 'mt-3',
+              'text-balance text-5xl font-bold leading-[1.1] text-accent-2 sm:text-6xl',
+            )}
+          >
             {name}
           </h1>
         </div>
-      ) : null}
-
-      {info && info.length > 0 ? (
-        <ul className="mt-8 flex flex-wrap items-center justify-center gap-y-2 border-y border-brand-400/40 py-3 text-sm font-semibold text-surface [&>li+li]:border-s [&>li+li]:border-brand-400/40">
-          {info.map((item) => (
-            <li key={item.icon} className="flex items-center gap-2 px-4">
-              <InfoIcon name={item.icon} />
-              <span>{item.text}</span>
-            </li>
-          ))}
-        </ul>
       ) : null}
     </section>
   );
 }
 
-/** The small line icons of the card's info row, in mint. */
-function InfoIcon({ name }: { name: 'calendar' | 'place' }) {
+/** The paragraph under the name: medium, light lavender, centred, airy. */
+export function IntroText({ children }: { children: ReactNode }) {
+  return <p className="text-center text-base leading-loose text-brand-200 sm:text-lg">{children}</p>;
+}
+
+/** The mint box, like the card's quote: bold navy text. */
+export function Highlight({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <p
+      className={cx(
+        'mx-auto w-fit max-w-full rounded-sm bg-accent-2 px-6 py-4 text-center text-lg font-bold leading-relaxed text-brand-950',
+        className,
+      )}
+    >
+      {children}
+    </p>
+  );
+}
+
+export type InfoItem = { icon: 'calendar' | 'place'; text: string };
+
+/** The info row: thin lines above and below, thin dividers between. */
+export function InfoRow({ items }: { items: InfoItem[] }) {
+  return (
+    <ul className="flex flex-wrap items-center justify-center gap-y-2 border-y border-brand-400/40 py-4 text-sm font-bold text-brand-50 [&>li+li]:border-s [&>li+li]:border-brand-400/40">
+      {items.map((item) => (
+        <li key={item.icon} className="flex flex-1 basis-32 items-center justify-center gap-2 px-4">
+          <InfoIcon name={item.icon} />
+          <span>{item.text}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The small line icons of the card's info row. */
+function InfoIcon({ name }: { name: InfoItem['icon'] }) {
   return (
     <svg
       viewBox="0 0 24 24"
       aria-hidden="true"
-      className="size-4 shrink-0 text-accent"
+      className="size-5 shrink-0 text-brand-200"
       fill="none"
       stroke="currentColor"
       strokeWidth={1.75}
@@ -98,19 +136,14 @@ function InfoIcon({ name }: { name: 'calendar' | 'place' }) {
   );
 }
 
-/** Everything under the hero, straight on the navy. */
-export function InviteBody({ children }: { children: ReactNode }) {
-  return <div className="mx-auto max-w-xl space-y-5">{children}</div>;
-}
+/** A box like the card's: rounded, thin lavender border, lighter translucent fill. */
+export const PANEL = 'rounded-xl border border-brand-400/50 bg-surface/5 px-5 py-4';
 
-/** A panel like the cards' info boxes: thin lavender border, lighter translucent background. */
-export const PANEL = 'rounded-2xl border border-brand-400/40 bg-surface/5 p-5';
-
-/** A panel's heading: a small mint fin before it, like "الجلسة الحوارية" on the cards. */
+/** A panel's heading: bold mint, a small mint fin before it. */
 export function PanelHeading({ children, as: Tag = 'h2' }: { children: ReactNode; as?: 'h2' | 'span' }) {
   return (
     <Tag className="flex items-start gap-2 text-base font-bold text-accent-2">
-      <QurooshFin className="mt-0.5 h-4 shrink-0 text-accent" />
+      <QurooshFin className="mt-1 h-4 shrink-0 text-accent" />
       <span>{children}</span>
     </Tag>
   );
@@ -118,19 +151,10 @@ export function PanelHeading({ children, as: Tag = 'h2' }: { children: ReactNode
 
 export function Panel({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <section className={cx(PANEL, 'space-y-4')}>
+    <section className={cx(PANEL, 'space-y-3')}>
       {title ? <PanelHeading>{title}</PanelHeading> : null}
       {children}
     </section>
-  );
-}
-
-/** The mint box, like the cards' quote: navy bold text. */
-export function Highlight({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <p className={cx('rounded-md bg-accent-2 px-5 py-4 text-center font-bold leading-relaxed text-brand-950', className)}>
-      {children}
-    </p>
   );
 }
 
@@ -147,10 +171,10 @@ export function BookedNotice({
   change?: string;
 }) {
   return (
-    <div className="space-y-5 text-center">
-      <h2 className="text-lg font-bold text-accent-2">{title}</h2>
+    <div className="space-y-6 text-center">
+      <h2 className="text-xl font-bold text-accent-2">{title}</h2>
       {day ? <Highlight className="text-xl">{day}</Highlight> : null}
-      <p className={BODY_TEXT}>{thanks}</p>
+      <p className="text-base leading-loose text-brand-200">{thanks}</p>
       {change ? <p className="text-sm text-brand-300">{change}</p> : null}
     </div>
   );

@@ -6,7 +6,17 @@ import { splitTitle, WRITTEN_TITLES } from '@/lib/quroosh/guestTitles';
 import { COUNTRIES, DEFAULT_COUNTRY } from '@/lib/quroosh/phones';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 import { BookingForm, type CountryOption, type SlotOption } from './BookingForm';
-import { BODY_TEXT, BookedNotice, Highlight, InviteBody, InviteHero, Panel } from './InvitationCard';
+import {
+  BODY_TEXT,
+  BookedNotice,
+  Highlight,
+  InfoRow,
+  IntroText,
+  InviteColumn,
+  InviteHero,
+  Panel,
+  type InfoItem,
+} from './InvitationCard';
 
 /** A personal link: never in a search engine. */
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -20,22 +30,34 @@ type Invitation = {
   booked_at: string | null;
 };
 
-/** The titles the New invitation form writes, in both languages, to split off a saved name. */
-async function writtenTitles(): Promise<string[]> {
-  const catalogs = await Promise.all(
+/** The title catalogs of both languages, which the New invitation form wrote names with. */
+async function titleCatalogs() {
+  const [ar, en] = await Promise.all(
     (['ar', 'en'] as const).map((locale) => getTranslations({ locale, namespace: 'quroosh.guests.new.titles' })),
   );
-  return catalogs.flatMap((t) => WRITTEN_TITLES.map((key) => t(`${key}.text`)));
+  return {
+    /** Every written title, to split off a saved name. */
+    all: [ar, en].flatMap((t) => WRITTEN_TITLES.map((key) => t(`${key}.text`))),
+    /** The titles that make the Arabic invitation line feminine (كمتحدثة). */
+    feminine: [ar('ustadha.text'), ar('doctor_f.text')],
+  };
 }
 
 /**
  * A guest's invitation (Quroosh 0005): /quroosh/invite/<token>, no account.
- * It follows the printed invitation cards (InvitationCard, and the navy
- * frame in this route group's layout): the logo, "دعوة للمشاركة كمتحدث", the
- * greeting, the title small with a slash and the name large in mint, the
- * info row (the days on offer, Riyadh); then, straight on the navy, the
- * welcome in a mint box and the form's panels. The welcome belongs to the
- * form (BookingForm), so it goes the moment the guest has booked.
+ * It is built like the printed speaker card (InvitationCard, and the frame
+ * in this route group's layout), one centred column:
+ *
+ *   the logo, "دعوة للمشاركة كمتحدث" (كمتحدثة when the saved name starts
+ *   with سعادة الأستاذة or سعادة الدكتورة), the greeting, the title small
+ *   with a slash and the name large in mint; then, before booking, the
+ *   intro paragraph, the mint box, the info row (the days on offer,
+ *   Riyadh), the VIP transport panel, and the form.
+ *
+ * Nothing about the session itself (topic, length): it differs per speaker.
+ * The parts shown only before booking are passed to BookingForm, which drops
+ * them the moment the guest has booked, so the page reads at once as it will
+ * on a later visit: the hero, the info row with their day, the confirmation.
  *
  * The name is the one the managers saved, title included. When it starts
  * with one of the New invitation form's titles, the title is split off and
@@ -63,7 +85,7 @@ export default async function QurooshInvitePage({
   setRequestLocale(locale);
   const t = await getTranslations('quroosh.invite');
   const logoName = (await getTranslations('quroosh'))('name');
-  const place = { icon: 'place' as const, text: t('place') };
+  const place: InfoItem = { icon: 'place', text: t('place') };
 
   const db = isToken(token) && isQurooshConfigured() ? createQurooshClient() : null;
   let invitation: Invitation | undefined;
@@ -74,51 +96,48 @@ export default async function QurooshInvitePage({
   }
   if (!db || !invitation) {
     return (
-      <>
+      <InviteColumn>
         <InviteHero logoName={logoName} subtitle={t('title')} />
-        <InviteBody>
-          <Panel>
-            <p className={`text-center ${BODY_TEXT}`}>{t('notFound')}</p>
-          </Panel>
-        </InviteBody>
-      </>
+        <Panel>
+          <p className={`text-center ${BODY_TEXT}`}>{t('notFound')}</p>
+        </Panel>
+      </InviteColumn>
     );
   }
 
-  const { title, name } = splitTitle(invitation.name, await writtenTitles());
-  const hero = (days?: string) => (
+  const titles = await titleCatalogs();
+  const { title, name } = splitTitle(invitation.name, titles.all);
+  const feminine = titles.feminine.some((written) => invitation.name.startsWith(`${written} `));
+  const hero = (
     <InviteHero
       logoName={logoName}
-      subtitle={t('title')}
+      subtitle={t(feminine ? 'titleFemale' : 'title')}
       greeting={t('greeting')}
       title={title}
       name={name}
-      info={days ? [{ icon: 'calendar', text: days }, place] : [place]}
     />
   );
 
   if (invitation.cancelled) {
     return (
-      <>
-        {hero()}
-        <InviteBody>
-          <Panel>
-            <p className={`text-center ${BODY_TEXT}`}>{t('cancelled')}</p>
-          </Panel>
-        </InviteBody>
-      </>
+      <InviteColumn>
+        {hero}
+        <InfoRow items={[place]} />
+        <Panel>
+          <p className={`text-center ${BODY_TEXT}`}>{t('cancelled')}</p>
+        </Panel>
+      </InviteColumn>
     );
   }
 
   if (invitation.slot_id && invitation.starts_at) {
     const day = slotDay(invitation.starts_at, locale);
     return (
-      <>
-        {hero(day)}
-        <InviteBody>
-          <BookedNotice title={t('booked.title')} day={day} thanks={t('booked.next')} change={t('booked.change')} />
-        </InviteBody>
-      </>
+      <InviteColumn>
+        {hero}
+        <InfoRow items={[{ icon: 'calendar', text: day }, place]} />
+        <BookedNotice title={t('booked.title')} day={day} thanks={t('booked.next')} change={t('booked.change')} />
+      </InviteColumn>
     );
   }
 
@@ -127,6 +146,30 @@ export default async function QurooshInvitePage({
   const slots: SlotOption[] = open.map((slot) => ({ id: slot.id, day: slotDay(slot.starts_at, locale) }));
   const range = open.length > 0 ? slotDayRange(open[0].starts_at, open[open.length - 1].starts_at, locale) : undefined;
 
+  /** Before booking only: the intro, the mint box, the info row, the transport panel. */
+  const lead = (
+    <>
+      <IntroText>{t('intro')}</IntroText>
+      <Highlight>{t('highlight')}</Highlight>
+      <InfoRow items={range ? [{ icon: 'calendar', text: range }, place] : [place]} />
+      <Panel title={t('vip.title')}>
+        <p className={BODY_TEXT}>{t('vip.body')}</p>
+      </Panel>
+    </>
+  );
+
+  if (slots.length === 0) {
+    return (
+      <InviteColumn>
+        {hero}
+        {lead}
+        <Panel>
+          <p className={`text-center ${BODY_TEXT}`}>{t('noSlots')}</p>
+        </Panel>
+      </InviteColumn>
+    );
+  }
+
   const names = new Intl.DisplayNames([locale === 'ar' ? 'ar' : 'en'], { type: 'region' });
   const countries: CountryOption[] = COUNTRIES.map(([iso, dial]) => ({ iso, dial, name: names.of(iso) ?? iso })).sort(
     (a, b) =>
@@ -134,20 +177,9 @@ export default async function QurooshInvitePage({
   );
 
   return (
-    <>
-      {hero(range)}
-      <InviteBody>
-        {slots.length === 0 ? (
-          <>
-            <Highlight>{t('intro')}</Highlight>
-            <Panel>
-              <p className={`text-center ${BODY_TEXT}`}>{t('noSlots')}</p>
-            </Panel>
-          </>
-        ) : (
-          <BookingForm token={token} locale={locale} slots={slots} countries={countries} />
-        )}
-      </InviteBody>
-    </>
+    <InviteColumn>
+      {hero}
+      <BookingForm token={token} locale={locale} slots={slots} countries={countries} lead={lead} place={place} />
+    </InviteColumn>
   );
 }

@@ -208,36 +208,45 @@ proxy).
   not valid; a cancelled invitation says so; a booked guest sees their day
   and no form. Otherwise: the free days, the guest's mobile
   with a country picker, "do you need transport?", and if so a contact
-  number ("رقم التواصل": their driver's or office manager's; the managers'
-  pages use the same label). `BookingForm` copies `ApplyForm`: the
+  number ("رقم التواصل للتنسيق", no hint, and no mention of who it
+  belongs to; the managers' guest page uses the same label). `BookingForm` copies `ApplyForm`: the
   hidden `website` field for bots, submitting from `onSubmit` so a refusal
   keeps what was typed, and the hints translated from
   `quroosh.invite.errors` (through `fromPostgrest`). On `slot_taken` or
   `slot_unavailable` it says "pick another" and reloads the free days, so
-  the taken one drops out. On success it reloads the page from the server,
-  so right after booking the page is exactly what a later visit shows (the
-  booked day in the info row, no welcome, no form); that is also why the
-  welcome line lives in `BookingForm` and not in the page.
+  the taken one drops out. What shows before booking only (the intro, the
+  mint box, the info row with the days on offer, the VIP transport panel) is
+  built by the page and handed to `BookingForm` as `lead`; on success the
+  form drops it and shows the info row with the booked day and the
+  confirmation, then reloads the page from the server. So right after
+  booking the page is exactly what a later visit shows. Put anything new
+  that is "before booking only" in `lead`, not straight in the page.
 - **A formal invitation, not a form.** The guests are senior figures, so the
-  page follows the printed invitation cards and is worded formally in both
+  page follows the printed speaker card and is worded formally in both
   languages ("نرجو"، "يسعدنا"، "نتشرف بحضوركم"; no exclamation marks). It has
   **its own route group and frame**, `(quroosh-invite)`, apart from the
-  application form's `(quroosh-public)`: the whole page is the Quroosh navy,
-  full width, with a small language switch, and the tagline "قروش | حيث
-  تلتقي الخبرات بآفاق المستقبل" in mint above the waves at the bottom. The
-  pieces are in `InvitationCard.tsx`: `InviteHero` (the logo with its
-  tagline, the lavender "دعوة للمشاركة كمتحدث", "مرحباً بك", the title small
-  with a slash, the name large in mint, and an info row with small icons:
-  the span of days on offer, `slotDayRange`, and الرياض, separated by thin
-  lines above, below and between), then **no white card**: everything sits
-  on the navy. `Panel`/`PANEL` are the cards' info boxes (thin lavender
-  border, translucent lighter background, a mint fin before the heading);
-  `Highlight` is the cards' mint quote box (the welcome before booking, the
-  booked day in `BookedNotice`). The form's fields, options and button are
-  drawn for the dark in `BookingForm` itself (`FIELD`, `OPTION`, a mint
-  button), not with the app's `Input`/`Select`/`Button`, which are for light
-  pages and stay unchanged. Chosen options are mint with navy text. The order is the greeting and name, a line about the
-  invitation, the choice of day, then the contact details. The name is the
+  application form's `(quroosh-public)`: the whole page is the Quroosh deep
+  navy-purple, full width, with the card's large curve behind the content
+  (`QurooshFin` much enlarged, in a faint purple, clipped), a small language
+  switch, and the tagline "قروش | حيث تلتقي الخبرات بآفاق المستقبل" in bold
+  mint above the waves at the bottom. One centred column, in the card's
+  order, from `InvitationCard.tsx`: `InviteHero` (the logo, the invitation
+  line in bold lavender, "مرحباً بك", the title small and light with a
+  slash, the name very large in mint), `IntroText`, `Highlight` (the card's
+  mint box, bold navy; also the booked day in `BookedNotice`), `InfoRow` (the
+  span of days on offer, `slotDayRange`, and الرياض, thin lines above, below
+  and between), then `Panel`s like the card's boxes (thin lavender border,
+  translucent lighter fill, a mint fin before a bold mint heading, small
+  light text): "تنقل كبار الضيوف" and the form's own. **No white card**, and
+  **nothing about the session** (topic, length): it differs per speaker.
+  The invitation line is "كمتحدثة" when the saved name starts with سعادة
+  الأستاذة or سعادة الدكتورة (the Arabic titles only), "كمتحدث" otherwise;
+  English has one line. The Arabic face's heaviest cut is bold (700), so
+  nothing asks for more (the browser would fake it). The form's fields,
+  options, radios and button are drawn for the dark in `BookingForm` itself
+  (`FIELD`, `OPTION`, `RADIO`, a mint button), not with the app's
+  `Input`/`Select`/`Button`, which are for light pages and stay unchanged.
+  Chosen options are mint with navy text. The name is the
   one the manager saved, **never shortened**: when it starts with one of the
   form's titles (`splitTitle`, both languages, longest first) the title is
   shown small above it; otherwise the whole name is shown large. A custom
@@ -267,8 +276,14 @@ proxy).
   database's E.164 CHECK would accept). The form checks it to
   name the field, the action decides, and the database's CHECK has the last
   word. To add a country, add its pair to `COUNTRIES`.
+- **Managers' forms.** Their Arabic addresses the manager in the singular
+  masculine ("اختر"، "ألغِ"، "اتركه"); the guest's booking page stays formal
+  plural. Required fields use `RequiredInput`/`RequiredSelect`
+  (`guests/RequiredField.tsx`), which replace the browser's own "Please
+  select an item in the list." with `quroosh.guests.required.*` in the
+  page's language. A new required field there should use them too.
 - **Managers and bookings.** The guest's page shows the booked day,
-  when the guest booked, their mobile, transport and the driver's number
+  when the guest booked, their mobile, transport and the contact number
   (the phones stay after a booking is cancelled). **Move** offers the free
   days (on, not yet begun, nobody's; `move_booking`, `slot_taken` if someone
   takes it first). **Cancel the booking** (`cancel_booking`) frees the day
@@ -293,8 +308,8 @@ proxy).
   The managers' history ("Invited on", "Booked on", "Cancelled on") keeps
   its times.
 - **Invitations** (`guest_invitations`): one per guest, holding the booking
-  too (the slot, the guest's phone, transport, the driver's or office
-  manager's phone). The link's `token` is the only key to it, made by the
+  too (the slot, the guest's phone, transport, the contact number for
+  coordination). The link's `token` is the only key to it, made by the
   app (`newToken`). `role` is `speaker` only, by a CHECK, so another role is a
   new migration and its wording in both catalogs. The status is **not
   stored**: `cancelled_at` set is cancelled, `slot_id` set is booked,

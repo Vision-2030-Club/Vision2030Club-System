@@ -43,7 +43,7 @@ export async function bookAction(_previous: ActionResult, formData: FormData): P
   let transportPhone: string | null = null;
   if (needsTransport) {
     const typed = String(formData.get('transport_phone') ?? '');
-    if (typed.trim() === '') return fail('Give the number of your driver or office manager.', 'transport_phone_missing');
+    if (typed.trim() === '') return fail('Give a contact number for coordination.', 'transport_phone_missing');
     transportPhone = internationalPhone(String(formData.get('transport_phone_country') ?? ''), typed);
     if (!transportPhone) return fail('That number is not valid.', 'transport_phone_invalid');
   }
