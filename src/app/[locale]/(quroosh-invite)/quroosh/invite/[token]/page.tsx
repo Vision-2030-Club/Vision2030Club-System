@@ -52,7 +52,7 @@ async function titleCatalogs() {
  *   with سعادة الأستاذة or سعادة الدكتورة), the greeting, the title small
  *   with a slash and the name large in mint; then, before booking, the
  *   intro paragraph, the mint box, the info row (the days on offer,
- *   Riyadh), the VIP transport panel, and the form.
+ *   Riyadh), and the form.
  *
  * Nothing about the session itself (topic, length): it differs per speaker.
  * The parts shown only before booking are passed to BookingForm, which drops
@@ -146,15 +146,12 @@ export default async function QurooshInvitePage({
   const slots: SlotOption[] = open.map((slot) => ({ id: slot.id, day: slotDay(slot.starts_at, locale) }));
   const range = open.length > 0 ? slotDayRange(open[0].starts_at, open[open.length - 1].starts_at, locale) : undefined;
 
-  /** Before booking only: the intro, the mint box, the info row, the transport panel. */
+  /** Before booking only: the intro, the mint box, the info row. */
   const lead = (
     <>
       <IntroText>{t('intro')}</IntroText>
       <Highlight>{t('highlight')}</Highlight>
       <InfoRow items={range ? [{ icon: 'calendar', text: range }, place] : [place]} />
-      <Panel title={t('vip.title')}>
-        <p className={BODY_TEXT}>{t('vip.body')}</p>
-      </Panel>
     </>
   );
 

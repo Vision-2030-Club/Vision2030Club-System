@@ -54,7 +54,7 @@ const RADIO =
  * coordination), each in its own panel.
  *
  * The page hands it `lead`, what shows before booking only (the intro, the
- * mint box, the info row with the days on offer, the transport panel), and
+ * mint box, the info row with the days on offer), and
  * it renders that above the form. The moment the guest has booked, both go
  * and the info row comes back with their day, above the confirmation: the
  * page then reads exactly as on a later visit, and is reloaded from the
@@ -82,7 +82,7 @@ export function BookingForm({
   locale: string;
   slots: SlotOption[];
   countries: CountryOption[];
-  /** What the page shows before booking only (intro, mint box, info row, transport panel). */
+  /** What the page shows before booking only (intro, mint box, info row). */
   lead: ReactNode;
   /** The info row's place, for the row with the booked day. */
   place: InfoItem;
