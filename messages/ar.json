@@ -1786,7 +1786,7 @@
         "transport": "المواصلات",
         "transportYes": "يحتاج إليها",
         "transportNo": "لا يحتاج إليها",
-        "transportPhone": "السائق أو مدير المكتب"
+        "transportPhone": "رقم التواصل"
       },
       "booking": {
         "title": "اليوم المحجوز",
@@ -1862,8 +1862,8 @@
       "transport": "هل تحتاج إلى وسيلة نقل من مقرّك إلى مقر إقامة قروش؟",
       "yes": "نعم",
       "no": "لا، شكراً لكم",
-      "transportPhone": "رقم السائق أو مدير المكتب",
-      "transportPhoneHint": "سيتواصل معه فريق التنسيق لترتيب النقل.",
+      "transportPhone": "رقم التواصل",
+      "transportPhoneHint": "رقم السائق أو مدير المكتب للتنسيق",
       "submit": "تأكيد الحضور",
       "submitting": "جارٍ التأكيد…",
       "booked": {

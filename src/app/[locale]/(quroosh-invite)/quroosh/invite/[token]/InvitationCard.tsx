@@ -1,18 +1,25 @@
 import type { ReactNode } from 'react';
-import { QurooshLogo } from '@/components/QurooshLogo';
+import { QurooshFin, QurooshLogo } from '@/components/QurooshLogo';
+import { cx } from '@/components/ui';
 
 /*
- * The guest's invitation, following the printed invitation cards: on the
- * navy page (the layout), the logo with its tagline, a lavender line saying
- * what the invitation is, the greeting, the guest's title small with a slash
- * and their name large in mint, and an info row with small icons. Below it,
- * a white card holds the form or the message, and the confirmation sits in a
- * mint box. Theme tokens only; phone first.
+ * The guest's invitation, following the printed invitation cards: dark all
+ * the way down (the layout's navy), the logo with its tagline, the invitation
+ * line in bold lavender, the greeting, the guest's title small and white with
+ * a slash and their name large in mint, and an info row between two thin
+ * lines. Below it, everything sits straight on the navy: panels like the
+ * cards' info boxes (a thin lavender border, a slightly lighter translucent
+ * background, a mint fin before the heading), and a mint box like the cards'
+ * quote for the one line that matters most (the welcome before booking, the
+ * booked day after). Theme tokens only; phone first.
  *
  * No hooks, so the server page and the client form both use these.
  */
 
-/** The top of the invitation, dark like the card. */
+/** Body text on the navy: light lavender. */
+export const BODY_TEXT = 'leading-relaxed text-brand-200';
+
+/** The top of the invitation. */
 export function InviteHero({
   logoName,
   subtitle,
@@ -37,20 +44,20 @@ export function InviteHero({
   return (
     <section className="mx-auto max-w-xl pb-8 pt-2 text-center">
       <QurooshLogo name={logoName} className="mx-auto h-20 text-accent-2 sm:h-24" />
-      <p className="mt-6 text-base font-semibold text-brand-200">{subtitle}</p>
+      <p className="mt-6 text-lg font-bold text-brand-200">{subtitle}</p>
 
       {name ? (
-        <div className="mt-8">
+        <div className="mt-6">
           {greeting ? <p className="text-sm text-brand-200">{greeting}</p> : null}
-          {title ? <p className="mt-3 text-sm font-semibold text-surface">{`${title}/`}</p> : null}
-          <h1 className={`${title ? 'mt-1' : 'mt-3'} text-balance text-3xl font-bold leading-tight text-accent sm:text-4xl`}>
+          {title ? <p className="mt-3 text-sm text-surface">{`${title}/`}</p> : null}
+          <h1 className={`${title ? 'mt-1' : 'mt-3'} text-balance text-4xl font-bold leading-tight text-accent sm:text-5xl`}>
             {name}
           </h1>
         </div>
       ) : null}
 
       {info && info.length > 0 ? (
-        <ul className="mt-8 flex flex-wrap items-center justify-center gap-y-2 text-sm text-surface [&>li+li]:border-s [&>li+li]:border-brand-400">
+        <ul className="mt-8 flex flex-wrap items-center justify-center gap-y-2 border-y border-brand-400/40 py-3 text-sm font-semibold text-surface [&>li+li]:border-s [&>li+li]:border-brand-400/40">
           {info.map((item) => (
             <li key={item.icon} className="flex items-center gap-2 px-4">
               <InfoIcon name={item.icon} />
@@ -91,12 +98,39 @@ function InfoIcon({ name }: { name: 'calendar' | 'place' }) {
   );
 }
 
-/** The white card under the hero: rounded, with a lavender border. */
-export function InviteCard({ children }: { children: ReactNode }) {
+/** Everything under the hero, straight on the navy. */
+export function InviteBody({ children }: { children: ReactNode }) {
+  return <div className="mx-auto max-w-xl space-y-5">{children}</div>;
+}
+
+/** A panel like the cards' info boxes: thin lavender border, lighter translucent background. */
+export const PANEL = 'rounded-2xl border border-brand-400/40 bg-surface/5 p-5';
+
+/** A panel's heading: a small mint fin before it, like "الجلسة الحوارية" on the cards. */
+export function PanelHeading({ children, as: Tag = 'h2' }: { children: ReactNode; as?: 'h2' | 'span' }) {
   return (
-    <div className="mx-auto max-w-xl space-y-8 rounded-2xl border border-brand-200 bg-surface p-6 shadow-sm sm:p-8">
+    <Tag className="flex items-start gap-2 text-base font-bold text-accent-2">
+      <QurooshFin className="mt-0.5 h-4 shrink-0 text-accent" />
+      <span>{children}</span>
+    </Tag>
+  );
+}
+
+export function Panel({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <section className={cx(PANEL, 'space-y-4')}>
+      {title ? <PanelHeading>{title}</PanelHeading> : null}
       {children}
-    </div>
+    </section>
+  );
+}
+
+/** The mint box, like the cards' quote: navy bold text. */
+export function Highlight({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <p className={cx('rounded-md bg-accent-2 px-5 py-4 text-center font-bold leading-relaxed text-brand-950', className)}>
+      {children}
+    </p>
   );
 }
 
@@ -114,14 +148,10 @@ export function BookedNotice({
 }) {
   return (
     <div className="space-y-5 text-center">
-      <h2 className="text-lg font-semibold text-brand-950">{title}</h2>
-      {day ? (
-        <p className="rounded-xl border border-accent bg-accent-2 px-4 py-4 text-xl font-semibold text-brand-950">
-          {day}
-        </p>
-      ) : null}
-      <p className="leading-relaxed text-ink">{thanks}</p>
-      {change ? <p className="text-sm text-ink-muted">{change}</p> : null}
+      <h2 className="text-lg font-bold text-accent-2">{title}</h2>
+      {day ? <Highlight className="text-xl">{day}</Highlight> : null}
+      <p className={BODY_TEXT}>{thanks}</p>
+      {change ? <p className="text-sm text-brand-300">{change}</p> : null}
     </div>
   );
 }
