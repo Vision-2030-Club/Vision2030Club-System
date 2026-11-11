@@ -207,13 +207,17 @@ proxy).
   never shows another guest or anyone's phone. An unknown link says it is
   not valid; a cancelled invitation says so; a booked guest sees their day
   and no form. Otherwise: the free days, the guest's mobile
-  with a country picker, "do you need transport?", and if so the number of
-  their driver or office manager. `BookingForm` copies `ApplyForm`: the
+  with a country picker, "do you need transport?", and if so a contact
+  number ("رقم التواصل": their driver's or office manager's; the managers'
+  pages use the same label). `BookingForm` copies `ApplyForm`: the
   hidden `website` field for bots, submitting from `onSubmit` so a refusal
   keeps what was typed, and the hints translated from
   `quroosh.invite.errors` (through `fromPostgrest`). On `slot_taken` or
   `slot_unavailable` it says "pick another" and reloads the free days, so
-  the taken one drops out.
+  the taken one drops out. On success it reloads the page from the server,
+  so right after booking the page is exactly what a later visit shows (the
+  booked day in the info row, no welcome, no form); that is also why the
+  welcome line lives in `BookingForm` and not in the page.
 - **A formal invitation, not a form.** The guests are senior figures, so the
   page follows the printed invitation cards and is worded formally in both
   languages ("نرجو"، "يسعدنا"، "نتشرف بحضوركم"; no exclamation marks). It has
@@ -225,9 +229,14 @@ proxy).
   tagline, the lavender "دعوة للمشاركة كمتحدث", "مرحباً بك", the title small
   with a slash, the name large in mint, and an info row with small icons:
   the span of days on offer, `slotDayRange`, and الرياض, separated by thin
-  lines), `InviteCard` (the white card with a lavender border holding the
-  form or the message) and `BookedNotice` (the day in a mint box). Chosen
-  options are mint. The order is the greeting and name, a line about the
+  lines above, below and between), then **no white card**: everything sits
+  on the navy. `Panel`/`PANEL` are the cards' info boxes (thin lavender
+  border, translucent lighter background, a mint fin before the heading);
+  `Highlight` is the cards' mint quote box (the welcome before booking, the
+  booked day in `BookedNotice`). The form's fields, options and button are
+  drawn for the dark in `BookingForm` itself (`FIELD`, `OPTION`, a mint
+  button), not with the app's `Input`/`Select`/`Button`, which are for light
+  pages and stay unchanged. Chosen options are mint with navy text. The order is the greeting and name, a line about the
   invitation, the choice of day, then the contact details. The name is the
   one the manager saved, **never shortened**: when it starts with one of the
   form's titles (`splitTitle`, both languages, longest first) the title is

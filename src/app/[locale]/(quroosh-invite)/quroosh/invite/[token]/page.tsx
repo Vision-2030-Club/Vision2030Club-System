@@ -6,7 +6,7 @@ import { splitTitle, WRITTEN_TITLES } from '@/lib/quroosh/guestTitles';
 import { COUNTRIES, DEFAULT_COUNTRY } from '@/lib/quroosh/phones';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 import { BookingForm, type CountryOption, type SlotOption } from './BookingForm';
-import { BookedNotice, InviteCard, InviteHero } from './InvitationCard';
+import { BODY_TEXT, BookedNotice, Highlight, InviteBody, InviteHero, Panel } from './InvitationCard';
 
 /** A personal link: never in a search engine. */
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -33,8 +33,9 @@ async function writtenTitles(): Promise<string[]> {
  * It follows the printed invitation cards (InvitationCard, and the navy
  * frame in this route group's layout): the logo, "دعوة للمشاركة كمتحدث", the
  * greeting, the title small with a slash and the name large in mint, the
- * info row (the days on offer, Riyadh); then a white card with the choice of
- * day and the contact details.
+ * info row (the days on offer, Riyadh); then, straight on the navy, the
+ * welcome in a mint box and the form's panels. The welcome belongs to the
+ * form (BookingForm), so it goes the moment the guest has booked.
  *
  * The name is the one the managers saved, title included. When it starts
  * with one of the New invitation form's titles, the title is split off and
@@ -75,9 +76,11 @@ export default async function QurooshInvitePage({
     return (
       <>
         <InviteHero logoName={logoName} subtitle={t('title')} />
-        <InviteCard>
-          <p className="text-center leading-relaxed text-ink">{t('notFound')}</p>
-        </InviteCard>
+        <InviteBody>
+          <Panel>
+            <p className={`text-center ${BODY_TEXT}`}>{t('notFound')}</p>
+          </Panel>
+        </InviteBody>
       </>
     );
   }
@@ -98,9 +101,11 @@ export default async function QurooshInvitePage({
     return (
       <>
         {hero()}
-        <InviteCard>
-          <p className="text-center leading-relaxed text-ink">{t('cancelled')}</p>
-        </InviteCard>
+        <InviteBody>
+          <Panel>
+            <p className={`text-center ${BODY_TEXT}`}>{t('cancelled')}</p>
+          </Panel>
+        </InviteBody>
       </>
     );
   }
@@ -110,9 +115,9 @@ export default async function QurooshInvitePage({
     return (
       <>
         {hero(day)}
-        <InviteCard>
+        <InviteBody>
           <BookedNotice title={t('booked.title')} day={day} thanks={t('booked.next')} change={t('booked.change')} />
-        </InviteCard>
+        </InviteBody>
       </>
     );
   }
@@ -131,14 +136,18 @@ export default async function QurooshInvitePage({
   return (
     <>
       {hero(range)}
-      <InviteCard>
-        <p className="text-center leading-relaxed text-ink">{t('intro')}</p>
+      <InviteBody>
         {slots.length === 0 ? (
-          <p className="text-center leading-relaxed text-ink-muted">{t('noSlots')}</p>
+          <>
+            <Highlight>{t('intro')}</Highlight>
+            <Panel>
+              <p className={`text-center ${BODY_TEXT}`}>{t('noSlots')}</p>
+            </Panel>
+          </>
         ) : (
           <BookingForm token={token} locale={locale} slots={slots} countries={countries} />
         )}
-      </InviteCard>
+      </InviteBody>
     </>
   );
 }

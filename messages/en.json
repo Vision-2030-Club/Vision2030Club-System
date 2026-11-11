@@ -1786,7 +1786,7 @@
         "transport": "Transport",
         "transportYes": "Needed",
         "transportNo": "Not needed",
-        "transportPhone": "Driver or office manager"
+        "transportPhone": "Contact number"
       },
       "booking": {
         "title": "Booked day",
@@ -1862,8 +1862,8 @@
       "transport": "Do you need transport from your place to the Quroosh venue?",
       "yes": "Yes, please",
       "no": "No, thank you",
-      "transportPhone": "Number of your driver or office manager",
-      "transportPhoneHint": "Our coordination team will contact them to arrange your transport.",
+      "transportPhone": "Contact number",
+      "transportPhoneHint": "Your driver’s or office manager’s number, for coordination",
       "submit": "Confirm attendance",
       "submitting": "Confirming…",
       "booked": {

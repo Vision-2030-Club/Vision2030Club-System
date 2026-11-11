@@ -1,13 +1,12 @@
 'use client';
 
-import { startTransition, useActionState, useState, type FormEvent, type ReactNode } from 'react';
+import { startTransition, useActionState, useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
-import { Alert, Button, Input, Label, Select } from '@/components/ui';
 import { useRouter } from '@/i18n/navigation';
 import type { ActionResult } from '@/lib/actions';
 import { DEFAULT_COUNTRY, internationalPhone } from '@/lib/quroosh/phones';
 import { bookAction } from './actions';
-import { BookedNotice } from './InvitationCard';
+import { BookedNotice, Highlight, PANEL, Panel, PanelHeading } from './InvitationCard';
 
 /** A free day as the invitation writes it: "الأحد 22 نوفمبر". */
 export type SlotOption = { id: string; day: string };
@@ -16,33 +15,41 @@ export type CountryOption = { iso: string; dial: string; name: string };
 /** The hints after which the list of free days is out of date. */
 const STALE = new Set(['slot_taken', 'slot_unavailable']);
 
-/**
- * One choice in the invitation: a full-width row with a lavender border,
- * mint when chosen, as on the printed cards.
+/*
+ * The form sits on the navy, so it does not use the app's Input, Select,
+ * Label and Button, which are drawn for light pages: these classes draw the
+ * same controls for the dark, on this page only. Light text on a translucent
+ * background with a lavender border, mint when focused or chosen. Native
+ * lists of options get the navy too (`option` ignores translucency).
  */
-const OPTION =
-  'flex cursor-pointer items-center gap-3 rounded-xl border border-brand-200 bg-surface px-4 py-3 ' +
-  'transition-colors hover:border-brand-400 has-[:checked]:border-accent-3 has-[:checked]:bg-accent-2 ' +
-  'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent-3';
+const FIELD =
+  'w-full rounded-lg border border-brand-400/60 bg-surface/5 px-3 py-2.5 text-base text-surface ' +
+  'outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30 touch-manipulation ' +
+  '[&>option]:bg-brand-950 [&>option]:text-surface';
 
-/** A section of the invitation: a navy heading over a thin mint rule. */
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="space-y-4">
-      <div className="space-y-2">
-        <h2 className="text-base font-semibold text-brand-950">{title}</h2>
-        <div className="h-px w-12 bg-accent" aria-hidden="true" />
-      </div>
-      {children}
-    </section>
-  );
-}
+const LABEL = 'mb-1.5 block text-sm font-semibold text-surface';
+const HINT = 'mt-1.5 text-xs text-brand-300';
+
+/** One choice: a full-width row, mint with navy text when chosen. */
+const OPTION =
+  'flex cursor-pointer items-center gap-3 rounded-xl border border-brand-400/60 bg-surface/5 px-4 py-3 text-surface ' +
+  'transition-colors hover:border-accent has-[:checked]:border-accent has-[:checked]:bg-accent ' +
+  'has-[:checked]:text-brand-950 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 ' +
+  'has-[:focus-visible]:outline-accent';
+
+const RADIO = 'size-4 shrink-0 accent-brand-950';
 
 /**
- * The guest's choice of day and contact details, inside their invitation
- * card (Quroosh 0005): one of the free days, their mobile number with a
- * country picker, whether they need transport (then the number of their
- * driver or office manager). After confirming, a formal acknowledgement.
+ * The guest's choice of day and contact details on their invitation
+ * (Quroosh 0005), after the welcome in its mint box: one of the free days,
+ * their mobile number with a country picker, whether they need transport
+ * (then a contact number: their driver's or office manager's), each in its
+ * own panel.
+ *
+ * After confirming, the page is reloaded from the server, so it reads
+ * exactly as it will on every later visit (the booked day in the info row,
+ * no welcome, no form); until it arrives, the same acknowledgement shows
+ * here.
  *
  * As on the application form, whatever goes wrong the guest keeps what they
  * typed: the submit is sent from onSubmit rather than by the form's own
@@ -71,7 +78,7 @@ export function BookingForm({
     async (previous, formData) => {
       try {
         const result = await bookAction(previous, formData);
-        if (result.hint && STALE.has(result.hint)) router.refresh();
+        if (result.ok || (result.hint && STALE.has(result.hint))) router.refresh();
         return result;
       } catch {
         return { ok: false, error: 'network', hint: 'network' };
@@ -101,13 +108,12 @@ export function BookingForm({
 
   if (state.ok) {
     return (
-      <div className="border-t border-brand-200 pt-8">
-        <BookedNotice
-          title={t('booked.title')}
-          day={state.data?.day}
-          thanks={t('booked.next')}
-        />
-      </div>
+      <BookedNotice
+        title={t('booked.title')}
+        day={state.data?.day}
+        thanks={t('booked.next')}
+        change={t('booked.change')}
+      />
     );
   }
 
@@ -117,14 +123,16 @@ export function BookingForm({
 
   const phoneField = (name: string, label: string, help: string) => (
     <div>
-      <Label htmlFor={`${name}-number`}>{label}</Label>
+      <label htmlFor={`${name}-number`} className={LABEL}>
+        {label}
+      </label>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Select
+        <select
           id={`${name}-country`}
           name={`${name}_country`}
           defaultValue={DEFAULT_COUNTRY}
           aria-label={t('country')}
-          className="sm:w-60"
+          className={`${FIELD} sm:w-60`}
         >
           {countries.map(({ iso, dial, name: country }) => (
             <option key={iso} value={iso}>
@@ -132,8 +140,8 @@ export function BookingForm({
               {`${country} ⁦+${dial}⁩`}
             </option>
           ))}
-        </Select>
-        <Input
+        </select>
+        <input
           id={`${name}-number`}
           name={name}
           type="tel"
@@ -142,15 +150,15 @@ export function BookingForm({
           dir="ltr"
           required
           maxLength={20}
-          className="min-w-0 flex-1"
+          className={`${FIELD} min-w-0 flex-1`}
         />
       </div>
-      <p className="mt-1 text-xs text-ink-muted">{help}</p>
+      <p className={HINT}>{help}</p>
     </div>
   );
 
   return (
-    <form action={formAction} onSubmit={onSubmit} className="space-y-8 border-t border-brand-200 pt-8">
+    <form action={formAction} onSubmit={onSubmit} className="space-y-5 [color-scheme:dark]">
       <input type="hidden" name="token" value={token} />
       <input type="hidden" name="locale" value={locale} />
       <div className="hidden" aria-hidden="true">
@@ -159,49 +167,59 @@ export function BookingForm({
         </label>
       </div>
 
-      <Section title={t('chooseSlot')}>
+      <Highlight>{t('intro')}</Highlight>
+
+      <Panel title={t('chooseSlot')}>
         <div className="space-y-2">
           {slots.map((slot) => (
             <label key={slot.id} className={OPTION}>
-              <input type="radio" name="slot_id" value={slot.id} required className="size-4 shrink-0 accent-accent-3" />
-              <span className="min-w-0 flex-1 font-semibold text-brand-950">{slot.day}</span>
+              <input type="radio" name="slot_id" value={slot.id} required className={RADIO} />
+              <span className="min-w-0 flex-1 font-semibold">{slot.day}</span>
             </label>
           ))}
         </div>
-      </Section>
+      </Panel>
 
-      <Section title={t('contactTitle')}>
-        <div className="space-y-6">
-          {phoneField('phone', t('phone'), t('phoneHint'))}
+      <Panel title={t('contactTitle')}>{phoneField('phone', t('phone'), t('phoneHint'))}</Panel>
 
-          <fieldset className="space-y-3">
-            <legend className="text-sm font-medium text-brand-950">{t('transport')}</legend>
-            <div className="grid grid-cols-2 gap-2">
-              {(['yes', 'no'] as const).map((value) => (
-                <label key={value} className={OPTION}>
-                  <input
-                    type="radio"
-                    name="needs_transport"
-                    value={value}
-                    required
-                    className="size-4 shrink-0 accent-accent-3"
-                    onChange={() => setTransport(value === 'yes')}
-                  />
-                  <span className="text-sm text-brand-950">{t(value)}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
+      {/* The panel is on a wrapper: a fieldset's own border would cut through its legend. */}
+      <div className={PANEL}>
+        <fieldset className="space-y-4">
+          <legend>
+            <PanelHeading as="span">{t('transport')}</PanelHeading>
+          </legend>
+          <div className="grid grid-cols-2 gap-2">
+            {(['yes', 'no'] as const).map((value) => (
+              <label key={value} className={OPTION}>
+                <input
+                  type="radio"
+                  name="needs_transport"
+                  value={value}
+                  required
+                  className={RADIO}
+                  onChange={() => setTransport(value === 'yes')}
+                />
+                <span className="text-sm font-semibold">{t(value)}</span>
+              </label>
+            ))}
+          </div>
           {transport ? phoneField('transport_phone', t('transportPhone'), t('transportPhoneHint')) : null}
-        </div>
-      </Section>
+        </fieldset>
+      </div>
 
-      {errorText ? <Alert tone="danger">{errorText}</Alert> : null}
+      {errorText ? (
+        <p role="alert" className="rounded-lg border border-danger bg-danger/25 px-4 py-3 text-sm text-surface">
+          {errorText}
+        </p>
+      ) : null}
 
-      <Button type="submit" disabled={pending} className="w-full py-3 text-base">
+      <button
+        type="submit"
+        disabled={pending}
+        className="w-full touch-manipulation rounded-lg bg-accent px-4 py-3.5 text-base font-bold text-brand-950 transition-colors hover:bg-accent-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-60"
+      >
         {pending ? t('submitting') : t('submit')}
-      </Button>
+      </button>
     </form>
   );
 }
