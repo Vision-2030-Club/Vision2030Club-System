@@ -11,7 +11,7 @@ import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh
  * A guest books their slot from their invitation link (Quroosh 0005).
  *
  * No account: the link's token is the key, and `book_slot()` is the only
- * write it reaches. The phones are built here from the country picked and
+ * write it reaches. The phone is built here from the country picked and
  * the number typed (E.164, phones.ts). The database decides the rest in one
  * step: the invitation is not cancelled or already booked, the slot is on,
  * not started and in the same project, and it is free. Two guests choosing
@@ -36,24 +36,14 @@ export async function bookAction(_previous: ActionResult, formData: FormData): P
   const phone = internationalPhone(String(formData.get('phone_country') ?? ''), String(formData.get('phone') ?? ''));
   if (!phone) return fail('The mobile number is not valid.', 'phone_invalid');
 
-  const answer = formData.get('needs_transport');
-  if (answer !== 'yes' && answer !== 'no') return fail('Say whether you need transport.', 'transport_missing');
-  const needsTransport = answer === 'yes';
-
-  let transportPhone: string | null = null;
-  if (needsTransport) {
-    const typed = String(formData.get('transport_phone') ?? '');
-    if (typed.trim() === '') return fail('Give a contact number for coordination.', 'transport_phone_missing');
-    transportPhone = internationalPhone(String(formData.get('transport_phone_country') ?? ''), typed);
-    if (!transportPhone) return fail('That number is not valid.', 'transport_phone_invalid');
-  }
-
   const { data: startsAt, error } = await createQurooshClient().rpc('book_slot', {
     p_token: token,
     p_slot: slotId,
     p_phone: phone,
-    p_needs_transport: needsTransport,
-    p_transport_phone: transportPhone,
+    // Every guest is driven to the venue (the form says so instead of
+    // asking), on the mobile number they gave.
+    p_needs_transport: true,
+    p_transport_phone: phone,
   });
   if (error) {
     const result = fromPostgrest(error);

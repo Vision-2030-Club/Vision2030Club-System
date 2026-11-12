@@ -1866,10 +1866,7 @@
       "phone": "Mobile number",
       "phoneHint": "For coordination and to confirm your attendance.",
       "country": "Country code",
-      "transport": "Do you need transport from your place to the Quroosh venue?",
-      "yes": "Yes, please",
-      "no": "No, thank you",
-      "transportPhone": "Contact number for coordination",
+      "transport": "We have arranged a dedicated Genesis car to take you to the event venue, courtesy of our partner Alwaalan.",
       "submit": "Confirm attendance",
       "submitting": "Confirming…",
       "booked": {
@@ -1885,9 +1882,6 @@
         "slot_taken": "We regret that this day has just been reserved. Please choose another.",
         "slot_unavailable": "We regret that this day is no longer available. Please choose another.",
         "phone_invalid": "Please check the mobile number and the country code.",
-        "transport_missing": "Please let us know whether you require transport.",
-        "transport_phone_missing": "Please provide a contact number for coordination.",
-        "transport_phone_invalid": "Please check the contact number and the country code.",
         "invalid": "Please review the details and try again.",
         "network": "We were unable to send your confirmation. Please check your connection and try again; the details you entered have been kept."
       },
