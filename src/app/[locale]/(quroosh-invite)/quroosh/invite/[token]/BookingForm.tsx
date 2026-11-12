@@ -6,7 +6,7 @@ import { useRouter } from '@/i18n/navigation';
 import type { ActionResult } from '@/lib/actions';
 import { DEFAULT_COUNTRY, internationalPhone } from '@/lib/quroosh/phones';
 import { bookAction } from './actions';
-import { BookedNotice, InfoRow, PANEL, Panel, PanelHeading, type InfoItem } from './InvitationCard';
+import { BookedNotice, InfoRow, Panel, type InfoItem } from './InvitationCard';
 
 /** A free day as the invitation writes it: "الأحد 22 نوفمبر". */
 export type SlotOption = { id: string; day: string };
@@ -50,8 +50,8 @@ const RADIO =
 /**
  * The guest's choice of day and contact details on their invitation
  * (Quroosh 0005): one of the free days, their mobile number with a country
- * picker, whether they need transport (then a contact number for
- * coordination), each in its own panel.
+ * picker, each in its own panel, then a statement that a car takes them to
+ * the venue: every guest is driven, so there is no transport question.
  *
  * The page hands it `lead`, what shows before booking only (the intro, the
  * mint box, the info row with the days on offer), and
@@ -67,7 +67,7 @@ const RADIO =
  * they chose was just taken, the page's free days are reloaded, so it drops
  * out of the list.
  *
- * The phone numbers are checked here first only so the message can name the
+ * The phone number is checked here first only so the message can name the
  * field; the action decides.
  */
 export function BookingForm({
@@ -102,7 +102,6 @@ export function BookingForm({
     { ok: false },
   );
   const [problem, setProblem] = useState<string | null>(null);
-  const [transport, setTransport] = useState<boolean | null>(null);
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -112,10 +111,6 @@ export function BookingForm({
     let found: string | null = null;
     if (!formData.get('slot_id')) found = 'slot_missing';
     else if (!internationalPhone(read('phone_country'), read('phone'))) found = 'phone_invalid';
-    else if (transport && read('transport_phone').trim() === '') found = 'transport_phone_missing';
-    else if (transport && !internationalPhone(read('transport_phone_country'), read('transport_phone'))) {
-      found = 'transport_phone_invalid';
-    }
     setProblem(found);
     if (found) return;
     startTransition(() => formAction(formData));
@@ -196,30 +191,9 @@ export function BookingForm({
 
         <Panel title={t('contactTitle')}>{phoneField('phone', t('phone'), t('phoneHint'))}</Panel>
 
-        {/* The panel is on a wrapper: a fieldset's own border would cut through its legend. */}
-        <div className={PANEL}>
-          <fieldset className="space-y-4">
-            <legend>
-              <PanelHeading as="span">{t('transport')}</PanelHeading>
-            </legend>
-            <div className="grid grid-cols-2 gap-2">
-              {(['yes', 'no'] as const).map((value) => (
-                <label key={value} className={OPTION}>
-                  <input
-                    type="radio"
-                    name="needs_transport"
-                    value={value}
-                    required
-                    className={RADIO}
-                    onChange={() => setTransport(value === 'yes')}
-                  />
-                  <span className="text-sm font-semibold">{t(value)}</span>
-                </label>
-              ))}
-            </div>
-            {transport ? phoneField('transport_phone', t('transportPhone')) : null}
-          </fieldset>
-        </div>
+        <Panel>
+          <p className="text-base leading-loose text-brand-100">{t('transport')}</p>
+        </Panel>
 
         {errorText ? (
           <p role="alert" className="rounded-lg border border-danger bg-danger/25 px-4 py-3 text-sm text-surface">

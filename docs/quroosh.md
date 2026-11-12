@@ -207,9 +207,12 @@ proxy).
   never shows another guest or anyone's phone. An unknown link says it is
   not valid; a cancelled invitation says so; a booked guest sees their day
   and no form. Otherwise: the free days, the guest's mobile
-  with a country picker, "do you need transport?", and if so a contact
-  number ("رقم التواصل للتنسيق", no hint, and no mention of who it
-  belongs to; the managers' guest page uses the same label). `BookingForm` copies `ApplyForm`: the
+  with a country picker, and a statement that a Genesis car from the
+  partner Alwaalan takes them to the venue (`quroosh.invite.transport`).
+  There is no transport question: every booking is saved with
+  `needs_transport = true` and the guest's mobile as the contact number,
+  so the managers' pages show "Needs transport" for every booked guest.
+  Bookings made before this change keep the guest's own answer. `BookingForm` copies `ApplyForm`: the
   hidden `website` field for bots, submitting from `onSubmit` so a refusal
   keeps what was typed, and the hints translated from
   `quroosh.invite.errors` (through `fromPostgrest`). On `slot_taken` or
@@ -265,8 +268,7 @@ proxy).
   "Ms.", "Dr.", "H.E.". A name saved earlier keeps whatever title was typed
   into it (and is split off too, if it is one of the listed titles). Keep
   the tone when adding text to `quroosh.invite`; the greeting ("مرحباً بك")
-  and the transport question keep the club's exact wording, in the
-  singular.
+  and the transport statement keep the club's exact wording.
 - **The country picker** (`src/lib/quroosh/phones.ts`): a list of ISO codes
   and calling codes, Saudi Arabia first, with country names from
   `Intl.DisplayNames` in the page's language (no translations to keep).
