@@ -1436,7 +1436,11 @@
       "overview": "Overview",
       "projectDetails": "Project details",
       "applications": "Applications",
-      "guests": "Guests"
+      "guests": "Guests",
+      "eventDay": "Event day",
+      "dealRoom": "Deal room",
+      "stage": "Stage",
+      "settings": "Settings"
     },
     "role": {
       "manager": "Manager",
@@ -1886,6 +1890,25 @@
         "network": "We were unable to send your confirmation. Please check your connection and try again; the details you entered have been kept."
       },
       "footer": "Quroosh | Where expertise meets the horizons of the future"
+    },
+    "sections": {
+      "comingSoon": "Being built"
+    },
+    "eventDay": {
+      "title": "Event day",
+      "body": "The development days, 21 to 24 November: the gate scan, the attendees’ wallet and challenges, the booth tablets, the founders’ board, and the team’s live view of the event."
+    },
+    "dealRoom": {
+      "title": "Deal room",
+      "body": "The deal room on 25 November: inviting investors and signing up walk-ins, booking meetings with projects, reception at the door, and what each investor thought after a meeting."
+    },
+    "stage": {
+      "title": "Stage",
+      "body": "The final wave on 26 November: the stage console, the six investors’ tablets, the audience voting with their coins, the big screen and the results."
+    },
+    "settings": {
+      "title": "Settings",
+      "body": "The platform’s rules in one place: the coin rules, the event’s days and stage clocks, and the deal room’s timetable."
     }
   }
 }

@@ -4,6 +4,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link, redirect } from '@/i18n/navigation';
 import { getMyMember, getMyPermissions } from '@/lib/auth/session';
 import { can, getMyComponentAccess } from '@/lib/interviews/access';
+import { QUROOSH_SECTIONS } from '@/lib/quroosh/sections';
 import { createClient } from '@/lib/supabase/server';
 import { signAvatar } from '@/lib/avatars';
 import { AppShell, type ComponentShell } from '@/components/AppShell';
@@ -197,7 +198,7 @@ export default async function AppLayout({
   });
 
   // Quroosh (0074) is a world of its own too: its identity on the header and
-  // its pages in the sidebar. A skeleton for now, one page and the way out.
+  // its pages in the sidebar.
   for (const component of components.filter((c) => c.component_key === 'quroosh')) {
     const base = `/projects/${component.project_id}/quroosh`;
     const label = locale === 'ar' ? component.name_ar : component.name_en;
@@ -218,6 +219,15 @@ export default async function AppLayout({
           icon: 'calendar',
           show: component.role === 'manager',
         },
+        // The event's four sections (src/lib/quroosh/sections.ts): managers
+        // only for now, as their pages are. Add screens inside a section's
+        // folder; this list never needs editing for them.
+        ...QUROOSH_SECTIONS.map((section) => ({
+          href: `${base}/${section.path}`,
+          label: tQuroosh(`tabs.${section.key}`),
+          icon: section.icon,
+          show: component.role === 'manager',
+        })),
         {
           href: `/projects/${component.project_id}?details=1`,
           label: tQuroosh('tabs.projectDetails'),

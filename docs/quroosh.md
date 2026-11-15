@@ -11,8 +11,10 @@ wear the Quroosh identity instead of the club's.
 **applying** (below), stored in the Quroosh database, the managers
 **editing the questions** (Quroosh `0004`), and **guest invitations**
 (Quroosh `0005`: slots, inviting guests with a link and QR code, the guests'
-own booking page, and the managers moving or cancelling bookings). Further screens become pages under
-`projects/[id]/quroosh/` and items in the Quroosh sidebar.
+own booking page, and the managers moving or cancelling bookings), and the
+**four event sections** (Event day, Deal room, Stage, Settings), each a
+placeholder page and folder for one owner to fill (below). Further screens
+go inside those sections' folders.
 
 ## Two databases
 
@@ -45,6 +47,7 @@ and the answer to *who may open it, and as what*. Everything Quroosh records
 | Its own world (header logo, sidebar) | the Quroosh loop in `(app)/layout.tsx`; `AppShell` reads `base` and `theme` from each shell |
 | Its colours | `html[data-theme="quroosh"]` in `src/app/globals.css`; set before first paint by the inline script in `[locale]/layout.tsx` |
 | Pages | `src/app/[locale]/(app)/projects/[id]/quroosh/` |
+| The four event sections in the sidebar | `src/lib/quroosh/sections.ts`, read by the Quroosh loop in `(app)/layout.tsx` |
 | Text | the `quroosh` namespace in `messages/en.json` and `messages/ar.json` |
 
 Who gets in, until the club decides its own roles (the Outreach rule):
@@ -342,6 +345,49 @@ proxy).
   or the managers' note.
 - **Before 0005 is applied** the slots page says the migration is needed,
   and nothing else changes.
+
+## The four event sections
+
+The event's screens (the platform PDF, Draft 2, screens 19–58) are split
+into four sections so each can have one owner and pull requests do not
+collide. Each section is a sidebar item, read from one list,
+`src/lib/quroosh/sections.ts` (`QUROOSH_SECTIONS`: key, folder, icon), so
+the sidebar in `(app)/layout.tsx` never needs editing to add screens.
+
+| Section | Folder under `projects/[id]/quroosh/` | Words | PDF screens |
+|---|---|---|---|
+| Event day | `event-day/` | `quroosh.eventDay` | 19–33 (development days, 21–24 Nov: gap card, gate paths, new account at the gate, sign-in code, wallet, attendance code, gate scanner, challenges, booth tablet, challenge question and result, leaderboard, founder's board, live event, participants), 35–36 (selection day, 24 Nov) |
+| Deal room | `deal-room/` | `quroosh.dealRoom` | 37–45 (investor invitation, projects, booking, schedule, walk-in investor, reception, founder's meetings, after the meeting, investors' interest) |
+| Stage | `stage/` | `quroosh.stage` | 46–57 (stage console, on stage now, the six's tablets, live market board, voting, investors' reveal, results review, results on stage and on phones, founder's result) |
+| Settings | `settings/` | `quroosh.settings` | 34 (coins and the ledger), 58 (settings) |
+
+Screens 1–18 (the application form, review, committee, partner export) are
+not in these sections: the form and the Applications page already exist;
+16–18 are not built.
+
+**Who owns what.** A section's owner works only in:
+
+- its folder under `src/app/[locale]/(app)/projects/[id]/quroosh/<folder>/`
+  (pages, their components, their server actions);
+- `src/lib/quroosh/<folder>/` for its loaders and types (made with the
+  section's first loader; nothing is there yet);
+- its own namespace in **both** `messages/en.json` and `messages/ar.json`.
+
+Shared files (`access.ts`, `types.ts`, `SectionPlaceholder.tsx`, the
+sidebar list) change only in a pull request of their own, so nobody's
+section breaks because of someone else's.
+
+**Today each section is a placeholder**: its title, one line on what it
+will hold, and "Being built" (`SectionPlaceholder`), for **managers only**,
+like Applications and Guests; anyone else gets a 404. The owner replaces the
+placeholder in the section's `page.tsx` with the first real screen.
+
+**Not decided yet.** These pages are the team's side, inside the signed-in
+club shell. Most of the event's screens are for people without a club
+account (attendees, investors, the stage screen); they will need public
+pages, like the application form's `(quroosh-public)`, and the Quroosh
+database will need their tables. Decide where those pages live before the
+first one is built.
 
 ## The identity
 
