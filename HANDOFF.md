@@ -10,6 +10,7 @@ still open. How each part works lives in `docs/`, one file per area.
 | [`docs/club.md`](docs/club.md) | The club side: stack, the permission model, every migration, the directory, the semester, hours and Outreach, short links, performance, UI rules, brand assets |
 | [`docs/interviews.md`](docs/interviews.md) | The Mock Interviews component (افترض): its second database, rooms, the floor, reception, walk-ins, the sheets, feedback. Ends with **"Things easy to break"** |
 | [`docs/quroosh.md`](docs/quroosh.md) | The Quroosh component (قروش): its identity, how it is wired, what is still to build |
+| [`docs/event-attendance.md`](docs/event-attendance.md) | The Event attendance component (حضور الفعالية): the public signing up to a project's event, their pass and its QR code, the gate scanner for the HR team, and the API other components use |
 | [`docs/integrations.md`](docs/integrations.md) | Google (Calendar and Sheets) and push notifications |
 | [`docs/data-and-testing.md`](docs/data-and-testing.md) | Importing the member list and the timeline, the testing rounds with the club, how the real club was loaded |
 | [`docs/spec.md`](docs/spec.md) | The system specification being implemented. Section references in these documents (§2, §3, …) point into it |
@@ -40,6 +41,10 @@ docs/                 how each part works
   database of its own (`supabase/quroosh/migrations`, `npm run
   db:push:quroosh`, up to `0005`: guest slots and invitations); see
   `docs/quroosh.md`.
+- **Event attendance** (club migration `0075`, written 2026-11-18, **not yet
+  applied**) keeps the public's names, mobiles and emails in the club
+  database, behind functions only. It needs `0075` applied, and Resend
+  configured for its pass emails; see `docs/event-attendance.md`.
 - The real club is in the database (98 active members when it was loaded on
   2026-09-16). The management team has tested it in rounds since; what each
   round changed is in `docs/data-and-testing.md`.
