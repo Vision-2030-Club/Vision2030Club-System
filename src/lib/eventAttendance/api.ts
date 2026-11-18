@@ -115,6 +115,23 @@ export async function listCheckIns(projectId: string, since?: string | null): Pr
   return (data ?? []) as EventApiCheckIn[];
 }
 
+/**
+ * The attendees with these ids (club 0076), for a component that has read
+ * check-ins and needs the people behind them. Ids of another project's
+ * attendees are left out. Before 0076 is applied this throws, like the two
+ * lists above; callers that run unattended catch it.
+ */
+export async function getAttendeesById(projectId: string, ids: string[]): Promise<EventApiAttendee[]> {
+  const wanted = [...new Set(ids)].filter((id) => UUID.test(id));
+  if (wanted.length === 0) return [];
+  const { data, error } = await createAdminClient().rpc('event_api_attendees_by_id', {
+    p_project: projectId,
+    p_ids: wanted,
+  });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as EventApiAttendee[];
+}
+
 /** True when the HTTP API has a key on this deployment. */
 export function isApiConfigured(): boolean {
   return Boolean(process.env.EVENT_ATTENDANCE_API_KEY);
