@@ -1984,7 +1984,6 @@
       "intro": "Fill in your details to get your entry pass: a QR code you show at the gate.",
       "days": "Event days: {days}",
       "name": "Full name",
-      "nameHint": "As on your ID.",
       "mobile": "Mobile number",
       "country": "Country code",
       "email": "Email",
