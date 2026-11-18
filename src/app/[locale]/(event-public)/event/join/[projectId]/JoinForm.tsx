@@ -73,7 +73,8 @@ export function JoinForm({
 
       <div>
         <Label htmlFor="join-name">{t('join.name')}</Label>
-        <Input id="join-name" name="name" required minLength={2} maxLength={200} autoComplete="name" />      </div>
+        <Input id="join-name" name="name" required minLength={2} maxLength={200} autoComplete="name" />
+      </div>
 
       <div>
         <Label htmlFor="join-phone">{t('join.mobile')}</Label>
