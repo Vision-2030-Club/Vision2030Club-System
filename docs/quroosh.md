@@ -11,7 +11,10 @@ wear the Quroosh identity instead of the club's.
 **applying** (below), stored in the Quroosh database, the managers
 **editing the questions** (Quroosh `0004`), and **guest invitations**
 (Quroosh `0005`: slots, inviting guests with a link and QR code, the guests'
-own booking page, and the managers moving or cancelling bookings). Further screens become pages under
+own booking page, and the managers moving or cancelling bookings), and
+**guest accounts** (Quroosh `0006`, written 2026-11-19, **not yet applied**:
+an account for everyone checked in at the gate, completed from an emailed
+link, with no password). Further screens become pages under
 `projects/[id]/quroosh/` and items in the Quroosh sidebar.
 
 ## Two databases
@@ -343,6 +346,79 @@ proxy).
 - **Before 0005 is applied** the slots page says the migration is needed,
   and nothing else changes.
 
+## Guest accounts (Quroosh 0006)
+
+A **guest** here is a member of the public who came to the event: they
+signed up in the Event attendance component
+([`docs/event-attendance.md`](event-attendance.md)) and were checked in at
+the gate. They are not the invited speakers of `0005` (the Guests tab), and
+they are not club members: nothing here touches the club's login, which
+forbids self-registration.
+
+The first time a person is checked in, Quroosh makes them an account and
+emails them **"complete creating your account"**. They open the link, press
+one button, and the account is theirs. It is what the Quroosh market (their
+quroosh, the challenges, the votes) will hang on. The project must carry
+**both** components, Quroosh and Event attendance.
+
+- **From a check-in to an account.** `syncGuestAccounts`
+  (`src/lib/quroosh/accountSync.ts`) is the one path between the two
+  databases. It reads the check-ins changed since last time through Event
+  attendance's API, fetches those attendees by id (club `0076`), reads the
+  attendees changed since last time (cancelled passes, corrections), and
+  hands all of it to `sync_accounts` in one transaction. It runs right after
+  a check-in at the gate (`kickGuestAccountSync`, called from the scanner's
+  action, after its answer is sent) and again on the club's five-minute
+  sweep (`/api/push/cron`), which is what catches up after a failure. The
+  managers' **Read the check-ins now** button runs the same pass.
+- **One account and one email per attendee**, whatever runs twice: the
+  unique constraint `accounts_attendee_once` is the claim, and the email is
+  queued only by the insert that won. A person **without an email** on their
+  pass gets no account: there is nowhere to send their link.
+- **No passwords** (the club's decision, 2026-11-19, and the Quroosh design).
+  A person gets in with a one-time link in their email:
+  `complete`, sent once on their first check-in and good for **seven days**;
+  `signin`, sent when they ask on the sign-in page and good for **fifteen
+  minutes**. Completing asks for nothing beyond one press (the club's
+  decision): the name, email and mobile shown are the ones on their pass.
+- **Opening a link does not use it.** `/quroosh/account/link/<token>` shows
+  whose account it is and one button; the button's server action
+  (`redeemLinkAction` → `use_account_link`) uses the link up, completes the
+  account if it was not, and starts a session. So a mail scanner that
+  fetches the link does not spend it.
+- **Sessions.** A cookie, `quroosh_guest` (HttpOnly, thirty days), set by
+  this server. `getGuestAccount()` in `src/lib/quroosh/accounts.ts` answers
+  who is signed in on this device; **every later guest page (the market)
+  starts by asking it**, and must compare the account's `project_id` with
+  the page's.
+- **Only hashes are stored.** A link's token and a cookie's value are made
+  by the app (`newToken`) and the database keeps their SHA-256
+  (`hashToken`). The email queue holds no token either: the link is made at
+  the moment of sending (`issue_account_token`). Somebody who read the
+  database could not sign in as anyone.
+- **The guest's page**, `/quroosh/account/<project id>`: signed in, their
+  name and a word on what the account is for (the market's pages will start
+  from here); not signed in, one field for their email. It answers the same
+  whether or not the email has an account. Two attendees who share an email
+  each get a link, and each link names its person.
+- **A cancelled pass disables the account** on the next sync: its sessions
+  end and its links are refused. Restoring the pass enables it again. A
+  corrected name or mobile is copied over; the email is copied only while
+  the account is not completed (after that it is how they sign in).
+- **Managers** (`projects/[id]/quroosh/accounts`, managers only): how many
+  accounts, how many completed, how many emails are still waiting; each
+  account's state; sending an account its link again (the "complete" email,
+  or a sign-in link once it is completed); and the guests' sign-in page to
+  hand to someone who lost their email.
+- **Email** goes through Resend (`src/lib/email/resend.ts`, the shared
+  sender new code should use). Without `RESEND_API_KEY` and `EMAIL_FROM`
+  the emails wait in `account_emails` and the page says so; the accounts are
+  still made.
+- **Before `0006` (or club `0076`) is applied** the Accounts page says the
+  migration is needed, the sync fails quietly in the background, the guest
+  pages find no link and no session, and checking in at the gate is not
+  affected.
+
 ## The identity
 
 From the club's identity guide (an Illustrator file; the original stays in
@@ -400,5 +476,19 @@ Drive, it is 10 MB).
   the race. Keep that index if the table is ever changed.
 - A new column on `guest_invitations` or `guest_slots` must be nullable (or
   have a default): rows already exist without it.
+- A guest's link must never be used by a GET. The page only reads it
+  (`account_link`); the button's POST uses it. Mail scanners open every link
+  in an email, and a link spent by one is a guest who cannot get in.
+- Never store or log a link's token or a session cookie's value: only
+  `hashToken()` of it goes to the database.
+- A guest page that shows anything personal must check
+  `getGuestAccount()` **and** that its `project_id` is the page's. The
+  cookie is one per browser, not one per project.
+- `sync_accounts` must stay safe to run twice with the same rows: the app
+  reads two minutes back of its cursor on purpose (a check-in's change time
+  is when its transaction began, so a late commit can carry a time the
+  cursor has passed).
+- A new column on `accounts` must be nullable or have a default: rows
+  already exist without it.
 - `0074` replaces `my_component_access()` with 0072's version plus two lines.
   A later migration that changes the function must start from 0074's.

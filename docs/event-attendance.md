@@ -152,8 +152,20 @@ Both directions, and two ways to call it.
   return what changed after `since`, oldest change first, 5000 at most. Page
   with the last row's `updated_at` / `changed_at`.
 
+- `getAttendeesById(projectId, ids)` (club `0076`) returns the people behind
+  a handful of check-ins, without paging through everyone.
+
 These run with the service role and return personal data: the calling page
 must decide who is looking first.
+
+**After a check-in.** The scanner's action tells whoever builds on
+attendance about a new arrival, once the scanner has its answer
+(`checkedIn` in `event-attendance/actions.ts`). Today that is Quroosh, which
+makes the guest's account and emails them (`kickGuestAccountSync`,
+"Guest accounts" in [`docs/quroosh.md`](quroosh.md)). It runs in `after()`
+and never fails the check-in; the five-minute sweep repeats it. A new
+component that needs to react to arrivals adds its call there and reads the
+check-ins by cursor, as Quroosh does.
 
 **From outside**, the same three over HTTP, with
 `Authorization: Bearer $EVENT_ATTENDANCE_API_KEY`. With no key set on the
