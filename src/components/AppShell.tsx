@@ -11,8 +11,11 @@ export type ComponentShell = {
   projectId: string;
   /** Where this world's pages live, e.g. `/projects/<id>/interviews`. */
   base: string;
-  /** The `data-theme` on <html> inside it; globals.css holds each palette. */
-  theme: 'interviews' | 'quroosh';
+  /**
+   * The `data-theme` on <html> inside it; globals.css holds each palette.
+   * Null keeps the club's own colours.
+   */
+  theme: 'interviews' | 'quroosh' | null;
   /** The project's name in the current language; the header mark shows it. */
   label: string;
   items: NavItem[];
@@ -90,11 +93,11 @@ export function AppShell({
             </span>
             {components.map((component) => (
               <span
-                key={component.projectId}
-                aria-hidden={active?.projectId !== component.projectId}
+                key={component.base}
+                aria-hidden={active?.base !== component.base}
                 className={cx(
                   'absolute inset-y-0 start-0 flex max-w-full items-center transition-opacity duration-500',
-                  active?.projectId === component.projectId ? 'opacity-100 delay-150' : 'pointer-events-none opacity-0',
+                  active?.base === component.base ? 'opacity-100 delay-150' : 'pointer-events-none opacity-0',
                 )}
               >
                 {component.logo}
@@ -115,8 +118,10 @@ export function AppShell({
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 lg:flex-row">
         <aside className="lg:w-60 lg:shrink-0">
           <div className="lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto">
-            {/* A new key per world: the old list leaves, the new one fades in. */}
-            <div key={active?.projectId ?? 'club'} className="shell-fade">
+            {/* A new key per world: the old list leaves, the new one fades in.
+                Keyed by where the world lives, not by project: a project may
+                carry two of them (Quroosh and Event attendance). */}
+            <div key={active?.base ?? 'club'} className="shell-fade">
               {active ? (
                 <Link
                   href={active.backHref}
@@ -136,7 +141,7 @@ export function AppShell({
               which also covers the typeface swap, the one thing CSS cannot
               fade. Within a world the key is stable, so pages navigate
               without remounting. */}
-          <div key={theme ?? 'club'} className="shell-fade">
+          <div key={active?.base ?? 'club'} className="shell-fade">
             {children}
           </div>
         </main>

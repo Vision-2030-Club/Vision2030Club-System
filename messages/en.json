@@ -199,7 +199,7 @@
     "kpiHidden": "You do not have permission to see this project’s KPI figures.",
     "noPmsAvailable": "Nobody holds the Project Manager role yet — assign it on a member's profile first.",
     "component": "Component",
-    "componentHint": "Whole systems this project carries, with their own data: Mock Interviews, Outreach, Quroosh, or more than one.",
+    "componentHint": "Whole systems this project carries, with their own data: Mock Interviews, Outreach, Quroosh, Event attendance, or more than one.",
     "component_mock_interviews": "Mock Interviews",
     "openComponent": "Open →",
     "componentNoAccess": "You are not on this component’s roster.",
@@ -213,7 +213,8 @@
     "componentEditionNew": "Start a new edition",
     "component_outreach": "Outreach",
     "componentEditionHint": "Mock Interviews only; ignored for Outreach and Quroosh.",
-    "component_quroosh": "Quroosh"
+    "component_quroosh": "Quroosh",
+    "component_event_attendance": "Event attendance"
   },
   "tasks": {
     "title": "Tasks",
@@ -1886,6 +1887,147 @@
         "network": "We were unable to send your confirmation. Please check your connection and try again; the details you entered have been kept."
       },
       "footer": "Quroosh | Where expertise meets the horizons of the future"
+    }
+  },
+  "eventAttendance": {
+    "name": "Event attendance",
+    "notReady": "Event attendance is not ready on this deployment yet: migration 0075 has to be applied to the club database first.",
+    "tabs": {
+      "overview": "Overview",
+      "scan": "Gate scanner",
+      "attendees": "Attendees",
+      "projectDetails": "Project details"
+    },
+    "overview": {
+      "attendees": "Signed up",
+      "cancelledHint": "{count, plural, one {# pass cancelled} other {# passes cancelled}}",
+      "checkedInToday": "Checked in today",
+      "passesWaiting": "Pass emails waiting",
+      "passesWaitingHint": "Queued and not sent yet.",
+      "scannerHint": "Open it on the phone you hold at the gate.",
+      "openScanner": "Open the scanner",
+      "byDay": "Arrivals by day",
+      "today": "today",
+      "noCheckIns": "Nobody has been checked in yet.",
+      "emailOff": "Email is not set up on this deployment (RESEND_API_KEY and EMAIL_FROM), so pass emails are waiting. People still get their pass on screen as soon as they sign up, and the waiting emails go out once email is set up.",
+      "signupLink": "Sign-up link",
+      "signupLinkHint": "Share this link, or print its QR code at the gate. People sign up with their name, mobile and email, and get their pass at once.",
+      "statusOpen": "Open",
+      "statusClosed": "Closed",
+      "qrAlt": "QR code of the sign-up link",
+      "qrDownload": "Download the QR code",
+      "settings": {
+        "title": "Settings",
+        "signupOpen": "Sign-up is open",
+        "signupOpenHint": "When this is off, the link says sign-up is closed. Passes already made keep working.",
+        "firstDay": "First day",
+        "lastDay": "Last day",
+        "daysHint": "The gate only checks people in on these days. Leave both empty to allow any day. One check-in per person per day.",
+        "save": "Save"
+      },
+      "api": {
+        "title": "Linking other components",
+        "on": "The API key is set. Another system can register attendees and read attendees and check-ins at these addresses.",
+        "off": "No API key is set on this deployment (EVENT_ATTENDANCE_API_KEY), so these addresses answer nobody. Components inside this system do not need it."
+      }
+    },
+    "attendees": {
+      "title": "Attendees",
+      "search": "Search",
+      "searchPlaceholder": "Name, mobile or email",
+      "count": "{count, plural, =0 {Nobody} one {# person} other {# people}}",
+      "shown": "Showing the first {shown} of {total}. Search to narrow the list.",
+      "empty": "Nobody here yet.",
+      "cancelled": "Cancelled",
+      "daysCount": "{count, plural, =0 {Not attended} one {Attended # day} other {Attended # days}}",
+      "passSent": "Pass emailed",
+      "passWaiting": "Pass email waiting",
+      "passFailed": "Pass email failed",
+      "registered": "Signed up {date}",
+      "sourceForm": "Sign-up form",
+      "sourceOther": "From: {source}",
+      "resend": "Email the pass again",
+      "resent": "Queued. It goes out within a few minutes.",
+      "cancel": "Cancel the pass",
+      "cancelTitle": "Cancel the pass of {name}?",
+      "cancelBody": "Their QR code stops working at the gate. Their past check-ins stay, and you can bring the pass back later.",
+      "restore": "Bring the pass back"
+    },
+    "scan": {
+      "title": "Gate scanner",
+      "today": "Checked in today:",
+      "start": "Start the camera",
+      "starting": "Starting…",
+      "stop": "Stop the camera",
+      "pointHint": "Hold the attendee’s QR code in front of the camera. It is read by itself.",
+      "cameraDenied": "The camera was not allowed. Allow it for this site in the browser’s settings, or open your phone’s own camera on the QR code and press Check in on the page that opens.",
+      "cameraUnsupported": "This browser cannot open the camera here. Open your phone’s own camera on the QR code and press Check in on the page that opens, or use the search below.",
+      "checkedIn": "Checked in",
+      "already": "Already checked in today at {time}",
+      "undo": "Undo this check-in",
+      "undone": "The check-in was undone.",
+      "failed": "This did not work. Try again.",
+      "network": "No connection. Check the network and try again.",
+      "search": {
+        "title": "Without a pass",
+        "hint": "Find the person by part of their name, or the last four digits of their mobile.",
+        "placeholder": "Name or last 4 digits",
+        "submit": "Find",
+        "empty": "Nobody matches.",
+        "checkIn": "Check in",
+        "checkedInToday": "In today",
+        "cancelled": "Pass cancelled"
+      }
+    },
+    "join": {
+      "title": "Sign up for {event}",
+      "intro": "Fill in your details to get your entry pass: a QR code you show at the gate.",
+      "days": "Event days: {days}",
+      "name": "Full name",
+      "nameHint": "As on your ID.",
+      "mobile": "Mobile number",
+      "country": "Country code",
+      "email": "Email",
+      "emailHint": "Your pass is sent to this address.",
+      "submit": "Get my pass",
+      "sending": "Sending…",
+      "already": "This mobile number is already registered. We have sent the pass again to the email it was registered with.",
+      "closed": "Sign-up for this event is closed.",
+      "notFound": "This sign-up link is not valid."
+    },
+    "pass": {
+      "registered": "You are registered. This is your pass, and a copy is on its way to your email.",
+      "show": "Show this code to the staff at the gate, each day you attend.",
+      "download": "Save the code as a picture",
+      "qrAlt": "Your entry QR code",
+      "attended": "Days attended",
+      "attendedNone": "None yet.",
+      "cancelled": "This pass was cancelled. Please contact the organisers.",
+      "notFound": "This pass link is not valid.",
+      "staff": {
+        "title": "Gate staff",
+        "checkIn": "Check in",
+        "done": "{name} is checked in.",
+        "already": "{name} was already checked in today at {time}."
+      }
+    },
+    "errors": {
+      "forbidden": "You may not do this for this event.",
+      "not_found": "Not found.",
+      "wrong_event": "This pass is for another event.",
+      "attendee_cancelled": "This pass was cancelled.",
+      "not_an_event_day": "Today is not one of the event’s days.",
+      "not_checked_in": "This person is not checked in today.",
+      "unknown_code": "This QR code is not an event pass.",
+      "signup_closed": "Sign-up for this event is closed.",
+      "name_invalid": "Please write your full name.",
+      "phone_invalid": "Please check the mobile number and the country code.",
+      "email_invalid": "Please check the email address.",
+      "days_invalid": "Give both the first and the last day, with the last day not before the first.",
+      "pass_not_queued": "Not sent: there is no email on file, or a pass was emailed in the last ten minutes.",
+      "invalid": "Some details are missing or not valid.",
+      "network": "We could not send your details. Check your connection and try again; what you typed has been kept.",
+      "unexpected": "Something went wrong. Try again."
     }
   }
 }

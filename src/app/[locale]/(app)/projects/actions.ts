@@ -296,6 +296,26 @@ export async function attachComponentAction(
     return ok();
   }
 
+  if (componentKey === 'event_attendance') {
+    // Event attendance (0075) lives in this database: the link row is the
+    // whole of attaching. Sign-up stays closed until a manager opens it.
+    const me = await getMyMember();
+    if (!me) return fail('Not signed in');
+    const supabase = await createClient();
+    const { error } = await supabase.from('project_components').insert({
+      project_id: projectId,
+      component_key: componentKey,
+      external_ref: null,
+      attached_by: me.id,
+    });
+    if (error?.code === '23505') return fail('This project already has Event attendance.');
+    // Before migration 0075 the key is not an allowed one yet.
+    if (error?.code === '23514') return fail('Event attendance needs migration 0075 applied to the club database.');
+    if (error) return fail(error.message);
+    revalidatePath(`/${locale}/projects/${projectId}`);
+    return ok();
+  }
+
   if (componentKey !== 'mock_interviews') return fail('Unknown component.');
 
   const { isInterviewsConfigured, createInterviewsClient } = await import('@/lib/supabase/interviews');

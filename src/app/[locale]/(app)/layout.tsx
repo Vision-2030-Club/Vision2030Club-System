@@ -80,6 +80,7 @@ export default async function AppLayout({
   const tMembers = await getTranslations('members');
   const tInterviews = await getTranslations('interviews');
   const tQuroosh = await getTranslations('quroosh');
+  const tEvent = await getTranslations('eventAttendance');
 
   /*
    * A Project Manager's projects are on their dashboard, so the club-wide
@@ -218,6 +219,16 @@ export default async function AppLayout({
           icon: 'calendar',
           show: component.role === 'manager',
         },
+        // The same project's Event attendance (0075), when it carries one
+        // this person may open: its own pages, one press away.
+        {
+          href: `/projects/${component.project_id}/event-attendance`,
+          label: tEvent('name'),
+          icon: 'attendance',
+          show: components.some(
+            (c) => c.project_id === component.project_id && c.component_key === 'event_attendance',
+          ),
+        },
         {
           href: `/projects/${component.project_id}?details=1`,
           label: tQuroosh('tabs.projectDetails'),
@@ -234,6 +245,53 @@ export default async function AppLayout({
       items,
       backHref: '/dashboard',
       logo: <QurooshLogo name={label} className="text-brand-950" />,
+    });
+  }
+
+  // Event attendance (0075): the public signing up to a project's event and
+  // being checked in at the gate. Its pages wear the identity of the project
+  // they belong to: Quroosh's when the project carries Quroosh too (and this
+  // person may open it), otherwise the club's.
+  for (const component of components.filter((c) => c.component_key === 'event_attendance')) {
+    const base = `/projects/${component.project_id}/event-attendance`;
+    const label = locale === 'ar' ? component.name_ar : component.name_en;
+    const manager = component.role === 'manager';
+    const inQuroosh = components.some(
+      (c) => c.project_id === component.project_id && c.component_key === 'quroosh',
+    );
+    const items: NavItem[] = (
+      [
+        { href: base, label: tEvent('tabs.overview'), icon: 'dashboard', show: true },
+        // The gate: managers and the HR team.
+        { href: `${base}/scan`, label: tEvent('tabs.scan'), icon: 'attendance', show: true },
+        // The attendees' names, mobiles and emails: managers only.
+        { href: `${base}/attendees`, label: tEvent('tabs.attendees'), icon: 'members', show: manager },
+        {
+          href: `/projects/${component.project_id}/quroosh`,
+          label: tQuroosh('name'),
+          icon: 'back',
+          show: inQuroosh,
+        },
+        {
+          href: `/projects/${component.project_id}?details=1`,
+          label: tEvent('tabs.projectDetails'),
+          icon: 'projects',
+          show: manager,
+        },
+      ] satisfies NavItem[]
+    ).filter((item) => item.show);
+    componentShells.push({
+      projectId: component.project_id,
+      base,
+      theme: inQuroosh ? 'quroosh' : null,
+      label,
+      items,
+      backHref: '/dashboard',
+      logo: inQuroosh ? (
+        <QurooshLogo name={label} className="text-brand-950" />
+      ) : (
+        <span className="truncate text-base font-semibold text-ink">{label}</span>
+      ),
     });
   }
 
