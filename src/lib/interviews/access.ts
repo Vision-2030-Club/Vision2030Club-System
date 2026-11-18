@@ -27,8 +27,9 @@ import type { Edition, EditionSettings } from '@/lib/interviews/types';
  *   viewer     Outreach: may see the project's KPI, reads the numbers.
  *              Mock Interviews (0072): the Development team, who read the
  *              visitor ratings (the Visitor feedback tab) and nothing else.
+ *   scanner    Event attendance only (0075): the HR team, who work the gate.
  */
-export type ComponentRole = 'manager' | 'hr' | 'organizer' | 'reception' | 'member' | 'viewer';
+export type ComponentRole = 'manager' | 'hr' | 'organizer' | 'reception' | 'member' | 'viewer' | 'scanner';
 
 export type ComponentAccess = {
   project_id: string;
@@ -51,6 +52,7 @@ export const COMPONENT_ROUTES: Record<string, string> = {
   mock_interviews: 'interviews',
   outreach: 'outreach',
   quroosh: 'quroosh',
+  event_attendance: 'event-attendance',
 };
 
 export function componentHref(projectId: string, componentKey: string): string {
@@ -142,7 +144,7 @@ export const can = {
   /** The visitor ratings: managers, HR, and the Development team (0072). */
   visitorResults: (role: ComponentRole) => role === 'manager' || role === 'hr' || role === 'viewer',
   /** Every page that shows students: everyone with a working role, not a viewer. */
-  floorAccess: (role: ComponentRole) => role !== 'viewer' && role !== 'member',
+  floorAccess: (role: ComponentRole) => role !== 'viewer' && role !== 'member' && role !== 'scanner',
 };
 
 /**

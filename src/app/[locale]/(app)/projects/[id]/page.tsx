@@ -40,7 +40,9 @@ import {
  * project page itself (tasks, people, KPIs, components) — the "Project
  * details" menu item and Outreach's back link use it.
  */
-const OPENS_IN = ['mock_interviews', 'outreach', 'quroosh'] as const;
+// Event attendance (0075) is last: a manager is taken to the project's main
+// component, and the HR team, who are on no other roster, still get in.
+const OPENS_IN = ['mock_interviews', 'outreach', 'quroosh', 'event_attendance'] as const;
 
 export default async function ProjectPage({
   params,
@@ -154,7 +156,7 @@ export default async function ProjectPage({
   const canOpen = (key: string) =>
     componentAccess.some((row) => row.project_id === id && row.component_key === key);
   // Every component the project does not already carry.
-  const attachable = (['mock_interviews', 'outreach', 'quroosh'] as const).filter((key) => !has(key));
+  const attachable = (['mock_interviews', 'outreach', 'quroosh', 'event_attendance'] as const).filter((key) => !has(key));
 
   const managerIds = new Set((managers ?? []).map((m) => m.member_id as string));
   const projectScope = await scopeFor('projects.manage');

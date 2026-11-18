@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { deliverPendingPasses } from '@/lib/eventAttendance/email';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { deliverPendingNotifications, pruneOutbox } from '@/lib/push';
 
@@ -9,6 +10,9 @@ import { deliverPendingNotifications, pruneOutbox } from '@/lib/push';
  *   2. send whatever is queued — reminders, plus any row an earlier inline
  *      delivery could not send
  *   3. forget rows that were sent a week ago
+ *   4. send the event passes still waiting (Event attendance, 0075): the
+ *      emails an inline delivery could not send, or that were queued while
+ *      email was not configured
  *
  * Called every five minutes by pg_cron inside Supabase (scripts/push-cron-
  * setup.mjs), not by Vercel: the Hobby plan allows one cron a day, which is
@@ -43,5 +47,8 @@ export async function GET(request: Request) {
   const report = await deliverPendingNotifications(200);
   await pruneOutbox();
 
-  return NextResponse.json({ reminders: reminders ?? 0, ...report });
+  // Never fails the sweep: the pushes above have already gone.
+  const passes = await deliverPendingPasses(100, 15_000).catch(() => null);
+
+  return NextResponse.json({ reminders: reminders ?? 0, ...report, passes });
 }

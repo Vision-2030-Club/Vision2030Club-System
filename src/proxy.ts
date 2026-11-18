@@ -16,8 +16,11 @@ const handleLocale = createIntlMiddleware(routing);
  *
  * `/quroosh/...` is the Quroosh component's public face: its application
  * form, open to anyone while the project's managers keep it open.
+ *
+ * `/event/...` is Event attendance's public face (0075): an event's sign-up
+ * form, and a person's pass, guarded by its unguessable token.
  */
-const PUBLIC_PATHS = ['/login', '/interviews', '/quroosh'];
+const PUBLIC_PATHS = ['/login', '/interviews', '/quroosh', '/event'];
 
 /** Public paths that make no sense once signed in: a member is sent on. */
 const SIGNED_OUT_ONLY_PATHS = ['/login'];
