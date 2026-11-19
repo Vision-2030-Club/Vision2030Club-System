@@ -49,6 +49,10 @@ docs/                 how each part works
   `0076`, written 2026-11-19, **not yet applied**): everyone checked in at
   the gate gets an account and an email to complete it, with no password.
   See "Guest accounts" in `docs/quroosh.md`.
+- **The Quroosh wallet** (Quroosh migration `0007`, written 2026-11-19,
+  **not yet applied**), the first part of the Quroosh market: an account
+  earns quroosh for each day it is checked in, and guests see their balance
+  and a leaderboard. See "The wallet" in `docs/quroosh.md`.
 - The real club is in the database (98 active members when it was loaded on
   2026-09-16). The management team has tested it in rounds since; what each
   round changed is in `docs/data-and-testing.md`.

@@ -397,8 +397,7 @@ quroosh, the challenges, the votes) will hang on. The project must carry
   the moment of sending (`issue_account_token`). Somebody who read the
   database could not sign in as anyone.
 - **The guest's page**, `/quroosh/account/<project id>`: signed in, their
-  name and a word on what the account is for (the market's pages will start
-  from here); not signed in, one field for their email. It answers the same
+  wallet (see "The wallet" below); not signed in, one field for their email. It answers the same
   whether or not the email has an account. Two attendees who share an email
   each get a link, and each link names its person.
 - **A cancelled pass disables the account** on the next sync: its sessions
@@ -418,6 +417,55 @@ quroosh, the challenges, the votes) will hang on. The project must carry
   migration is needed, the sync fails quietly in the background, the guest
   pages find no link and no session, and checking in at the gate is not
   affected.
+
+## The wallet (Quroosh 0007)
+
+The first part of the **Quroosh market**: guests collect quroosh during the
+event and see their balance and a leaderboard. Built 2026-11-19. Still to
+come, on the same ledger: the booths' challenges, and voting for the
+projects on the last day.
+
+- **The ledger.** `wallet_entries` holds one row per thing that moved
+  quroosh for an account: `kind` (`attendance` today; `challenge`, `vote`
+  and `adjustment` are named so the table does not change shape later),
+  a signed `amount`, the event `day`, and `source_ref` (what it came from).
+  Nothing is deleted or edited: an entry taken back is **voided**
+  (`voided_at`) and counts for nothing.
+- **Two numbers, different on purpose.** `balance` is everything standing,
+  plus and minus: what a guest can spend. `earned` is the plus entries only:
+  what a guest is **ranked** by, so that voting later never costs anyone
+  their place (the Quroosh design).
+- **Attendance pays once a day.** `syncWallet` (`src/lib/quroosh/wallet.ts`)
+  reads Event attendance's check-ins with a cursor of its own
+  (`wallet_sync`) and hands them to `sync_wallet`: a standing check-in pays
+  its attendee's account the day's quroosh, an undone one has its entry
+  voided. It runs right after the accounts sync (after each check-in and on
+  the five-minute sweep, `payAttendance` in `accountSync.ts`), so a guest
+  sees their quroosh within moments, or within five minutes at worst.
+  Two unique indexes are the claim: one per check-in
+  (`wallet_entries_source_once`) and one standing attendance entry per
+  account per day (`wallet_entries_attendance_once`).
+- **The amount** is `wallet_settings.attendance_points`, 5,000 until a
+  manager changes it. A change applies from then on; days already paid keep
+  their amount. 0 stops paying for attendance.
+- **Who earns.** An account, so a person **without an email** on their pass
+  earns nothing (they have no account, see above). A check-in made before
+  the account existed is paid on the pass that makes the account. A disabled
+  account (pass cancelled) keeps its entries but leaves the leaderboard.
+- **The guest's pages** (signed in, `getGuestAccount()`):
+  `/quroosh/account/<project id>` is the wallet (balance, place, today's
+  attendance, a button to their pass, their ledger) and `…/leaderboard` the
+  top twenty. Other guests appear as **first name and the first letter of
+  the last** (`shortName`); nobody's full name is shown to the public.
+- **Managers** (`projects/[id]/quroosh/wallet`, managers only): quroosh
+  handed out, how many guests earned, the average, the amount per day, the
+  top ten and the latest 200 ledger entries with full names. **Recount from
+  the check-ins** reads every check-in again and pays what is missing; use
+  it once after applying `0007` mid-event.
+- **Before `0007` is applied** the guest's page shows the old "your account
+  is ready" card, the leaderboard says it is not open, the managers' page
+  says the migration is needed, and accounts and their emails are not
+  affected (the wallet pass fails on its own).
 
 ## The identity
 
@@ -451,6 +499,14 @@ Drive, it is 10 MB).
 
 ## Things easy to break
 
+- **Never write to `wallet_entries` by checking first and then inserting.**
+  Give the entry a `source_ref` and let `wallet_entries_source_once` refuse
+  the second one (`on conflict do nothing`). And never update or delete an
+  entry: void it and write a new one.
+- Rank guests by `earned`, never by `balance`: a vote lowers the balance and
+  must not lower anyone's place.
+- A leaderboard shown to guests or on a screen uses `shortName`. Full names
+  are for the managers' page only.
 - A raw colour in a Quroosh page bypasses the theme. Use the tokens above,
   as everywhere else in the app.
 - `AppShell` decides the world from `base`. A Quroosh page outside
