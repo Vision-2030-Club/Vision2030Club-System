@@ -909,6 +909,7 @@
     },
     "messages": {
       "notConfigured": "Email is not set up on this server (RESEND_API_KEY / EMAIL_FROM). Messages wait in the outbox until it is.",
+      "onHold": "Mock Interviews email is on hold on this server, so nothing here is sent, including with Send now. Messages wait in the outbox. To release them, set INTERVIEWS_EMAIL to on in Vercel and redeploy: every waiting message then goes out.",
       "outbox": "Outbox",
       "pending": "{count} waiting to be sent",
       "sendNow": "Send now",

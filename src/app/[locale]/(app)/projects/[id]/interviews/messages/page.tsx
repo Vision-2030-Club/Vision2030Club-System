@@ -4,7 +4,7 @@ import { ActionForm } from '@/components/ActionForm';
 import { Alert, Badge, Card, EmptyState } from '@/components/ui';
 import { formatDateTime } from '@/lib/format';
 import { can, getInterviewAccess } from '@/lib/interviews/access';
-import { isEmailConfigured } from '@/lib/interviews/email';
+import { isEmailConfigured, isEmailHeld } from '@/lib/interviews/email';
 import type { OutboxRow } from '@/lib/interviews/types';
 import { createInterviewsClient } from '@/lib/supabase/interviews';
 import { retryEmailAction, sendPendingEmailsAction } from '../actions';
@@ -53,6 +53,7 @@ export default async function InterviewsMessagesPage({
   return (
     <div className="space-y-4">
       {!configured ? <Alert tone="warn">{t('messages.notConfigured')}</Alert> : null}
+      {configured && isEmailHeld() ? <Alert tone="warn">{t('messages.onHold')}</Alert> : null}
 
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
