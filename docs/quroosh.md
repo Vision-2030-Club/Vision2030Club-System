@@ -422,8 +422,8 @@ quroosh, the challenges, the votes) will hang on. The project must carry
 
 The first part of the **Quroosh market**: guests collect quroosh during the
 event and see their balance and a leaderboard. Built 2026-11-19. Still to
-come, on the same ledger: the booths' challenges, and voting for the
-projects on the last day.
+come, on the same ledger: voting for the projects on the last day. The
+booths' challenges are below.
 
 - **The ledger.** `wallet_entries` holds one row per thing that moved
   quroosh for an account: `kind` (`attendance` today; `challenge`, `vote`
@@ -467,6 +467,62 @@ projects on the last day.
   says the migration is needed, and accounts and their emails are not
   affected (the wallet pass fails on its own).
 
+## The challenges (Quroosh 0008)
+
+The second part of the Quroosh market: each booth at the event has a short
+multiple-choice quiz. A guest scans the booth's QR code, plays once, and is
+paid into their wallet for being right and for being quick. Built
+2026-11-19.
+
+- **A challenge** (`challenges`) belongs to a booth and has a topic, the
+  seconds allowed per question (20), the most it pays (3,000) and optionally
+  a **day**. With a day it can be started on that day only; without one, any
+  day. The design wants a new quiz per booth per day: the managers make one
+  challenge per booth per day. Its `token` (made by the app, `newToken`) is
+  what the booth's QR code holds: `/quroosh/challenge/<token>`.
+- **One attempt per account per challenge**, ever
+  (`challenge_attempts_once`). Starting again returns the same attempt.
+- **The database keeps the clock.** An attempt knows which question it is on
+  and when that question was shown (`shown_at`). `challenge_answer` measures
+  `now() - shown_at` itself; the countdown on the phone is only for show. An
+  answer more than a second and a half late counts as no answer. Leaving and
+  coming back lands on the same question with its clock still running. An
+  answer to a question the attempt is not on (a second press, an old tab)
+  changes nothing.
+- **The right option never reaches a guest's page.** `challenge_state`
+  returns the prompt and the options only; `correct` is read by the
+  managers' functions alone.
+- **Points.** The design left the formula open. Here each question is worth
+  an equal share of the challenge's most; a right answer earns half its
+  share for being right and the other half scaled by the time left. So
+  everything right and instant pays the most, and a right answer in the last
+  second still pays half its share. `app.challenge_advance` computes it when
+  the last question is answered and writes one `challenge` entry to the
+  wallet's ledger in the same transaction, with the attempt's id as
+  `source_ref`. An attempt that scores 0 writes no entry.
+- **The guest's pages:** `/quroosh/challenge/<token>` is one page with four
+  faces (sign in first, the intro and Start, the question with its
+  countdown, the result), chosen by the database each time it is read. The
+  question is a client component (`QuestionForm`) that sends itself with no
+  choice when its countdown ends. `/quroosh/account/<project id>/challenges`
+  lists today's challenges and what the guest got; it has **no start
+  button on purpose**: a challenge begins at its booth.
+- **Managers** (`projects/[id]/quroosh/challenges`, managers only): the list
+  with how many played and the average; a challenge's page with its QR code
+  to print, its settings, its questions (add, rewrite, hide; the right
+  option marked; how many answered each right) and the best ten scores with
+  full names.
+- **Changing a challenge while it is being played.** A hidden question is
+  skipped by attempts that have not reached it; an added one is asked of
+  attempts still open. Each attempt's share per question is the most divided
+  by the questions *it* answered. A rewritten question does not re-score
+  answers already given.
+- **Not built:** the booth's tablet screen ("fastest today"), and a staff
+  member starting the challenge for a guest by scanning the guest's code.
+- **Before `0008` is applied** the guest's Challenges tab says they are not
+  open, a booth's code says it is not valid, the managers' page says the
+  migration is needed, and the wallet is not affected.
+
 ## The identity
 
 From the club's identity guide (an Illustrator file; the original stays in
@@ -507,6 +563,12 @@ Drive, it is 10 MB).
   must not lower anyone's place.
 - A leaderboard shown to guests or on a screen uses `shortName`. Full names
   are for the managers' page only.
+- **Never time a challenge answer in the browser**, and never send the right
+  option to a guest's page. The database measures from `shown_at` and scores;
+  a page that did either would let a guest pick their own score.
+- A challenge pays through `app.challenge_advance` only, once, when its last
+  question is answered. Do not add a second place that writes `challenge`
+  entries.
 - A raw colour in a Quroosh page bypasses the theme. Use the tokens above,
   as everywhere else in the app.
 - `AppShell` decides the world from `base`. A Quroosh page outside

@@ -4,15 +4,16 @@ import { Link } from '@/i18n/navigation';
 import { accountHomePath } from '@/lib/quroosh/accounts';
 
 /**
- * The guest's way around the Quroosh market (Quroosh 0007): the wallet and
- * the leaderboard today. The challenges and the projects join this row as
- * they are built.
+ * The guest's way around the Quroosh market (Quroosh 0007): the wallet, the
+ * booths' challenges (0008) and the leaderboard. The projects join this row
+ * when they are built.
  */
-export async function GuestTabs({ projectId, current }: { projectId: string; current: 'wallet' | 'leaderboard' }) {
+export async function GuestTabs({ projectId, current }: { projectId: string; current: 'wallet' | 'challenges' | 'leaderboard' }) {
   const t = await getTranslations('quroosh.account.tabs');
   const home = accountHomePath(projectId);
   const tabs = [
     { key: 'wallet', href: home },
+    { key: 'challenges', href: `${home}/challenges` },
     { key: 'leaderboard', href: `${home}/leaderboard` },
   ] as const;
 
@@ -24,7 +25,7 @@ export async function GuestTabs({ projectId, current }: { projectId: string; cur
           href={tab.href}
           aria-current={tab.key === current ? 'page' : undefined}
           className={cx(
-            'flex-1 rounded-lg px-3 py-2 text-center text-sm font-semibold',
+            'flex-1 rounded-lg px-2 py-2 text-center text-sm font-semibold',
             tab.key === current ? 'bg-brand-950 text-accent-2' : 'text-ink-muted hover:bg-surface-muted',
           )}
         >

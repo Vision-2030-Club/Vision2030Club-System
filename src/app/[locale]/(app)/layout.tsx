@@ -235,6 +235,14 @@ export default async function AppLayout({
           icon: 'kpi',
           show: component.role === 'manager',
         },
+        // The booths' challenges and their right answers (Quroosh 0008):
+        // managers only.
+        {
+          href: `${base}/challenges`,
+          label: tQuroosh('tabs.challenges'),
+          icon: 'tasks',
+          show: component.role === 'manager',
+        },
         // The same project's Event attendance (0075), when it carries one
         // this person may open: its own pages, one press away.
         {
