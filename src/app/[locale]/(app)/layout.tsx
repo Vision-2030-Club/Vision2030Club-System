@@ -227,6 +227,14 @@ export default async function AppLayout({
           icon: 'members',
           show: component.role === 'manager',
         },
+        // What the guests collected and the ledger behind it (Quroosh 0007):
+        // full names, so managers only.
+        {
+          href: `${base}/wallet`,
+          label: tQuroosh('tabs.wallet'),
+          icon: 'kpi',
+          show: component.role === 'manager',
+        },
         // The same project's Event attendance (0075), when it carries one
         // this person may open: its own pages, one press away.
         {

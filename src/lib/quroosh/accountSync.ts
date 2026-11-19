@@ -4,6 +4,7 @@ import { escapeHtml, isEmailConfigured, sendEmail } from '@/lib/email/resend';
 import { getAttendeesById, listAttendees, listCheckIns } from '@/lib/eventAttendance/api';
 import { newToken } from '@/lib/interviews/tokens';
 import { accountLinkUrl, hashToken } from '@/lib/quroosh/accounts';
+import { syncWallet } from '@/lib/quroosh/wallet';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 
@@ -266,6 +267,19 @@ export async function deliverAccountEmails(limit = 50, budgetMs = 30_000): Promi
   return report;
 }
 
+/**
+ * The day's quroosh for whoever was checked in (Quroosh 0007), after their
+ * accounts exist. On its own so that trouble here (0007 not applied yet)
+ * never holds back an account or its email.
+ */
+async function payAttendance(projectId: string): Promise<void> {
+  try {
+    await syncWallet(projectId);
+  } catch (error) {
+    console.error('[quroosh/wallet] paying attendance failed', error);
+  }
+}
+
 /** For the end of a server action: send once the response is out the door. */
 export function kickAccountEmails(): void {
   after(async () => {
@@ -288,6 +302,7 @@ export function kickGuestAccountSync(projectId: string): void {
     try {
       if (!(await carriesAttendanceAndQuroosh(projectId))) return;
       const { created } = await syncGuestAccounts(projectId);
+      await payAttendance(projectId);
       if (created > 0) await deliverAccountEmails();
     } catch (error) {
       console.error('[quroosh/accounts] sync after a check-in failed', error);
@@ -303,6 +318,7 @@ export async function sweepGuestAccounts(): Promise<{ projects: number; created:
   for (const projectId of projects) {
     try {
       created += (await syncGuestAccounts(projectId)).created;
+      await payAttendance(projectId);
     } catch (error) {
       // One project's trouble (a migration not applied) must not stop the rest.
       console.error('[quroosh/accounts] sweep failed for a project', error);

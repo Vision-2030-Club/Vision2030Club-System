@@ -1439,7 +1439,8 @@
       "projectDetails": "Project details",
       "applications": "Applications",
       "guests": "Guests",
-      "accounts": "Accounts"
+      "accounts": "Accounts",
+      "wallet": "Quroosh & ledger"
     },
     "role": {
       "manager": "Manager",
@@ -1930,6 +1931,36 @@
         "account_disabled": "This account is not active. Please contact the Quroosh team.",
         "email_invalid": "Please check the email address.",
         "invalid": "This did not work. Please try again."
+      },
+      "tabs": {
+        "label": "Quroosh market",
+        "wallet": "My wallet",
+        "leaderboard": "Leaderboard"
+      },
+      "wallet": {
+        "balance": "Your quroosh",
+        "place": "You are #{position} of {players} guests",
+        "noPlaceYet": "Collect quroosh to take your place among the guests.",
+        "earnTitle": "Earn today",
+        "attendance": "Today’s attendance",
+        "attendanceHint": "Show your pass at the gate. It is counted once a day and can take a few minutes to appear here.",
+        "attendanceDone": "Counted for today. See you tomorrow.",
+        "showPass": "Show my pass",
+        "ledgerTitle": "Your ledger",
+        "ledgerEmpty": "Nothing yet. Your first quroosh arrive when you are checked in at the gate.",
+        "kind": {
+          "attendance": "Attendance",
+          "challenge": "Challenge",
+          "vote": "Vote",
+          "adjustment": "Adjustment"
+        }
+      },
+      "leaderboard": {
+        "title": "Leaderboard",
+        "intro": "Guests are ranked by the quroosh they have collected.",
+        "you": "You · {name}",
+        "empty": "Nobody has collected quroosh yet.",
+        "notReady": "The leaderboard is not open yet."
       }
     },
     "accounts": {
@@ -1968,6 +1999,39 @@
         "not_found": "This account does not exist.",
         "account_disabled": "This account is disabled because the pass was cancelled.",
         "just_sent": "A link was queued for this account a moment ago.",
+        "invalid": "This did not work. Try again."
+      }
+    },
+    "wallet": {
+      "title": "Quroosh and the ledger",
+      "intro": "Guests collect quroosh during the event. Today they earn them by being checked in at the gate, once a day. Each guest sees their balance and the leaderboard on their account page.",
+      "notReady": "The wallet is not ready on this deployment yet: Quroosh migration 0007 has to be applied first.",
+      "distributed": "Quroosh handed out",
+      "holders": "Guests who earned",
+      "average": "Average per guest",
+      "perDay": "Quroosh for a day’s attendance",
+      "perDayHint": "Applies from now on. Days already paid keep the amount they were paid. 0 stops paying for attendance.",
+      "save": "Save",
+      "recount": "Recount from the check-ins",
+      "recountHint": "Attendance is paid by itself after each check-in and every five minutes. A recount reads every check-in again and pays what is missing; nothing is paid twice.",
+      "recounted": "Done. Every check-in has been counted.",
+      "topTitle": "Top ten",
+      "ledgerTitle": "Latest entries",
+      "shown": "Showing the latest {shown} entries.",
+      "empty": "No entries yet. They appear as guests with accounts are checked in.",
+      "voided": "Taken back",
+      "kind": {
+        "attendance": "Attendance",
+        "challenge": "Challenge",
+        "vote": "Vote",
+        "adjustment": "Adjustment"
+      },
+      "errors": {
+        "forbidden": "Only the project’s managers can do this.",
+        "not_configured": "The Quroosh database is not configured on this deployment.",
+        "needs_attendance": "This project has no Event attendance component.",
+        "points_invalid": "Enter a whole number between 0 and 1,000,000.",
+        "sync_failed": "The check-ins could not be read. Check that club migration 0076 and Quroosh migrations 0006 and 0007 are applied.",
         "invalid": "This did not work. Try again."
       }
     }
