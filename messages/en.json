@@ -1440,7 +1440,8 @@
       "applications": "Applications",
       "guests": "Guests",
       "accounts": "Accounts",
-      "wallet": "Quroosh & ledger"
+      "wallet": "Quroosh & ledger",
+      "challenges": "Challenges"
     },
     "role": {
       "manager": "Manager",
@@ -1935,7 +1936,8 @@
       "tabs": {
         "label": "Quroosh market",
         "wallet": "My wallet",
-        "leaderboard": "Leaderboard"
+        "leaderboard": "Leaderboard",
+        "challenges": "Challenges"
       },
       "wallet": {
         "balance": "Your quroosh",
@@ -1961,6 +1963,25 @@
         "you": "You · {name}",
         "empty": "Nobody has collected quroosh yet.",
         "notReady": "The leaderboard is not open yet."
+      },
+      "challenges": {
+        "title": "Challenges",
+        "intro": "Booths at the event have a short quiz. Play it and collect quroosh.",
+        "rules": {
+          "scan": "Scan the QR code at the booth to start.",
+          "speed": "Multiple choice. A right answer pays, and a faster one pays more.",
+          "once": "One go at each challenge."
+        },
+        "notReady": "Challenges are not open yet.",
+        "empty": "No challenges are open today.",
+        "questions": "{count, plural, one {# question} other {# questions}}",
+        "upTo": "up to {points}",
+        "status": {
+          "new": "Open now",
+          "open": "Started, not finished",
+          "done": "Done"
+        },
+        "scanToStart": "Scan the booth’s QR code"
       }
     },
     "accounts": {
@@ -2032,6 +2053,125 @@
         "needs_attendance": "This project has no Event attendance component.",
         "points_invalid": "Enter a whole number between 0 and 1,000,000.",
         "sync_failed": "The check-ins could not be read. Check that club migration 0076 and Quroosh migrations 0006 and 0007 are applied.",
+        "invalid": "This did not work. Try again."
+      }
+    },
+    "challenge": {
+      "notFound": "This challenge code is not valid.",
+      "booth": "{booth} challenge",
+      "signInTitle": "Sign in to play",
+      "signInBody": "The challenge pays into your Quroosh account. Sign in first, then scan the booth’s QR code again.",
+      "signIn": "Sign in",
+      "progress": "Question {number} of {total}",
+      "next": "Next",
+      "finish": "Finish",
+      "timeLeft": "Time left",
+      "timeUp": "Time is up",
+      "letters": {
+        "a": "A",
+        "b": "B",
+        "c": "C",
+        "d": "D"
+      },
+      "closed": "This challenge is not open today.",
+      "intro": {
+        "title": "Ready?",
+        "questions": "{count, plural, one {# multiple-choice question} other {# multiple-choice questions}}",
+        "seconds": "{seconds} seconds for each question",
+        "points": "Up to {points} quroosh: right answers pay, faster ones pay more",
+        "once": "You get one go, and you cannot go back to a question",
+        "start": "Start the challenge",
+        "clock": "The clock starts as soon as you press."
+      },
+      "result": {
+        "added": "quroosh added to your wallet",
+        "nothing": "No quroosh this time",
+        "correct": "Right answers",
+        "time": "Your time",
+        "seconds": "{seconds} s",
+        "place": "Your place today",
+        "once": "This challenge is done for you. Look for the other booths.",
+        "back": "Back to my wallet"
+      },
+      "errors": {
+        "forbidden": "Sign in to your Quroosh account first.",
+        "challenge_closed": "This challenge is not open today.",
+        "challenge_empty": "This challenge has no questions yet.",
+        "not_found": "This challenge code is not valid.",
+        "invalid": "This did not work. Please try again."
+      }
+    },
+    "challenges": {
+      "title": "Challenges",
+      "intro": "Each booth has a short quiz that guests start by scanning the booth’s QR code. A guest plays each challenge once, and what they score goes into their wallet.",
+      "notReady": "Challenges are not ready on this deployment yet: Quroosh migration 0008 has to be applied first.",
+      "empty": "No challenges yet. Make the first one below.",
+      "off": "Switched off",
+      "noQuestions": "No questions",
+      "everyDay": "Every day",
+      "questionCount": "{count, plural, one {# question} other {# questions}}",
+      "played": "{count} played",
+      "average": "average {points}",
+      "newTitle": "New challenge",
+      "create": "Create and write its questions",
+      "newHint": "For a different quiz each day, make one challenge per booth per day and give each its day. Each challenge has its own QR code.",
+      "fields": {
+        "booth": "Booth",
+        "topic": "Topic (shown to guests)",
+        "day": "Day",
+        "dayHint": "Leave empty for a challenge that is open every day.",
+        "seconds": "Seconds per question",
+        "maxPoints": "Most quroosh it pays",
+        "active": "Open to guests"
+      },
+      "letters": {
+        "a": "A",
+        "b": "B",
+        "c": "C",
+        "d": "D"
+      },
+      "offNote": "This challenge is switched off: guests cannot start it.",
+      "noQuestionsNote": "This challenge has no questions, so guests cannot start it. Add at least one below.",
+      "qrTitle": "The booth’s QR code",
+      "qrAlt": "QR code of the {booth} challenge",
+      "qrHint": "Print it and put it at the booth, or show it on the booth’s tablet. A guest scans it with their phone’s camera to start.",
+      "link": "Challenge link",
+      "downloadQr": "Download the QR code (PNG)",
+      "settingsTitle": "Settings",
+      "save": "Save",
+      "settingsHint": "A right answer earns half of the question’s share for being right and the rest for speed. Changes apply to guests who have not finished yet.",
+      "questionsTitle": "Questions ({count})",
+      "question": {
+        "prompt": "Question",
+        "options": "Options, and which one is right",
+        "rightOne": "Option {letter} is the right one",
+        "option": "Option {letter}",
+        "optionsHint": "Two to four options. Mark the right one. Leave the ones you do not need empty.",
+        "hidden": "Hidden",
+        "right": "right",
+        "stats": "{right} of {answered} answered it right",
+        "edit": "Edit or hide",
+        "show": "Show this question again",
+        "hide": "Hide this question",
+        "addTitle": "Add a question",
+        "add": "Add the question"
+      },
+      "topTitle": "Best scores",
+      "topLine": "{correct} right · {seconds} s",
+      "errors": {
+        "forbidden": "Only the project’s managers can do this.",
+        "not_configured": "The Quroosh database is not configured on this deployment.",
+        "not_found": "This does not exist any more. Reload the page.",
+        "booth_invalid": "Write the booth’s name (120 characters at most).",
+        "topic_invalid": "The topic is too long (200 characters at most).",
+        "day_invalid": "Choose a valid day.",
+        "seconds_invalid": "Seconds per question must be between 5 and 120.",
+        "points_invalid": "Quroosh must be a whole number between 0 and 1,000,000.",
+        "challenge_invalid": "The challenge could not be saved. Check the fields.",
+        "prompt_invalid": "Write the question (500 characters at most).",
+        "options_invalid": "Write two to four options, 200 characters each at most.",
+        "correct_invalid": "Mark which option is right. It must be one you filled in.",
+        "question_invalid": "The question could not be saved. Check the fields.",
         "invalid": "This did not work. Try again."
       }
     }

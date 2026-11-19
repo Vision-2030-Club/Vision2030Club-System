@@ -53,6 +53,10 @@ docs/                 how each part works
   **not yet applied**), the first part of the Quroosh market: an account
   earns quroosh for each day it is checked in, and guests see their balance
   and a leaderboard. See "The wallet" in `docs/quroosh.md`.
+- **The Quroosh challenges** (Quroosh migration `0008`, written 2026-11-19,
+  **not yet applied**): a quiz at each booth, started from the booth's QR
+  code, timed by the database and paid into the wallet. See "The
+  challenges" in `docs/quroosh.md`.
 - The real club is in the database (98 active members when it was loaded on
   2026-09-16). The management team has tested it in rounds since; what each
   round changed is in `docs/data-and-testing.md`.
