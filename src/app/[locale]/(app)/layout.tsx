@@ -219,6 +219,14 @@ export default async function AppLayout({
           icon: 'calendar',
           show: component.role === 'manager',
         },
+        // The accounts of the public who were checked in (Quroosh 0006):
+        // their names, mobiles and emails, so managers only.
+        {
+          href: `${base}/accounts`,
+          label: tQuroosh('tabs.accounts'),
+          icon: 'members',
+          show: component.role === 'manager',
+        },
         // The same project's Event attendance (0075), when it carries one
         // this person may open: its own pages, one press away.
         {

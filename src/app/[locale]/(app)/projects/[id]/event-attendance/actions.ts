@@ -9,6 +9,7 @@ import { tokenFromScan } from '@/lib/eventAttendance/links';
 import { answer, refusal } from '@/lib/eventAttendance/refusal';
 import type { EventAttendeeMatch, EventCheckInResult } from '@/lib/eventAttendance/types';
 import { formatTime } from '@/lib/format';
+import { kickGuestAccountSync } from '@/lib/quroosh/accountSync';
 import { createClient } from '@/lib/supabase/server';
 
 /**
@@ -88,8 +89,14 @@ export async function resendPassAction(_previous: ActionResult, formData: FormDa
 // The gate
 // -----------------------------------------------------------------------------
 
-/** What the scanner shows after a check-in: who, and when they first came in today. */
-function checkedIn(result: EventCheckInResult, locale: string): ActionResult {
+/**
+ * What the scanner shows after a check-in: who, and when they first came in
+ * today. A new arrival is also told to whoever builds on attendance, after
+ * the scanner has its answer: Quroosh makes the guest's account and emails
+ * them (src/lib/quroosh/accountSync.ts). That never fails the check-in.
+ */
+function checkedIn(result: EventCheckInResult, locale: string, projectId: string): ActionResult {
+  if (result.result === 'checked_in') kickGuestAccountSync(projectId);
   return ok('saved', {
     result: result.result,
     attendee_id: result.attendee_id,
@@ -108,7 +115,7 @@ export async function scanAction(projectId: string, locale: string, scanned: str
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('event_check_in', { p_project: projectId, p_token: token });
   if (error) return answer(locale, error);
-  return checkedIn(data as EventCheckInResult, locale);
+  return checkedIn(data as EventCheckInResult, locale, projectId);
 }
 
 /** Checks in an attendee found by name or mobile. */
@@ -117,7 +124,7 @@ export async function checkInByIdAction(projectId: string, locale: string, atten
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('event_check_in', { p_project: projectId, p_attendee: attendeeId });
   if (error) return answer(locale, error);
-  return checkedIn(data as EventCheckInResult, locale);
+  return checkedIn(data as EventCheckInResult, locale, projectId);
 }
 
 /** Undoes an attendee's check-in for today. */

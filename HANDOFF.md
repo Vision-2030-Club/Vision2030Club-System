@@ -45,6 +45,10 @@ docs/                 how each part works
   applied**) keeps the public's names, mobiles and emails in the club
   database, behind functions only. It needs `0075` applied, and Resend
   configured for its pass emails; see `docs/event-attendance.md`.
+- **Quroosh guest accounts** (Quroosh migration `0006` and club migration
+  `0076`, written 2026-11-19, **not yet applied**): everyone checked in at
+  the gate gets an account and an email to complete it, with no password.
+  See "Guest accounts" in `docs/quroosh.md`.
 - The real club is in the database (98 active members when it was loaded on
   2026-09-16). The management team has tested it in rounds since; what each
   round changed is in `docs/data-and-testing.md`.

@@ -15,6 +15,9 @@ import { serviceRoleKey, supabaseEnv } from './env';
  *      form, a pass page, the pass emails and the API other components call.
  *      Nobody is signed in there, and the `event_*` functions it calls are
  *      granted to the service role alone
+ *   5. Quroosh's guest-account sync (lib/quroosh/accountSync, Quroosh 0006),
+ *      which runs after a check-in and on the sweep with nobody signed in:
+ *      it reads which projects carry both components, and the attendance API
  *
  * Never use it for ordinary data access: doing so would silently skip every
  * permission rule the database enforces. Use `lib/supabase/server.ts` instead.
