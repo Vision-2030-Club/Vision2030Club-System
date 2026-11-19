@@ -26,6 +26,11 @@ const SCALE_WORDS_AR = { excellent: 'ممتاز', good: 'جيد', needsImproveme
  *
  * Without RESEND_API_KEY nothing is sent and nothing is lost: the rows wait,
  * and the Messages page says the key is missing.
+ *
+ * The same is true while the interviews' email is held (`isEmailHeld`), which
+ * is the default: Resend is shared with Event attendance and Quroosh, and
+ * switching it on for them must not release what has waited here since
+ * October 2026. Nothing leaves until INTERVIEWS_EMAIL is set to "on".
  */
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
@@ -33,6 +38,11 @@ const CONCURRENCY = 4;
 
 export function isEmailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
+}
+
+/** Held unless the deployment says INTERVIEWS_EMAIL=on. Held rows wait; none is lost. */
+export function isEmailHeld(): boolean {
+  return (process.env.INTERVIEWS_EMAIL ?? '').trim().toLowerCase() !== 'on';
 }
 
 /**
@@ -281,12 +291,12 @@ async function sendViaResend(to: string, toName: string | null, rendered: Render
 
 /**
  * Drains the outbox. Safe to call from anywhere: with nothing queued it does
- * nothing, and without a key it leaves every row where it is.
+ * nothing, and without a key, or while held, it leaves every row where it is.
  */
 export async function deliverPendingEmails(limit = 50, budgetMs = 40_000): Promise<EmailReport> {
   const started = Date.now();
   const report: EmailReport = { claimed: 0, sent: 0, failed: 0, deferred: 0, ms: 0 };
-  if (!isEmailConfigured()) return report;
+  if (!isEmailConfigured() || isEmailHeld()) return report;
 
   const db = createInterviewsClient();
   const { data, error } = await db.rpc('claim_email_outbox', { p_limit: limit });

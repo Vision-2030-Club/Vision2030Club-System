@@ -48,8 +48,13 @@ short version:
   contact you" instead of promising an email with a link
   (`apply.whatNext`, `apply.emailHint`, `student.nothingYet`). Accepted
   students reach their booking page through an assignment's candidate link
-  and HR's accepted phone list. If Resend is switched on later, every row
-  queued since 11 Oct goes out at once: look at the Messages tab first. Feedback is **email only** and held until a manager
+  and HR's accepted phone list. **Held by a switch since 2026-11-19:** Resend
+  is shared with Event attendance and Quroosh, so setting its two variables
+  no longer sends anything from here. Interviews email leaves only when
+  `INTERVIEWS_EMAIL=on` is also set (`isEmailHeld` in `email.ts`); until then
+  rows wait, *Send now* sends nothing and the Messages page says so. Setting
+  it to `on` sends every row queued since 11 Oct at once: look at the
+  Messages tab first. Feedback is **email only** and held until a manager
   presses *Send feedback emails* (or sent at once, per edition setting).
 - **Exports.** `edition_snapshot` renders an edition as one JSON document;
   the sweep writes it to the private `exports` bucket once a night after 03:00
@@ -105,7 +110,7 @@ carry the brand outright.
 2. `npm run db:push` for `0062`, then `npm run db:components`.
 3. Resend: an API key and a verified sender domain; `RESEND_API_KEY` and
    `EMAIL_FROM`. Until the domain is verified Resend delivers only to the
-   account owner's address.
+   account owner's address. Interviews email also needs `INTERVIEWS_EMAIL=on`.
 4. Vercel: the five variables above; then `npm run interviews:cron`.
 5. In the app: open a project, attach *Mock Interviews*, then Settings → set
    the windows and status *Active*; Companies; Schedule → rooms and sessions;
