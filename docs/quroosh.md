@@ -523,6 +523,53 @@ paid into their wallet for being right and for being quick. Built
   open, a booth's code says it is not valid, the managers' page says the
   migration is needed, and the wallet is not affected.
 
+## The session check-in (Quroosh 0009)
+
+The third way to earn: checking in to the day's **dialogue session**
+(جلسة حوارية). Built 2026-11-21.
+
+- **One permanent QR code per project.** It holds
+  `/<locale>/quroosh/checkin/<project id>` (`sessionCheckInUrl` in
+  `src/lib/quroosh/sessions.ts`) and never expires or changes, so a printed
+  copy works for every session. Organizers find it on the **تسجيل حضور
+  للجلسة** (Session check-in) tab of the **Event attendance** sidebar
+  (`projects/[id]/event-attendance/session`): the code (pressing it opens the
+  page too), the link to copy, *Download QR*, and how many checked in and the
+  average rating, day by day. Counts only, no names, so the HR team may open
+  it as well as the managers. The tab shows only where the project carries
+  Quroosh too, and only to someone who may open both (so not to an HR member
+  without Quroosh access).
+- **The guest's page** (`(quroosh-public)/quroosh/checkin/[projectId]`), three
+  faces, decided by the database each time it is read:
+  - **not signed in** (no `getGuestAccount()`, or another project's): the
+    sign-in form (`SignInForm`, shared with the account page). The emailed
+    link brings them **back to the check-in page**: asking for the link from
+    here remembers the page in a cookie, `quroosh_return` (an hour, HttpOnly),
+    and `redeemLinkAction` sends them there instead of the account page when
+    the cookie names the same project. Only `/quroosh/checkin/<uuid>` is
+    accepted (`safeReturnPath`). A link opened on another device lands on the
+    account page as before.
+  - **not checked in today:** five stars (radio buttons, so a keyboard and a
+    screen reader work) and **تسجيل حضور**, disabled until a star is chosen.
+  - **checked in today:** "لقد قمت بتسجيل حضورك لجلسة اليوم بالفعل", their
+    stars, and the button disabled until 00:00 Riyadh. Right after checking
+    in (`?done=1`) the confirmation and the quroosh added are shown on top.
+- **Once a day, on the club's calendar.** `session_check_ins` has one row per
+  account per day (`app.quroosh_today()`, Riyadh) with the rating, and the
+  unique constraint `session_check_ins_once` is the claim: a second press or
+  a second tab is refused with `already_checked_in`. A new day begins at
+  00:00 Riyadh with nothing to reset.
+- **Paid in the same transaction.** `session_check_in` writes the check-in and
+  a `session` entry on the ledger (`source_ref` = the check-in's id), worth
+  `wallet_settings.session_points`: **1,000** until changed (no screen for it
+  yet; 0 stops paying). 0009 adds `session` to the ledger's kinds.
+- **Who can check in:** a guest account (0006), so someone checked in at the
+  gate with an email on their pass. Being at the gate is not required on the
+  day; the session code is enough.
+- **Before `0009` is applied** the guest's page says check-in is not open,
+  the organizers' tab shows the QR code with a note that the migration is
+  needed, and the wallet page leaves the session line out.
+
 ## The identity
 
 From the club's identity guide (an Illustrator file; the original stays in
@@ -568,7 +615,11 @@ Drive, it is 10 MB).
   a page that did either would let a guest pick their own score.
 - A challenge pays through `app.challenge_advance` only, once, when its last
   question is answered. Do not add a second place that writes `challenge`
-  entries.
+  entries. The same for `session` entries: `session_check_in` only.
+- Never "check whether they checked in today, then insert" for the session:
+  the unique constraint `session_check_ins_once` is the claim.
+- The return cookie must only ever hold a path `safeReturnPath` accepts. A
+  free-form "next" would let anyone's link send a guest to another site.
 - A raw colour in a Quroosh page bypasses the theme. Use the tokens above,
   as everywhere else in the app.
 - `AppShell` decides the world from `base`. A Quroosh page outside

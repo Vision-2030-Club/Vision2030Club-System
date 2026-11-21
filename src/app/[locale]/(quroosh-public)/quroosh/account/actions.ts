@@ -3,7 +3,14 @@
 import { getTranslations } from 'next-intl/server';
 import { redirect } from '@/i18n/navigation';
 import { fail, ok, type ActionResult } from '@/lib/actions';
-import { accountHomePath, endGuestSession, redeemAccountLink } from '@/lib/quroosh/accounts';
+import {
+  accountHomePath,
+  endGuestSession,
+  redeemAccountLink,
+  rememberReturnPath,
+  safeReturnPath,
+  takeReturnPath,
+} from '@/lib/quroosh/accounts';
 import { kickAccountEmails } from '@/lib/quroosh/accountSync';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 
@@ -37,9 +44,15 @@ export async function redeemLinkAction(_previous: ActionResult, formData: FormDa
   const locale = localeOf(formData);
   const result = await redeemAccountLink(String(formData.get('token') ?? ''));
   if (!result.ok) return refusal(locale, result.hint);
+  // Back to the page the link was asked for from (the session check-in), when
+  // it is on this device and belongs to the same project.
+  const back = await takeReturnPath();
   // Outside any try: redirect() works by throwing.
   redirect({
-    href: `${accountHomePath(result.projectId)}${result.newlyCompleted ? '?created=1' : ''}`,
+    href:
+      back && back.endsWith(`/${result.projectId}`)
+        ? back
+        : `${accountHomePath(result.projectId)}${result.newlyCompleted ? '?created=1' : ''}`,
     locale,
   });
   return ok();
@@ -58,6 +71,9 @@ export async function requestSignInAction(_previous: ActionResult, formData: For
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
   if (email.length > 254 || !EMAIL.test(email)) return refusal(locale, 'email_invalid');
   if (!UUID.test(projectId) || !isQurooshConfigured()) return ok('sent');
+  // Asked for from the session check-in: come back to it after signing in.
+  // Asked for from the account page: forget any older page.
+  await rememberReturnPath(safeReturnPath(formData.get('next')));
 
   // An error here (0006 not applied) reads the same as "no such account".
   await createQurooshClient().rpc('request_account_signin', { p_project: projectId, p_email: email });

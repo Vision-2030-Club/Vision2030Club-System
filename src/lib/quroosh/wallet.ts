@@ -18,7 +18,7 @@ import { createQurooshClient } from '@/lib/supabase/quroosh';
  * pages can say so instead of crashing.
  */
 
-export type WalletKind = 'attendance' | 'challenge' | 'vote' | 'adjustment';
+export type WalletKind = 'attendance' | 'challenge' | 'vote' | 'adjustment' | 'session';
 
 export type WalletOverview = { balance: number; earned: number; position: number; players: number };
 export type WalletEntry = { id: string; kind: WalletKind; amount: number; day: string | null; created_at: string };
