@@ -86,7 +86,8 @@ export default async function SessionCheckInQrPage({
             <StatTile label={t('today')} value={String(todayRow?.check_ins ?? 0)} tone="ok" />
             <StatTile
               label={t('averageToday')}
-              value={todayRow ? `${todayRow.average_rating.toFixed(1)} / 5` : '—'}
+              // Isolated left to right, or Arabic shows "5 / 4.6".
+              value={todayRow ? `\u2066${todayRow.average_rating.toFixed(1)} / 5\u2069` : '—'}
             />
             <StatTile label={t('reward')} value={points === null ? '—' : formatQuroosh(points)} hint={t('rewardHint')} />
           </div>
