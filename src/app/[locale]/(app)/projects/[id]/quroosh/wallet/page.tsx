@@ -14,6 +14,7 @@ import {
   type LedgerRow,
   type WalletTotals,
 } from '@/lib/quroosh/wallet';
+import { getSessionPoints } from '@/lib/quroosh/sessions';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 import { recountWalletAction, saveWalletSettingsAction } from './actions';
 
@@ -22,8 +23,9 @@ const SHOWN = 200;
 
 /**
  * Quroosh and the ledger (Quroosh 0007), for the project's managers only:
- * how many quroosh have been handed out, what a day's attendance is worth,
- * who is ahead, and the latest entries of the ledger with full names.
+ * how many quroosh have been handed out, what a guest's first visit and a
+ * session check-in are worth, who is ahead, and the latest entries of the
+ * ledger with full names.
  */
 export default async function QurooshWalletPage({
   params,
@@ -48,11 +50,13 @@ export default async function QurooshWalletPage({
   }
 
   const db = createQurooshClient();
-  const [totalsResult, ledgerResult, perDay, top] = await Promise.all([
+  const [totalsResult, ledgerResult, perDay, top, perSession] = await Promise.all([
     db.rpc('wallet_totals', { p_project: id }),
     db.rpc('wallet_ledger', { p_project: id, p_limit: SHOWN }),
     getAttendancePoints(id),
     getLeaderboard(id, 10),
+    // Null before 0009 is applied: its field is left off the form.
+    getSessionPoints(id),
   ]);
   // Before 0007 is applied the functions do not exist: say so, do not crash.
   if (totalsResult.error || ledgerResult.error || perDay === null) {
@@ -101,8 +105,26 @@ export default async function QurooshWalletPage({
               dir="ltr"
               required
             />
+            <p className="mt-1 text-xs text-ink-muted">{t('wallet.perDayHint')}</p>
           </div>
-          <p className="text-xs text-ink-muted">{t('wallet.perDayHint')}</p>
+          {perSession !== null ? (
+            <div className="max-w-xs">
+              <Label htmlFor="session-points">{t('wallet.perSession')}</Label>
+              <Input
+                id="session-points"
+                name="session_points"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={1000000}
+                step={1}
+                defaultValue={perSession}
+                dir="ltr"
+                required
+              />
+              <p className="mt-1 text-xs text-ink-muted">{t('wallet.perSessionHint')}</p>
+            </div>
+          ) : null}
         </ActionForm>
 
         <ActionForm

@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { StatTile } from '@/components/charts/BarList';
 import { Alert, Card, PageHeader } from '@/components/ui';
-import { getEventAttendanceAccess } from '@/lib/eventAttendance/access';
+import { Link } from '@/i18n/navigation';
+import { can, getEventAttendanceAccess } from '@/lib/eventAttendance/access';
 import { eventDay } from '@/lib/eventAttendance/links';
 import { localized } from '@/lib/format';
 import { qrDataUrls } from '@/lib/links';
@@ -91,6 +92,16 @@ export default async function SessionCheckInQrPage({
             />
             <StatTile label={t('reward')} value={points === null ? '—' : formatQuroosh(points)} hint={t('rewardHint')} />
           </div>
+          {/* The amount is a wallet setting, changed with the other one on the
+              Quroosh Wallet page (managers of the project only). */}
+          {can.manage(access.role) ? (
+            <p className="text-sm text-ink-muted">
+              {t('changeReward')}{' '}
+              <Link href={`/projects/${id}/quroosh/wallet`} className="font-medium text-brand-600 hover:underline">
+                {t('changeRewardLink')}
+              </Link>
+            </p>
+          ) : null}
 
           <Card>
             <h2 className="mb-3 font-semibold text-ink">{t('byDay')}</h2>

@@ -8,7 +8,8 @@
 -- pays the guest's wallet (0007): 1,000 quroosh until a manager changes it.
 --
 --   session_check_ins   one row per account per day, with the rating
---   wallet_settings     gains session_points (what a check-in pays)
+--   wallet_settings     gains session_points (what a check-in pays), which
+--                       the managers change on the Wallet page
 --   wallet_entries      gains the kind 'session'
 --
 -- The unique constraint on (account_id, day) is the claim: two presses, or
@@ -73,6 +74,27 @@ security definer
 set search_path = public, pg_temp
 as $$
   select coalesce((select s.session_points from wallet_settings s where s.project_id = p_project), 1000);
+$$;
+
+-- Changes what a session check-in pays from now on (the managers' Wallet
+-- page). Check-ins already paid keep the amount they were paid. 0 stops
+-- paying; checking in still works.
+create or replace function public.wallet_save_session_points(p_project uuid, p_session_points integer)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if p_session_points is null or p_session_points < 0 or p_session_points > 1000000 then
+    perform app.refuse('points_invalid', 'The quroosh for a session check-in must be between 0 and 1,000,000.');
+  end if;
+  insert into wallet_settings (project_id, session_points)
+  values (p_project, p_session_points)
+  on conflict (project_id) do update
+     set session_points = excluded.session_points, updated_at = now();
+end;
 $$;
 
 -- -----------------------------------------------------------------------------
@@ -170,11 +192,13 @@ $$;
 -- -----------------------------------------------------------------------------
 
 revoke execute on function public.session_points(uuid) from public, anon, authenticated;
+revoke execute on function public.wallet_save_session_points(uuid, integer) from public, anon, authenticated;
 revoke execute on function public.session_today(uuid) from public, anon, authenticated;
 revoke execute on function public.session_check_in(uuid, uuid, integer) from public, anon, authenticated;
 revoke execute on function public.session_summary(uuid) from public, anon, authenticated;
 
 grant execute on function public.session_points(uuid) to service_role;
+grant execute on function public.wallet_save_session_points(uuid, integer) to service_role;
 grant execute on function public.session_today(uuid) to service_role;
 grant execute on function public.session_check_in(uuid, uuid, integer) to service_role;
 grant execute on function public.session_summary(uuid) to service_role;

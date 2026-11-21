@@ -39,7 +39,7 @@ docs/                 how each part works
   `schema_migrations` table of its database; `npm run db:push` and
   `npm run db:push:interviews` apply what is missing. Quroosh has a third
   database of its own (`supabase/quroosh/migrations`, `npm run
-  db:push:quroosh`, up to `0009`); see
+  db:push:quroosh`, up to `0010`); see
   `docs/quroosh.md`.
 - **Event attendance** (club migration `0075`, written 2026-11-18, **not yet
   applied**) keeps the public's names, mobiles and emails in the club
@@ -61,7 +61,12 @@ docs/                 how each part works
   **not yet applied**): a permanent QR code per project, on the Event
   attendance sidebar's "تسجيل حضور للجلسة" tab. A signed-in guest rates the
   day's dialogue session and checks in once a day, and 1,000 quroosh are
-  paid into their wallet. See "The session check-in" in `docs/quroosh.md`.
+  paid into their wallet (managers change the amount on Quroosh → Wallet).
+  See "The session check-in" in `docs/quroosh.md`.
+- **Attendance pays the first visit only** (Quroosh migration `0010`,
+  written 2026-11-21, **not yet applied**): a guest's first check-in at the
+  gate pays 5,000 quroosh and later days pay nothing. See "The wallet" in
+  `docs/quroosh.md`.
 - The real club is in the database (98 active members when it was loaded on
   2026-09-16). The management team has tested it in rounds since; what each
   round changed is in `docs/data-and-testing.md`.

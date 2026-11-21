@@ -59,7 +59,8 @@ export default async function QurooshAccountPage({
     ]);
     // The event's day on the club's clock, as the ledger writes it.
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: CLUB_TIME_ZONE }).format(new Date());
-    const paidToday = entries.some((entry) => entry.kind === 'attendance' && entry.day === today);
+    // Attendance pays the first visit only (Quroosh 0010), so once paid it is done.
+    const firstVisitPaid = entries.some((entry) => entry.kind === 'attendance');
     const sessionToday = entries.some((entry) => entry.kind === 'session' && entry.day === today);
 
     if (wallet) {
@@ -87,12 +88,12 @@ export default async function QurooshAccountPage({
               <div>
                 <p className="text-sm font-medium text-ink">{t('wallet.attendance')}</p>
                 <p className="mt-1 text-sm text-ink-muted">
-                  {paidToday ? t('wallet.attendanceDone') : t('wallet.attendanceHint')}
+                  {firstVisitPaid ? t('wallet.attendanceDone') : t('wallet.attendanceHint')}
                 </p>
               </div>
               {perDay ? (
                 <span
-                  className={`ltr-nums shrink-0 font-semibold tabular-nums ${paidToday ? 'text-ok' : 'text-ink'}`}
+                  className={`ltr-nums shrink-0 font-semibold tabular-nums ${firstVisitPaid ? 'text-ok' : 'text-ink'}`}
                   dir="ltr"
                 >
                   {formatSigned(perDay)}

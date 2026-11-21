@@ -435,30 +435,37 @@ booths' challenges are below.
   plus and minus: what a guest can spend. `earned` is the plus entries only:
   what a guest is **ranked** by, so that voting later never costs anyone
   their place (the Quroosh design).
-- **Attendance pays once a day.** `syncWallet` (`src/lib/quroosh/wallet.ts`)
+- **Attendance pays the first visit only** (Quroosh `0010`, the club's
+  decision of 2026-11-21; until then, once a day). `syncWallet` (`src/lib/quroosh/wallet.ts`)
   reads Event attendance's check-ins with a cursor of its own
-  (`wallet_sync`) and hands them to `sync_wallet`: a standing check-in pays
-  its attendee's account the day's quroosh, an undone one has its entry
-  voided. It runs right after the accounts sync (after each check-in and on
+  (`wallet_sync`) and hands them to `sync_wallet`: a guest's first standing
+  check-in pays their account, later days pay nothing, and an undone one has
+  its entry voided (the guest's next standing check-in is then their first
+  visit and is paid). It runs right after the accounts sync (after each check-in and on
   the five-minute sweep, `payAttendance` in `accountSync.ts`), so a guest
   sees their quroosh within moments, or within five minutes at worst.
-  Two unique indexes are the claim: one per check-in
-  (`wallet_entries_source_once`) and one standing attendance entry per
-  account per day (`wallet_entries_attendance_once`).
-- **The amount** is `wallet_settings.attendance_points`, 5,000 until a
-  manager changes it. A change applies from then on; days already paid keep
-  their amount. 0 stops paying for attendance.
+  `wallet_entries_source_once` stops a check-in being paid twice. "First
+  visit only" is not an index, because guests paid for several days before
+  `0010` keep those entries: `sync_wallet` locks the account's row, then
+  pays only if it has no standing attendance entry, so two passes at once
+  cannot both pay. It takes the check-ins oldest day first.
+- **The amount** is `wallet_settings.attendance_points` (the name is from
+  `0007`; it now means the first visit), 5,000 until a manager changes it on
+  the Wallet page. A change applies from then on; entries already paid keep
+  their amount. 0 stops paying for attendance. **Applying `0010` mid-event
+  takes nothing back**: a guest already paid for two days keeps both.
 - **Who earns.** An account, so a person **without an email** on their pass
   earns nothing (they have no account, see above). A check-in made before
   the account existed is paid on the pass that makes the account. A disabled
   account (pass cancelled) keeps its entries but leaves the leaderboard.
 - **The guest's pages** (signed in, `getGuestAccount()`):
-  `/quroosh/account/<project id>` is the wallet (balance, place, today's
-  attendance, a button to their pass, their ledger) and `…/leaderboard` the
+  `/quroosh/account/<project id>` is the wallet (balance, place, their
+  first visit and today's session check-in, a button to their pass, their ledger) and `…/leaderboard` the
   top twenty. Other guests appear as **first name and the first letter of
   the last** (`shortName`); nobody's full name is shown to the public.
 - **Managers** (`projects/[id]/quroosh/wallet`, managers only): quroosh
-  handed out, how many guests earned, the average, the amount per day, the
+  handed out, how many guests earned, the average, the settings (the first
+  visit's quroosh and, once `0009` is applied, a session check-in's), the
   top ten and the latest 200 ledger entries with full names. **Recount from
   the check-ins** reads every check-in again and pays what is missing; use
   it once after applying `0007` mid-event.
@@ -561,8 +568,10 @@ The third way to earn: checking in to the day's **dialogue session**
   00:00 Riyadh with nothing to reset.
 - **Paid in the same transaction.** `session_check_in` writes the check-in and
   a `session` entry on the ledger (`source_ref` = the check-in's id), worth
-  `wallet_settings.session_points`: **1,000** until changed (no screen for it
-  yet; 0 stops paying). 0009 adds `session` to the ledger's kinds.
+  `wallet_settings.session_points`: **1,000** until a manager changes it on
+  the Quroosh **Wallet** page (`wallet_save_session_points`; the session tab
+  links there for managers). A change applies from then on; 0 stops paying
+  and checking in still works. 0009 adds `session` to the ledger's kinds.
 - **Who can check in:** a guest account (0006), so someone checked in at the
   gate with an email on their pass. Being at the gate is not required on the
   day; the session code is enough.
@@ -616,6 +625,9 @@ Drive, it is 10 MB).
 - A challenge pays through `app.challenge_advance` only, once, when its last
   question is answered. Do not add a second place that writes `challenge`
   entries. The same for `session` entries: `session_check_in` only.
+- Attendance's "first visit only" is a check in `sync_wallet` made safe by
+  locking the account row (`for update`) first. Keep the lock if the
+  function is changed, or two passes at once can pay two days.
 - Never "check whether they checked in today, then insert" for the session:
   the unique constraint `session_check_ins_once` is the claim.
 - The return cookie must only ever hold a path `safeReturnPath` accepts. A
