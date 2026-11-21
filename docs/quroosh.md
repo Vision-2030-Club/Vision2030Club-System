@@ -451,7 +451,10 @@ booths' challenges are below.
   cannot both pay. It takes the check-ins oldest day first.
 - **The amount** is `wallet_settings.attendance_points` (the name is from
   `0007`; it now means the first visit), 5,000 until a manager changes it on
-  the Wallet page. A change applies from then on; entries already paid keep
+  the Wallet page. Managers and guests see it as the **sign-up bonus**
+  (قروش التسجيل / مكافأة التسجيل), and attendance entries on the ledger are
+  labelled that way. It cannot be paid at the sign-up form itself: the
+  account, and so the wallet, only exists from the first gate check-in. A change applies from then on; entries already paid keep
   their amount. 0 stops paying for attendance. **Applying `0010` mid-event
   takes nothing back**: a guest already paid for two days keeps both.
 - **Who earns.** An account, so a person **without an email** on their pass
