@@ -1944,17 +1944,21 @@
         "place": "You are #{position} of {players} guests",
         "noPlaceYet": "Collect quroosh to take your place among the guests.",
         "earnTitle": "Earn today",
-        "attendance": "Today’s attendance",
-        "attendanceHint": "Show your pass at the gate. It is counted once a day and can take a few minutes to appear here.",
-        "attendanceDone": "Counted for today. See you tomorrow.",
+        "attendance": "Your first visit",
+        "attendanceHint": "Show your pass at the gate on your first visit. It is paid once and can take a few minutes to appear here.",
+        "attendanceDone": "Received for your first visit.",
         "showPass": "Show my pass",
+        "session": "Dialogue session",
+        "sessionHint": "Scan the QR code at the session, rate it and check in. Once a day.",
+        "sessionDone": "Checked in to today’s session.",
         "ledgerTitle": "Your ledger",
         "ledgerEmpty": "Nothing yet. Your first quroosh arrive when you are checked in at the gate.",
         "kind": {
           "attendance": "Attendance",
           "challenge": "Challenge",
           "vote": "Vote",
-          "adjustment": "Adjustment"
+          "adjustment": "Adjustment",
+          "session": "Session"
         }
       },
       "leaderboard": {
@@ -2025,16 +2029,18 @@
     },
     "wallet": {
       "title": "Quroosh and the ledger",
-      "intro": "Guests collect quroosh during the event. Today they earn them by being checked in at the gate, once a day. Each guest sees their balance and the leaderboard on their account page.",
+      "intro": "Guests collect quroosh during the event: on their first check-in at the gate, at the booths’ challenges, and by checking in to the dialogue session. Each guest sees their balance and the leaderboard on their account page.",
       "notReady": "The wallet is not ready on this deployment yet: Quroosh migration 0007 has to be applied first.",
       "distributed": "Quroosh handed out",
       "holders": "Guests who earned",
       "average": "Average per guest",
-      "perDay": "Quroosh for a day’s attendance",
-      "perDayHint": "Applies from now on. Days already paid keep the amount they were paid. 0 stops paying for attendance.",
+      "perDay": "Quroosh for a guest’s first visit",
+      "perDayHint": "Paid once, on a guest’s first check-in at the gate; later days pay nothing. Applies from now on; entries already paid keep their amount. 0 stops paying for attendance.",
+      "perSession": "Quroosh per session check-in",
+      "perSessionHint": "Paid each time a guest checks in to the dialogue session, once a day. Applies from now on. 0 stops paying; checking in still works.",
       "save": "Save",
       "recount": "Recount from the check-ins",
-      "recountHint": "Attendance is paid by itself after each check-in and every five minutes. A recount reads every check-in again and pays what is missing; nothing is paid twice.",
+      "recountHint": "Attendance is paid by itself after each check-in and every five minutes. A recount reads every check-in again and pays what is missing (each guest’s first visit); nothing is paid twice.",
       "recounted": "Done. Every check-in has been counted.",
       "topTitle": "Top ten",
       "ledgerTitle": "Latest entries",
@@ -2045,7 +2051,8 @@
         "attendance": "Attendance",
         "challenge": "Challenge",
         "vote": "Vote",
-        "adjustment": "Adjustment"
+        "adjustment": "Adjustment",
+        "session": "Session"
       },
       "errors": {
         "forbidden": "Only the project’s managers can do this.",
@@ -2174,6 +2181,47 @@
         "question_invalid": "The question could not be saved. Check the fields.",
         "invalid": "This did not work. Try again."
       }
+    },
+    "checkin": {
+      "eyebrow": "Quroosh",
+      "title": "Session check-in",
+      "notFound": "This check-in link is not valid.",
+      "notReady": "Session check-in is not open yet. Please try again later.",
+      "greeting": "Welcome, {name}",
+      "signIn": {
+        "title": "Sign in to check in",
+        "body": "Enter the email on your pass. We will send you a sign-in link; open it on this phone and you will come straight back here.",
+        "howToGet": "Accounts are created for guests after they check in at the event gate, using the email on their pass."
+      },
+      "question": "How would you rate today’s dialogue session?",
+      "pick": "Choose from 1 to 5 stars",
+      "stars": {
+        "1": "1 star: poor",
+        "2": "2 stars: fair",
+        "3": "3 stars: good",
+        "4": "4 stars: very good",
+        "5": "5 stars: excellent"
+      },
+      "submit": "Check In",
+      "sending": "Checking in…",
+      "reward": "Checking in adds {points} quroosh to your wallet.",
+      "already": "You have already checked in for today’s session.",
+      "yourRating": "Your rating: {rating} out of 5 stars",
+      "nextDay": "You can check in again tomorrow, from 12:00 AM.",
+      "done": {
+        "title": "You are checked in. Thank you for your rating.",
+        "added": "{points} quroosh have been added to your wallet."
+      },
+      "toWallet": "Go to my wallet",
+      "errors": {
+        "signed_out": "Please sign in to your Quroosh account first.",
+        "rating_invalid": "Please choose a rating from 1 to 5 stars.",
+        "already_checked_in": "You have already checked in for today’s session.",
+        "account_disabled": "This account is not active. Please contact the Quroosh team.",
+        "not_found": "Your account does not belong to this event.",
+        "not_ready": "Session check-in is not open yet. Please try again later.",
+        "invalid": "This did not work. Please try again."
+      }
     }
   },
   "eventAttendance": {
@@ -2183,6 +2231,7 @@
       "overview": "Overview",
       "scan": "Gate scanner",
       "attendees": "Attendees",
+      "session": "Session check-in",
       "projectDetails": "Project details"
     },
     "overview": {
@@ -2265,6 +2314,28 @@
         "checkedInToday": "In today",
         "cancelled": "Pass cancelled"
       }
+    },
+    "session": {
+      "title": "Session check-in",
+      "notReady": "Session check-in needs Quroosh migration 0009 to be applied. The QR code below already works and will open once it is.",
+      "qrTitle": "The session’s QR code",
+      "qrHint": "Show it on the screen at the dialogue session or print it. Guests scan it with their phone camera, sign in to their Quroosh account, rate the session and check in. You can also press the code to open the page.",
+      "qrOpen": "Open the check-in page",
+      "qrAlt": "QR code for the session check-in",
+      "link": "Check-in link",
+      "download": "Download QR",
+      "permanent": "This code is permanent: it never expires or changes, so a printed copy works for every session. Each guest can check in once a day; it opens again at 12:00 AM.",
+      "today": "Checked in today",
+      "averageToday": "Average rating today",
+      "reward": "Quroosh per check-in",
+      "rewardHint": "Added to the guest’s wallet",
+      "byDay": "Day by day",
+      "none": "No check-ins yet.",
+      "todayTag": "today",
+      "average": "Average",
+      "count": "{count, plural, one {# check-in} other {# check-ins}}",
+      "changeReward": "Managers change this amount on",
+      "changeRewardLink": "Quroosh → Wallet"
     },
     "join": {
       "title": "Sign up for {event}",

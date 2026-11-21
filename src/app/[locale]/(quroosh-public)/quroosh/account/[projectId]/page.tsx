@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { ActionForm } from '@/components/ActionForm';
-import { Alert, Button, Card, Input, Label } from '@/components/ui';
+import { Alert, Button, Card } from '@/components/ui';
 import { getAttendeesById } from '@/lib/eventAttendance/api';
 import { eventDay, passUrl } from '@/lib/eventAttendance/links';
 import { getGuestAccount } from '@/lib/quroosh/accounts';
+import { getSessionPoints } from '@/lib/quroosh/sessions';
 import { CLUB_TIME_ZONE } from '@/lib/time';
 import {
   formatQuroosh,
@@ -13,8 +13,9 @@ import {
   getWalletEntries,
   getWalletOverview,
 } from '@/lib/quroosh/wallet';
-import { requestSignInAction, signOutAction } from '../actions';
+import { signOutAction } from '../actions';
 import { GuestTabs } from '../GuestTabs';
+import { SignInForm } from '../SignInForm';
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
@@ -44,10 +45,12 @@ export default async function QurooshAccountPage({
   const account = await getGuestAccount();
   // A session of another project's account is nobody here.
   if (account && account.project_id === projectId) {
-    const [wallet, entries, perDay, pass] = await Promise.all([
+    const [wallet, entries, perDay, perSession, pass] = await Promise.all([
       getWalletOverview(account.account_id),
       getWalletEntries(account.account_id),
       getAttendancePoints(projectId),
+      // Null before 0009 is applied: the session line is left out.
+      getSessionPoints(projectId),
       // Their pass is what the gate scans. Its link is theirs already (it was
       // emailed to them); trouble reading it only hides the button.
       getAttendeesById(projectId, [account.attendee_id])
@@ -56,7 +59,9 @@ export default async function QurooshAccountPage({
     ]);
     // The event's day on the club's clock, as the ledger writes it.
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: CLUB_TIME_ZONE }).format(new Date());
-    const paidToday = entries.some((entry) => entry.kind === 'attendance' && entry.day === today);
+    // Attendance pays the first visit only (Quroosh 0010), so once paid it is done.
+    const firstVisitPaid = entries.some((entry) => entry.kind === 'attendance');
+    const sessionToday = entries.some((entry) => entry.kind === 'session' && entry.day === today);
 
     if (wallet) {
       return (
@@ -83,18 +88,34 @@ export default async function QurooshAccountPage({
               <div>
                 <p className="text-sm font-medium text-ink">{t('wallet.attendance')}</p>
                 <p className="mt-1 text-sm text-ink-muted">
-                  {paidToday ? t('wallet.attendanceDone') : t('wallet.attendanceHint')}
+                  {firstVisitPaid ? t('wallet.attendanceDone') : t('wallet.attendanceHint')}
                 </p>
               </div>
               {perDay ? (
                 <span
-                  className={`ltr-nums shrink-0 font-semibold tabular-nums ${paidToday ? 'text-ok' : 'text-ink'}`}
+                  className={`ltr-nums shrink-0 font-semibold tabular-nums ${firstVisitPaid ? 'text-ok' : 'text-ink'}`}
                   dir="ltr"
                 >
                   {formatSigned(perDay)}
                 </span>
               ) : null}
             </div>
+            {perSession ? (
+              <div className="flex items-start justify-between gap-3 border-t border-line pt-3">
+                <div>
+                  <p className="text-sm font-medium text-ink">{t('wallet.session')}</p>
+                  <p className="mt-1 text-sm text-ink-muted">
+                    {sessionToday ? t('wallet.sessionDone') : t('wallet.sessionHint')}
+                  </p>
+                </div>
+                <span
+                  className={`ltr-nums shrink-0 font-semibold tabular-nums ${sessionToday ? 'text-ok' : 'text-ink'}`}
+                  dir="ltr"
+                >
+                  {formatSigned(perSession)}
+                </span>
+              </div>
+            ) : null}
             {pass ? (
               <a
                 href={passUrl(locale, pass)}
@@ -174,28 +195,7 @@ export default async function QurooshAccountPage({
         <p className="mt-2 text-sm text-ink-muted">{t('signIn.intro')}</p>
       </div>
       <Card>
-        <ActionForm action={requestSignInAction} submitLabel={t('signIn.submit')} successText={t('signIn.sent')}>
-          <input type="hidden" name="locale" value={locale} />
-          <input type="hidden" name="project_id" value={projectId} />
-          {/* Hidden from people, tempting to bots. */}
-          <div aria-hidden="true" className="absolute -start-[9999px] size-px overflow-hidden">
-            <label htmlFor="signin-website">Website</label>
-            <input id="signin-website" name="website" type="text" tabIndex={-1} autoComplete="off" />
-          </div>
-          <div>
-            <Label htmlFor="signin-email">{t('signIn.email')}</Label>
-            <Input
-              id="signin-email"
-              name="email"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              dir="ltr"
-              required
-              maxLength={254}
-            />
-          </div>
-        </ActionForm>
+        <SignInForm locale={locale} projectId={projectId} />
       </Card>
       <p className="text-xs text-ink-muted">{t('signIn.howToGet')}</p>
     </div>

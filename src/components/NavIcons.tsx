@@ -27,6 +27,7 @@ export type NavIconName =
   | 'stage'
   | 'register'
   | 'mail'
+  | 'qr'
   | 'back'
   | 'menu';
 
@@ -152,6 +153,14 @@ const GLYPHS: Record<NavIconName, ReactNode> = {
     <>
       <rect x="3" y="5" width="18" height="14" rx="2.5" />
       <path d="m3.5 7.5 8.5 6 8.5-6" />
+    </>
+  ),
+  qr: (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <path d="M6.5 6.5h.01M17.5 6.5h.01M6.5 17.5h.01M14 14h2.5v2.5M20.5 14v.01M14 20.5h.01M17.5 17.5h3v3h-3z" />
     </>
   ),
   // The one directional glyph here; the shell mirrors it in RTL.

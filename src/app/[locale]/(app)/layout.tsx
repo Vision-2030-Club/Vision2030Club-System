@@ -290,6 +290,10 @@ export default async function AppLayout({
         { href: `${base}/scan`, label: tEvent('tabs.scan'), icon: 'attendance', show: true },
         // The attendees' names, mobiles and emails: managers only.
         { href: `${base}/attendees`, label: tEvent('tabs.attendees'), icon: 'members', show: manager },
+        // The dialogue session's QR code (Quroosh 0009): guests check in and
+        // are paid into their Quroosh wallet, so only where the project
+        // carries Quroosh too. Counts only, so the HR team may open it.
+        { href: `${base}/session`, label: tEvent('tabs.session'), icon: 'qr', show: inQuroosh },
         {
           href: `/projects/${component.project_id}/quroosh`,
           label: tQuroosh('name'),

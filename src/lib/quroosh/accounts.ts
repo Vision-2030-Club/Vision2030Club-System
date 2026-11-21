@@ -123,6 +123,48 @@ export async function redeemAccountLink(
   return { ok: true, projectId: row.project_id, newlyCompleted: row.newly_completed };
 }
 
+/**
+ * Where to send a guest once a sign-in link has signed them in, when they
+ * asked for the link from a page other than their account (the session
+ * check-in). The link is emailed, so the page is remembered on this device
+ * for an hour, longer than a sign-in link lasts (fifteen minutes). Opened on
+ * another device, the link lands on the account page as before.
+ */
+const RETURN_COOKIE = 'quroosh_return';
+const ONE_HOUR = 60 * 60;
+
+/** Only the session check-in page, as a path without the language: never another site. */
+export function safeReturnPath(value: unknown): string | null {
+  const path = typeof value === 'string' ? value : '';
+  return /^\/quroosh\/checkin\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path)
+    ? path
+    : null;
+}
+
+/** Remembers a page to come back to. Only from a server action. */
+export async function rememberReturnPath(path: string | null): Promise<void> {
+  const store = await cookies();
+  if (!path) {
+    store.delete(RETURN_COOKIE);
+    return;
+  }
+  store.set(RETURN_COOKIE, path, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: ONE_HOUR,
+  });
+}
+
+/** The page remembered by `rememberReturnPath`, forgotten as it is read. Only from a server action. */
+export async function takeReturnPath(): Promise<string | null> {
+  const store = await cookies();
+  const path = safeReturnPath(store.get(RETURN_COOKIE)?.value);
+  store.delete(RETURN_COOKIE);
+  return path;
+}
+
 /** Signs this device out. Only from a server action. */
 export async function endGuestSession(): Promise<void> {
   const store = await cookies();

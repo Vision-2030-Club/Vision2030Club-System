@@ -435,30 +435,37 @@ booths' challenges are below.
   plus and minus: what a guest can spend. `earned` is the plus entries only:
   what a guest is **ranked** by, so that voting later never costs anyone
   their place (the Quroosh design).
-- **Attendance pays once a day.** `syncWallet` (`src/lib/quroosh/wallet.ts`)
+- **Attendance pays the first visit only** (Quroosh `0010`, the club's
+  decision of 2026-11-21; until then, once a day). `syncWallet` (`src/lib/quroosh/wallet.ts`)
   reads Event attendance's check-ins with a cursor of its own
-  (`wallet_sync`) and hands them to `sync_wallet`: a standing check-in pays
-  its attendee's account the day's quroosh, an undone one has its entry
-  voided. It runs right after the accounts sync (after each check-in and on
+  (`wallet_sync`) and hands them to `sync_wallet`: a guest's first standing
+  check-in pays their account, later days pay nothing, and an undone one has
+  its entry voided (the guest's next standing check-in is then their first
+  visit and is paid). It runs right after the accounts sync (after each check-in and on
   the five-minute sweep, `payAttendance` in `accountSync.ts`), so a guest
   sees their quroosh within moments, or within five minutes at worst.
-  Two unique indexes are the claim: one per check-in
-  (`wallet_entries_source_once`) and one standing attendance entry per
-  account per day (`wallet_entries_attendance_once`).
-- **The amount** is `wallet_settings.attendance_points`, 5,000 until a
-  manager changes it. A change applies from then on; days already paid keep
-  their amount. 0 stops paying for attendance.
+  `wallet_entries_source_once` stops a check-in being paid twice. "First
+  visit only" is not an index, because guests paid for several days before
+  `0010` keep those entries: `sync_wallet` locks the account's row, then
+  pays only if it has no standing attendance entry, so two passes at once
+  cannot both pay. It takes the check-ins oldest day first.
+- **The amount** is `wallet_settings.attendance_points` (the name is from
+  `0007`; it now means the first visit), 5,000 until a manager changes it on
+  the Wallet page. A change applies from then on; entries already paid keep
+  their amount. 0 stops paying for attendance. **Applying `0010` mid-event
+  takes nothing back**: a guest already paid for two days keeps both.
 - **Who earns.** An account, so a person **without an email** on their pass
   earns nothing (they have no account, see above). A check-in made before
   the account existed is paid on the pass that makes the account. A disabled
   account (pass cancelled) keeps its entries but leaves the leaderboard.
 - **The guest's pages** (signed in, `getGuestAccount()`):
-  `/quroosh/account/<project id>` is the wallet (balance, place, today's
-  attendance, a button to their pass, their ledger) and `…/leaderboard` the
+  `/quroosh/account/<project id>` is the wallet (balance, place, their
+  first visit and today's session check-in, a button to their pass, their ledger) and `…/leaderboard` the
   top twenty. Other guests appear as **first name and the first letter of
   the last** (`shortName`); nobody's full name is shown to the public.
 - **Managers** (`projects/[id]/quroosh/wallet`, managers only): quroosh
-  handed out, how many guests earned, the average, the amount per day, the
+  handed out, how many guests earned, the average, the settings (the first
+  visit's quroosh and, once `0009` is applied, a session check-in's), the
   top ten and the latest 200 ledger entries with full names. **Recount from
   the check-ins** reads every check-in again and pays what is missing; use
   it once after applying `0007` mid-event.
@@ -523,6 +530,55 @@ paid into their wallet for being right and for being quick. Built
   open, a booth's code says it is not valid, the managers' page says the
   migration is needed, and the wallet is not affected.
 
+## The session check-in (Quroosh 0009)
+
+The third way to earn: checking in to the day's **dialogue session**
+(جلسة حوارية). Built 2026-11-21.
+
+- **One permanent QR code per project.** It holds
+  `/<locale>/quroosh/checkin/<project id>` (`sessionCheckInUrl` in
+  `src/lib/quroosh/sessions.ts`) and never expires or changes, so a printed
+  copy works for every session. Organizers find it on the **تسجيل حضور
+  للجلسة** (Session check-in) tab of the **Event attendance** sidebar
+  (`projects/[id]/event-attendance/session`): the code (pressing it opens the
+  page too), the link to copy, *Download QR*, and how many checked in and the
+  average rating, day by day. Counts only, no names, so the HR team may open
+  it as well as the managers. The tab shows only where the project carries
+  Quroosh too, and only to someone who may open both (so not to an HR member
+  without Quroosh access).
+- **The guest's page** (`(quroosh-public)/quroosh/checkin/[projectId]`), three
+  faces, decided by the database each time it is read:
+  - **not signed in** (no `getGuestAccount()`, or another project's): the
+    sign-in form (`SignInForm`, shared with the account page). The emailed
+    link brings them **back to the check-in page**: asking for the link from
+    here remembers the page in a cookie, `quroosh_return` (an hour, HttpOnly),
+    and `redeemLinkAction` sends them there instead of the account page when
+    the cookie names the same project. Only `/quroosh/checkin/<uuid>` is
+    accepted (`safeReturnPath`). A link opened on another device lands on the
+    account page as before.
+  - **not checked in today:** five stars (radio buttons, so a keyboard and a
+    screen reader work) and **تسجيل حضور**, disabled until a star is chosen.
+  - **checked in today:** "لقد قمت بتسجيل حضورك لجلسة اليوم بالفعل", their
+    stars, and the button disabled until 00:00 Riyadh. Right after checking
+    in (`?done=1`) the confirmation and the quroosh added are shown on top.
+- **Once a day, on the club's calendar.** `session_check_ins` has one row per
+  account per day (`app.quroosh_today()`, Riyadh) with the rating, and the
+  unique constraint `session_check_ins_once` is the claim: a second press or
+  a second tab is refused with `already_checked_in`. A new day begins at
+  00:00 Riyadh with nothing to reset.
+- **Paid in the same transaction.** `session_check_in` writes the check-in and
+  a `session` entry on the ledger (`source_ref` = the check-in's id), worth
+  `wallet_settings.session_points`: **1,000** until a manager changes it on
+  the Quroosh **Wallet** page (`wallet_save_session_points`; the session tab
+  links there for managers). A change applies from then on; 0 stops paying
+  and checking in still works. 0009 adds `session` to the ledger's kinds.
+- **Who can check in:** a guest account (0006), so someone checked in at the
+  gate with an email on their pass. Being at the gate is not required on the
+  day; the session code is enough.
+- **Before `0009` is applied** the guest's page says check-in is not open,
+  the organizers' tab shows the QR code with a note that the migration is
+  needed, and the wallet page leaves the session line out.
+
 ## The identity
 
 From the club's identity guide (an Illustrator file; the original stays in
@@ -568,7 +624,14 @@ Drive, it is 10 MB).
   a page that did either would let a guest pick their own score.
 - A challenge pays through `app.challenge_advance` only, once, when its last
   question is answered. Do not add a second place that writes `challenge`
-  entries.
+  entries. The same for `session` entries: `session_check_in` only.
+- Attendance's "first visit only" is a check in `sync_wallet` made safe by
+  locking the account row (`for update`) first. Keep the lock if the
+  function is changed, or two passes at once can pay two days.
+- Never "check whether they checked in today, then insert" for the session:
+  the unique constraint `session_check_ins_once` is the claim.
+- The return cookie must only ever hold a path `safeReturnPath` accepts. A
+  free-form "next" would let anyone's link send a guest to another site.
 - A raw colour in a Quroosh page bypasses the theme. Use the tokens above,
   as everywhere else in the app.
 - `AppShell` decides the world from `base`. A Quroosh page outside

@@ -61,7 +61,7 @@ roster to maintain; joining or leaving the HR team is the whole of it.
 | Reading the role in the app | `src/lib/eventAttendance/access.ts` (`getEventAttendanceAccess`, `can`) |
 | Attaching it to a project | `attachComponentAction` in `projects/actions.ts`; the project page's component form lists it |
 | The project opening into it | `OPENS_IN` in `projects/[id]/page.tsx`, **last**: a manager lands in the project's main component; the HR team, on no other roster, lands here |
-| Its sidebar | the Event attendance loop in `(app)/layout.tsx`. A project that also carries Quroosh gets a link each way, and these pages wear the Quroosh colours |
+| Its sidebar | the Event attendance loop in `(app)/layout.tsx`. A project that also carries Quroosh gets a link each way, the **Session check-in** tab (the dialogue session's QR code, Quroosh `0009`, see `docs/quroosh.md`), and these pages wear the Quroosh colours |
 | Signed-in pages | `src/app/[locale]/(app)/projects/[id]/event-attendance/` (overview, `scan/`, `attendees/`) |
 | Public pages | `src/app/[locale]/(event-public)/event/` (`join/[projectId]`, `pass/[token]`); `/event` is in the proxy's `PUBLIC_PATHS` |
 | Email | `src/lib/eventAttendance/email.ts` |
