@@ -44,7 +44,9 @@ docs/                 how each part works
 - **Event attendance** (club migration `0075`, written 2026-11-18, **not yet
   applied**) keeps the public's names, mobiles and emails in the club
   database, behind functions only. It needs `0075` applied, and Resend
-  configured for its pass emails; see `docs/event-attendance.md`.
+  configured for its pass emails; see `docs/event-attendance.md`. Club
+  migration `0077` (written 2026-11-22, **not yet applied**) stops a manager
+  or HR member from checking in their own pass.
 - **Quroosh guest accounts** (Quroosh migration `0006` and club migration
   `0076`, written 2026-11-19, **not yet applied**): everyone checked in at
   the gate gets an account and an email to complete it, with no password.
