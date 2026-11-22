@@ -18,14 +18,14 @@ export async function GuestTabs({ projectId, current }: { projectId: string; cur
   ] as const;
 
   return (
-    <nav aria-label={t('label')} className="flex gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm">
+    <nav aria-label={t('label')} className="flex gap-1 rounded-full border border-line bg-surface p-1 shadow-sm">
       {tabs.map((tab) => (
         <Link
           key={tab.key}
           href={tab.href}
           aria-current={tab.key === current ? 'page' : undefined}
           className={cx(
-            'flex-1 rounded-lg px-2 py-2 text-center text-sm font-semibold',
+            'flex-1 rounded-full px-2 py-2.5 text-center text-sm font-semibold',
             tab.key === current ? 'bg-brand-950 text-accent-2' : 'text-ink-muted hover:bg-surface-muted',
           )}
         >

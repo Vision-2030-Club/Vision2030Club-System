@@ -48,7 +48,7 @@ export default async function EventPassPage({
   const eventName = locale === 'ar' ? pass.name_ar : pass.name_en;
   if (pass.cancelled) {
     return (
-      <EventFrame theme={pass.theme} name={eventName}>
+      <EventFrame theme={pass.theme} name={eventName} title={t('pass.title')} subtitle={eventName}>
         <Alert tone="warn">{t('pass.cancelled')}</Alert>
       </EventFrame>
     );
@@ -62,7 +62,7 @@ export default async function EventPassPage({
   const days = eventDayRange(pass.first_day, pass.last_day, locale);
 
   return (
-    <EventFrame theme={pass.theme} name={eventName}>
+    <EventFrame theme={pass.theme} name={eventName} title={t('pass.title')} subtitle={eventName}>
       <div className="space-y-4">
         {justRegistered ? <Alert tone="ok">{t('pass.registered')}</Alert> : null}
 

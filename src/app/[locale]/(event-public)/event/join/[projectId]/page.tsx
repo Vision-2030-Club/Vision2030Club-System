@@ -5,6 +5,7 @@ import { eventDayRange } from '@/lib/eventAttendance/links';
 import type { EventPublic } from '@/lib/eventAttendance/types';
 import { COUNTRIES } from '@/lib/quroosh/phones';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { QurooshCard, QurooshNote } from '@/components/QurooshHero';
 import { EventFrame } from '../../../EventFrame';
 import { JoinForm } from './JoinForm';
 
@@ -39,9 +40,27 @@ export default async function EventJoinPage({
   }
 
   const name = locale === 'ar' ? event.name_ar : event.name_en;
+  const quroosh = event.theme === 'quroosh';
   const days = eventDayRange(event.first_day, event.last_day, locale);
   const regionNames = new Intl.DisplayNames([locale], { type: 'region' });
   const countries = COUNTRIES.map(([iso, dial]) => ({ iso, dial, name: regionNames.of(iso) ?? iso }));
+
+  if (quroosh) {
+    // Quroosh: the identity's page design. The title and the intro sit in the
+    // navy hero; the form is a white card on the light page.
+    return (
+      <EventFrame theme={event.theme} name={name} title={t('join.title', { event: name })} subtitle={t('join.intro')}>
+        {event.signup_open ? (
+          <QurooshCard icon={<TicketIcon />} title={t('join.cardTitle')}>
+            <JoinForm projectId={projectId} locale={locale} countries={countries} />
+          </QurooshCard>
+        ) : (
+          <Alert tone="warn">{t('join.closed')}</Alert>
+        )}
+        {days ? <QurooshNote>{t('join.days', { days })}</QurooshNote> : null}
+      </EventFrame>
+    );
+  }
 
   return (
     <EventFrame theme={event.theme} name={name}>
@@ -60,5 +79,14 @@ export default async function EventJoinPage({
         )}
       </div>
     </EventFrame>
+  );
+}
+
+function TicketIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+      <path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2.5a2.5 2.5 0 0 0 0 5V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2.5a2.5 2.5 0 0 0 0-5z" />
+      <path d="M14 5v14" strokeDasharray="2 2.5" />
+    </svg>
   );
 }

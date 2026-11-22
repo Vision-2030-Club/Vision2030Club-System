@@ -32,6 +32,16 @@
   --color-accent-2: #a6eddd;
   /* Quroosh's teal, for its waves; unused elsewhere. */
   --color-accent-3: #09798b;
+  /* Quroosh's coin purple, the rim of the coins in its identity; unused
+     elsewhere. */
+  --color-coin: #542f90;
+  /* The leaderboard's medals for the top three: a face and a deeper rim each. */
+  --color-medal-gold: #f2c94c;
+  --color-medal-gold-rim: #b8860b;
+  --color-medal-silver: #d9dde3;
+  --color-medal-silver-rim: #8e959f;
+  --color-medal-bronze: #d9925a;
+  --color-medal-bronze-rim: #9a5a2c;
 
   --color-ok: #15803d;
   --color-warn: #b45309;
@@ -191,6 +201,39 @@ html[data-theme="quroosh"] {
   /* Titillium Web, as the identity specifies. It has no Arabic, so Arabic
      falls back glyph by glyph to the club's Arabic face. */
   font-family: var(--font-quroosh), var(--font-arabic), system-ui, sans-serif;
+}
+
+/* The Quroosh guest pages (.quroosh-type: the account, the challenges, the
+   session check-in, the event sign-up and pass), as the identity's page
+   design draws them (`QurooshPage`). Type: Latin and digits in Titillium
+   (the identity's face), Arabic in thmanyah Sans, IBM Plex Sans Arabic
+   behind them as the fallback. */
+.quroosh-type {
+  font-family: var(--font-quroosh), var(--font-quroosh-arabic), var(--font-arabic), system-ui, sans-serif;
+}
+
+/* thmanyah Sans sets a narrow word space: after a word ending in a free
+   letter (جمعها كل) the two words read as one. A little more, in Arabic only. */
+.quroosh-type:lang(ar) {
+  word-spacing: 0.12em;
+}
+
+/* Fields and buttons: tall fields on a pale lavender, generous rounding,
+   and the purple primary button, wide and lifted. The shared primitives
+   keep their markup; only their look changes here. */
+.quroosh-type :is(input:not([type="hidden"], [type="checkbox"], [type="radio"]), select, textarea) {
+  min-height: 3rem;
+  border-radius: 0.875rem;
+  border-color: var(--color-brand-200);
+  background-color: var(--color-brand-100);
+  font-size: 1rem;
+}
+.quroosh-type button.bg-brand-600 {
+  min-height: 3.25rem;
+  border-radius: 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  box-shadow: 0 10px 24px -8px rgb(84 47 144 / 0.45);
 }
 
 html.theme-animate {

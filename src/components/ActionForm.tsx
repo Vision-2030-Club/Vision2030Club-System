@@ -19,6 +19,7 @@ export function ActionForm({
   successText,
   variant = 'primary',
   className,
+  submitClassName,
 }: {
   action: (state: ActionResult, formData: FormData) => Promise<ActionResult>;
   children: ReactNode;
@@ -26,6 +27,8 @@ export function ActionForm({
   successText?: string;
   variant?: 'primary' | 'secondary' | 'danger';
   className?: string;
+  /** Extra classes for the submit button (its size and shape on a page with its own design). */
+  submitClassName?: string;
 }) {
   const t = useTranslations('common');
   const [state, formAction, pending] = useActionState<ActionResult, FormData>(action, {
@@ -39,7 +42,7 @@ export function ActionForm({
       {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
       {state.ok ? <Alert tone="ok">{successText ?? t('saved')}</Alert> : null}
 
-      <Button type="submit" variant={variant} disabled={pending}>
+      <Button type="submit" variant={variant} disabled={pending} className={submitClassName}>
         {submitLabel}
       </Button>
     </form>

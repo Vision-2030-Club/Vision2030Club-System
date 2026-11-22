@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Alert, Button, Card } from '@/components/ui';
+import { QurooshCard, QurooshNote, QurooshPage } from '@/components/QurooshHero';
 import { Link } from '@/i18n/navigation';
 import { accountHomePath, getGuestAccount } from '@/lib/quroosh/accounts';
 import { getSessionPoints, getSessionToday, sessionCheckInPath } from '@/lib/quroosh/sessions';
 import { formatQuroosh } from '@/lib/quroosh/wallet';
-import { SignInForm } from '../../account/SignInForm';
+import { MailIcon, SignInForm } from '@/app/[locale]/(quroosh-public)/quroosh/account/SignInForm';
 import { RatingForm, StarsShown } from './RatingForm';
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -38,49 +39,42 @@ export default async function SessionCheckInPage({
   const { done } = await searchParams;
   setRequestLocale(locale);
   const t = await getTranslations('quroosh.checkin');
+  const tq = await getTranslations('quroosh');
+
+  const frame = (body: React.ReactNode) => (
+    <QurooshPage name={tq('name')} title={t('title')} subtitle={t('subtitle')}>
+      {body}
+    </QurooshPage>
+  );
 
   if (!UUID.test(projectId)) {
-    return (
-      <div className="mx-auto max-w-md">
-        <Alert tone="warn">{t('notFound')}</Alert>
-      </div>
-    );
+    return frame(<Alert tone="warn">{t('notFound')}</Alert>);
   }
-
-  const heading = (
-    <div className="text-center">
-      <p className="text-sm font-medium text-brand-600">{t('eyebrow')}</p>
-      <h1 className="mt-1 text-balance text-2xl font-semibold tracking-tight text-ink">{t('title')}</h1>
-    </div>
-  );
 
   const account = await getGuestAccount();
   // A session of another project's account is nobody here.
   if (!account || account.project_id !== projectId) {
-    return (
-      <div className="mx-auto max-w-md space-y-5">
-        {heading}
-        <Card className="space-y-4">
-          <div>
-            <h2 className="font-semibold text-ink">{t('signIn.title')}</h2>
-            <p className="mt-1 text-sm text-ink-muted">{t('signIn.body')}</p>
-          </div>
-          <SignInForm locale={locale} projectId={projectId} next={sessionCheckInPath(projectId)} />
-        </Card>
-        <p className="text-xs text-ink-muted">{t('signIn.howToGet')}</p>
-      </div>
+    return frame(
+      <>
+        <QurooshCard icon={<MailIcon className="size-5" />} title={t('signIn.title')}>
+          <SignInForm
+            locale={locale}
+            projectId={projectId}
+            next={sessionCheckInPath(projectId)}
+            look={{ label: t('signIn.email'), hint: t('signIn.hint'), submit: t('signIn.submit') }}
+          />
+        </QurooshCard>
+        <QurooshNote>
+          {t('signIn.noAccount')} {t('signIn.howToGet')}
+        </QurooshNote>
+      </>,
     );
   }
 
   const [today, points] = await Promise.all([getSessionToday(account.account_id), getSessionPoints(projectId)]);
   // Before 0009 is applied the database cannot answer.
   if (today === undefined || points === null) {
-    return (
-      <div className="mx-auto max-w-md space-y-5">
-        {heading}
-        <Alert tone="warn">{t('notReady')}</Alert>
-      </div>
-    );
+    return frame(<Alert tone="warn">{t('notReady')}</Alert>);
   }
 
   const walletLink = (
@@ -90,9 +84,8 @@ export default async function SessionCheckInPage({
   );
 
   if (today) {
-    return (
-      <div className="mx-auto max-w-md space-y-5">
-        {heading}
+    return frame(
+      <>
         {done ? (
           <section className="rounded-2xl bg-brand-950 p-6 text-center text-brand-50 shadow-sm" role="status">
             <p className="text-lg font-semibold">{t('done.title')}</p>
@@ -118,13 +111,12 @@ export default async function SessionCheckInPage({
           <p className="text-xs text-ink-muted">{t('nextDay')}</p>
         </Card>
         {walletLink}
-      </div>
+      </>,
     );
   }
 
-  return (
-    <div className="mx-auto max-w-md space-y-5">
-      {heading}
+  return frame(
+    <>
       <Card className="space-y-4">
         <p className="text-center text-sm text-ink-muted">{t('greeting', { name: account.name })}</p>
         <RatingForm
@@ -143,6 +135,6 @@ export default async function SessionCheckInPage({
         ) : null}
       </Card>
       {walletLink}
-    </div>
+    </>,
   );
 }
