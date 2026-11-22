@@ -618,22 +618,27 @@ The third way to earn: checking in to the day's **dialogue session**
 ## Reception
 
 `projects/[id]/quroosh/reception`, built 2026-11-22: the event's
-**attendees** arriving today, for a desk with a laptop. It is not about the
-invited speakers under Guests (the club's decision, 2026-11-22).
+**attendees** arriving today. It is not about the invited speakers under
+Guests (the club's decision, 2026-11-22).
 
 - **Who may open it:** the project's managers and the HR team, the people
   who work the gate. The page asks **Event attendance** who is looking
   (`getEventAttendanceAccess`, `can.scan`), not Quroosh: a Quroosh `member`
   or `viewer` who is neither gets a 404.
 - **What it shows:** arrived today, not here yet (registered minus arrived)
-  and registered; a search by part of a name or the last four digits of a
-  mobile with **Check in**; and today's arrivals, newest first (name, last
+  and registered; **the gate scanner itself** (the camera reads a pass, or
+  a search by part of a name or the last four digits of a mobile, with
+  **Check in** and undo); and today's arrivals, newest first (name, last
   four digits, the time, and "At the desk" for a check-in made by search).
   Never a full mobile or an email. The page reads itself again after every
   change and every 30 seconds while on screen.
-- **It stores nothing.** `ReceptionDesk` calls Event attendance's own
-  actions (`findAttendeesAction`, `checkInByIdAction`, `undoCheckInAction`),
-  so every rule is the gate's: one check-in a day, only on the event's days,
+- **It stores nothing.** The page renders Event attendance's own `Scanner`
+  (`event-attendance/scan/Scanner.tsx`) with `live`, which makes it call
+  `router.refresh()` after a check-in or an undo and every half minute, so
+  the numbers and the arrivals follow; the camera keeps running through a
+  refresh. A change to the scanner is a change to both pages. (Until
+  2026-11-22 the page had its own search-only `ReceptionDesk`.)
+  Every rule is the gate's: one check-in a day, only on the event's days,
   nobody checks in their own pass (club `0077`), and a new arrival still
   gets their Quroosh account and the wallet's sign-up bonus. No migration.
 - **The arrivals list** is read with the service role through

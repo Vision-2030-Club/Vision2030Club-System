@@ -2,14 +2,13 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { StatTile } from '@/components/charts/BarList';
 import { Alert, Badge, Card, PageHeader } from '@/components/ui';
-import { Link } from '@/i18n/navigation';
 import { can, getEventAttendanceAccess } from '@/lib/eventAttendance/access';
 import { getAttendeesById, listCheckIns } from '@/lib/eventAttendance/api';
 import { eventDay } from '@/lib/eventAttendance/links';
 import type { EventSummary } from '@/lib/eventAttendance/types';
 import { formatTime, localized } from '@/lib/format';
 import { createClient } from '@/lib/supabase/server';
-import { ReceptionDesk } from './ReceptionDesk';
+import { Scanner } from '../../event-attendance/scan/Scanner';
 
 /** One person who came in today, as the desk sees them: no full mobile, no email. */
 type Arrival = { id: string; name: string; phoneTail: string; at: string; via: 'scan' | 'manual' };
@@ -53,10 +52,11 @@ async function todaysArrivals(projectId: string, today: string): Promise<Arrival
  * project's managers and the HR team, the people who work the gate (Event
  * attendance, 0075), so it asks Event attendance who is looking, not Quroosh.
  *
- * It is the gate without a camera, for a desk with a laptop: how many have
- * come and how many are still expected, finding a person by name or the end
- * of their mobile and checking them in, and who has arrived today. Nothing
- * is stored by this page: every check-in is Event attendance's.
+ * It is the gate with the day around it: how many have come and how many
+ * are still expected, the gate's own scanner (the camera reads a pass, or a
+ * person is found by name or the end of their mobile), and who has arrived
+ * today. Nothing is stored by this page: every check-in is Event
+ * attendance's.
  */
 export default async function QurooshReceptionPage({
   params,
@@ -108,14 +108,8 @@ export default async function QurooshReceptionPage({
         <StatTile label={t('registered')} value={String(summary.attendees)} />
       </div>
 
-      <ReceptionDesk projectId={id} locale={locale} />
-
-      <p className="text-sm text-ink-muted">
-        {t('scannerHint')}{' '}
-        <Link href={`/projects/${id}/event-attendance/scan`} className="font-medium text-brand-600 hover:underline">
-          {t('scannerLink')}
-        </Link>
-      </p>
+      {/* The gate's scanner itself; `live` reads this page again after each change. */}
+      <Scanner projectId={id} locale={locale} checkedInToday={summary.checked_in_today} live />
 
       <Card>
         <h2 className="mb-3 font-semibold text-ink">{t('arrivals.title')}</h2>

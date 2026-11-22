@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { Alert, Badge, Button, Card, Input, cx } from '@/components/ui';
+import { useRouter } from '@/i18n/navigation';
 import type { ActionResult } from '@/lib/actions';
 import type { EventAttendeeMatch } from '@/lib/eventAttendance/types';
 import { checkInByIdAction, findAttendeesAction, scanAction, undoCheckInAction } from '../actions';
@@ -42,12 +43,20 @@ export function Scanner({
   projectId,
   locale,
   checkedInToday,
+  live = false,
 }: {
   projectId: string;
   locale: string;
   checkedInToday: number;
+  /**
+   * The page around the scanner shows the server's numbers and arrivals
+   * (Quroosh's Reception): read it again after every change, and every half
+   * minute while it is on screen. The camera keeps running through it.
+   */
+  live?: boolean;
 }) {
   const t = useTranslations('eventAttendance.scan');
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const busyRef = useRef(false);
@@ -77,9 +86,25 @@ export function Scanner({
       setCount((n) => n + 1);
       setOutcome({ tone: 'ok', title: name, detail: t('checkedIn'), undo: attendeeId });
       navigator.vibrate?.(80);
+      if (live) router.refresh();
     },
-    [t],
+    [t, live, router],
   );
+
+  useEffect(() => {
+    if (!live) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') router.refresh();
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [live, router]);
+
+  // The server's count is newer than this one after the page was read again.
+  const [seenCount, setSeenCount] = useState(checkedInToday);
+  if (seenCount !== checkedInToday) {
+    setSeenCount(checkedInToday);
+    setCount(checkedInToday);
+  }
 
   // The loop below reaches `report` through a ref, so it depends on the
   // camera alone: were it to restart on a re-render, its cleanup would stop
@@ -230,6 +255,7 @@ export function Scanner({
         setMatches((rows) => rows?.map((row) => (row.id === attendeeId ? { ...row, checked_in_today: false } : row)) ?? null);
         // The same pass may be read again straight away.
         lastRef.current = null;
+        if (live) router.refresh();
       } else {
         setOutcome({ tone: 'danger', title: result.error ?? t('failed') });
       }
