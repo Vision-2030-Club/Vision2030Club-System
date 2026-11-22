@@ -553,12 +553,24 @@ The third way to earn: checking in to the day's **dialogue session**
   faces, decided by the database each time it is read:
   - **not signed in** (no `getGuestAccount()`, or another project's): the
     sign-in form (`SignInForm`, shared with the account page). The emailed
-    link brings them **back to the check-in page**: asking for the link from
-    here remembers the page in a cookie, `quroosh_return` (an hour, HttpOnly),
-    and `redeemLinkAction` sends them there instead of the account page when
-    the cookie names the same project. Only `/quroosh/checkin/<uuid>` is
-    accepted (`safeReturnPath`). A link opened on another device lands on the
-    account page as before.
+    link brings them **back to the check-in page**, and since 2026-11-22
+    the link says so itself: asking from here makes the email's link end in
+    `?next=checkin` (`accountLinkUrl`), the link page passes it on, and
+    `redeemLinkAction` opens the check-in page of the link's own project, for
+    both kinds of link ("complete your account" too). So it works in
+    whatever browser opens the email. Before, the page was remembered only in
+    a cookie (`quroosh_return`, an hour, HttpOnly), and a guest whose mail
+    app opened the link in its own browser (Gmail on an iPhone, say) landed
+    on the account page and never saw the stars. The cookie is still read,
+    for a link sent without `next`: the queue does not hold where a request
+    came from, so only the send right after the request
+    (`kickAccountEmails(toCheckIn)`) adds it, and an email the five-minute
+    sweep sends instead has the plain link. Only `/quroosh/checkin/<uuid>`
+    is accepted from the form (`safeReturnPath`).
+  - **A guest signed in in one browser is not signed in in another.** The
+    phone's camera may open the QR code in a browser other than the one the
+    email's link opened in; they are then asked for their email again, and
+    the new link brings them to the stars.
   - **not checked in today:** five stars (radio buttons, so a keyboard and a
     screen reader work) and **تسجيل حضور**, disabled until a star is chosen.
   - **checked in today:** "لقد قمت بتسجيل حضورك لجلسة اليوم بالفعل", their

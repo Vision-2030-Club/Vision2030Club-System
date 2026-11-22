@@ -4,6 +4,7 @@ import { ActionForm } from '@/components/ActionForm';
 import { Alert, Card } from '@/components/ui';
 import { Link } from '@/i18n/navigation';
 import { accountHomePath, maskPhone, readAccountLink } from '@/lib/quroosh/accounts';
+import { sessionCheckInPath } from '@/lib/quroosh/sessions';
 import { redeemLinkAction } from '../../actions';
 
 // A one-time link is a secret: it does not belong in a search engine.
@@ -21,13 +22,20 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
  *
  * A link that was used, ran out or belongs to a disabled account says so and
  * points at the sign-in page, where a new one can be asked for.
+ *
+ * `?next=checkin` is on a link asked for from the session check-in page: the
+ * button then opens that page (the stars), in whichever browser this is, and
+ * "get a new link" goes back there too.
  */
 export default async function QurooshAccountLinkPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; token: string }>;
+  searchParams: Promise<{ next?: string }>;
 }) {
   const { locale, token } = await params;
+  const toCheckIn = (await searchParams).next === 'checkin';
   setRequestLocale(locale);
   const t = await getTranslations('quroosh.account');
 
@@ -35,7 +43,10 @@ export default async function QurooshAccountLinkPage({
   if (!link) return <Alert tone="warn">{t('link.notFound')}</Alert>;
 
   const signInLink = (
-    <Link href={accountHomePath(link.project_id)} className="font-medium text-brand-600 hover:underline">
+    <Link
+      href={toCheckIn ? sessionCheckInPath(link.project_id) : accountHomePath(link.project_id)}
+      className="font-medium text-brand-600 hover:underline"
+    >
       {t('link.askAgain')}
     </Link>
   );
@@ -88,6 +99,7 @@ export default async function QurooshAccountLinkPage({
         <ActionForm action={redeemLinkAction} submitLabel={creating ? t('link.create') : t('link.signIn')}>
           <input type="hidden" name="token" value={token} />
           <input type="hidden" name="locale" value={locale} />
+          {toCheckIn ? <input type="hidden" name="next" value="checkin" /> : null}
         </ActionForm>
         {creating ? <p className="text-xs text-ink-muted">{t('link.noPassword')}</p> : null}
       </Card>
