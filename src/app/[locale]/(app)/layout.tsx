@@ -243,6 +243,17 @@ export default async function AppLayout({
           icon: 'tasks',
           show: component.role === 'manager',
         },
+        // The reception desk: the event's attendees arriving today. It is
+        // Event attendance's gate (0075) without a camera, so it shows to
+        // whoever may work that gate: the managers and the HR team.
+        {
+          href: `${base}/reception`,
+          label: tQuroosh('tabs.reception'),
+          icon: 'teams',
+          show: components.some(
+            (c) => c.project_id === component.project_id && c.component_key === 'event_attendance',
+          ),
+        },
         // The same project's Event attendance (0075), when it carries one
         // this person may open: its own pages, one press away.
         {
@@ -294,6 +305,14 @@ export default async function AppLayout({
         // are paid into their Quroosh wallet, so only where the project
         // carries Quroosh too. Counts only, so the HR team may open it.
         { href: `${base}/session`, label: tEvent('tabs.session'), icon: 'qr', show: inQuroosh },
+        // Quroosh's reception desk (finding and checking in without a
+        // camera, and today's arrivals), under the same rule as the tab above.
+        {
+          href: `/projects/${component.project_id}/quroosh/reception`,
+          label: tQuroosh('tabs.reception'),
+          icon: 'teams',
+          show: inQuroosh,
+        },
         {
           href: `/projects/${component.project_id}/quroosh`,
           label: tQuroosh('name'),

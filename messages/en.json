@@ -1441,7 +1441,8 @@
       "guests": "Guests",
       "accounts": "Accounts",
       "wallet": "Quroosh & ledger",
-      "challenges": "Challenges"
+      "challenges": "Challenges",
+      "reception": "Reception"
     },
     "role": {
       "manager": "Manager",
@@ -2184,6 +2185,39 @@
         "invalid": "This did not work. Try again."
       }
     },
+    "reception": {
+      "title": "Reception",
+      "notReady": "Reception is not ready on this deployment yet: Event attendance (club migration 0075) has to be applied first.",
+      "notAnEventDay": "Today is not one of the event’s days, so nobody can be checked in.",
+      "arrivedToday": "Arrived today",
+      "expected": "Not here yet",
+      "registered": "Registered",
+      "checkedIn": "Checked in",
+      "already": "Already checked in today at {time}",
+      "undo": "Undo this check-in",
+      "undone": "The check-in was undone.",
+      "failed": "This did not work. Try again.",
+      "network": "No connection. Check the network and try again.",
+      "scannerHint": "Has the guest brought their QR code?",
+      "scannerLink": "Open the gate scanner",
+      "search": {
+        "title": "Find a guest",
+        "hint": "Search by part of their name, or the last four digits of their mobile, then check them in.",
+        "placeholder": "Name or last 4 digits",
+        "submit": "Find",
+        "empty": "Nobody matches.",
+        "checkIn": "Check in",
+        "checkedInToday": "In today",
+        "cancelled": "Pass cancelled"
+      },
+      "arrivals": {
+        "title": "Arrived today",
+        "none": "Nobody has arrived yet today.",
+        "unavailable": "The list of arrivals cannot be read on this deployment yet. Checking in still works.",
+        "manual": "At the desk",
+        "more": "Showing the latest {count}."
+      }
+    },
     "checkin": {
       "eyebrow": "Quroosh",
       "title": "Session check-in",
@@ -2199,6 +2233,12 @@
         "submit": "Send my sign-in link",
         "noAccount": "No account yet?",
         "howToGet": "Accounts are created when you check in at the event gate with the email on your pass."
+      },
+      "byEmail": {
+        "title": "Enter your email to check in",
+        "hint": "Type the email on your pass. Nothing is sent to you: you go straight to the rating.",
+        "submit": "Continue",
+        "change": "Not you? Use another email"
       },
       "question": "How would you rate today’s dialogue session?",
       "pick": "Choose from 1 to 5 stars",
@@ -2227,6 +2267,8 @@
         "account_disabled": "This account is not active. Please contact the Quroosh team.",
         "not_found": "Your account does not belong to this event.",
         "not_ready": "Session check-in is not open yet. Please try again later.",
+        "no_account": "No account has this email. Use the email on your pass; accounts are created when you check in at the event gate.",
+        "email_invalid": "Please check the email address.",
         "invalid": "This did not work. Please try again."
       }
     }

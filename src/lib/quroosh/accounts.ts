@@ -64,9 +64,15 @@ export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-/** The address in an account email. Always the production site, like every link people are sent. */
-export function accountLinkUrl(locale: string, token: string): string {
-  return `${siteUrl()}/${locale}/quroosh/account/link/${token}`;
+/**
+ * The address in an account email. Always the production site, like every
+ * link people are sent. `next` says where the link leads once it has signed
+ * the guest in: 'checkin' is the session check-in they asked for it from.
+ * It travels in the link itself, because the link is often opened in another
+ * browser than the one that asked (a mail app's own), where no cookie follows.
+ */
+export function accountLinkUrl(locale: string, token: string, next?: 'checkin'): string {
+  return `${siteUrl()}/${locale}/quroosh/account/link/${token}${next ? `?next=${next}` : ''}`;
 }
 
 /** Where a guest signs in and, once in, finds their account. */

@@ -212,6 +212,14 @@ function render(row: EmailRow, href: string): { subject: string; html: string; t
 export type AccountEmailReport = { claimed: number; sent: number; failed: number; deferred: number };
 
 /**
+ * Whose sign-in link was just asked for from the session check-in page: their
+ * email's link leads back there (`accountLinkUrl`'s `next`). The queue does
+ * not hold this, so it is only known to the pass that sends right after the
+ * request; an email the five-minute sweep sends instead gets the plain link.
+ */
+export type CheckInReturn = { projectId: string; email: string };
+
+/**
  * Sends the queued account emails. Safe to call from anywhere: with nothing
  * queued it does nothing, without the Resend variables it leaves every row
  * where it is, and before 0006 is applied it returns quietly.
@@ -219,7 +227,11 @@ export type AccountEmailReport = { claimed: number; sent: number; failed: number
  * The link in each email is made here, at the moment of sending: the queue
  * holds no token, so an email that is never sent leaves no link behind.
  */
-export async function deliverAccountEmails(limit = 50, budgetMs = 30_000): Promise<AccountEmailReport> {
+export async function deliverAccountEmails(
+  limit = 50,
+  budgetMs = 30_000,
+  toCheckIn?: CheckInReturn,
+): Promise<AccountEmailReport> {
   const started = Date.now();
   const report: AccountEmailReport = { claimed: 0, sent: 0, failed: 0, deferred: 0 };
   if (!isEmailConfigured() || !isQurooshConfigured()) return report;
@@ -250,7 +262,18 @@ export async function deliverAccountEmails(limit = 50, budgetMs = 30_000): Promi
           : await sendEmail({
               to: row.to_email,
               toName: row.to_name,
-              ...render(row, accountLinkUrl(row.locale === 'en' ? 'en' : 'ar', token)),
+              ...render(
+                row,
+                accountLinkUrl(
+                  row.locale === 'en' ? 'en' : 'ar',
+                  token,
+                  toCheckIn &&
+                    row.project_id === toCheckIn.projectId &&
+                    row.to_email.toLowerCase() === toCheckIn.email.toLowerCase()
+                    ? 'checkin'
+                    : undefined,
+                ),
+              ),
             });
       } catch (caught) {
         outcome = { error: caught instanceof Error ? caught.message : 'Unknown error' };
@@ -282,10 +305,10 @@ async function payAttendance(projectId: string): Promise<void> {
 }
 
 /** For the end of a server action: send once the response is out the door. */
-export function kickAccountEmails(): void {
+export function kickAccountEmails(toCheckIn?: CheckInReturn): void {
   after(async () => {
     try {
-      await deliverAccountEmails();
+      await deliverAccountEmails(50, 30_000, toCheckIn);
     } catch (error) {
       console.error('[quroosh/accounts] email delivery failed', error);
     }

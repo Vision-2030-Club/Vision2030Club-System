@@ -1,4 +1,6 @@
 import 'server-only';
+import { cookies } from 'next/headers';
+import { getGuestAccount } from '@/lib/quroosh/accounts';
 import { siteUrl } from '@/lib/site';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 
@@ -82,4 +84,89 @@ export async function checkInToSession(
   }
   const row = (data as { day: string; points: number }[] | null)?.[0];
   return row ? { ok: true, points: Number(row.points) } : { ok: false, hint: 'invalid' };
+}
+
+// -----------------------------------------------------------------------------
+// Checking in with an email alone (Quroosh 0011)
+// -----------------------------------------------------------------------------
+
+/**
+ * Who is checking in on this device, for the session check-in page and its
+ * action only. Either the signed-in guest (the session cookie of 0006), or
+ * the account whose email was typed on this page (0011).
+ *
+ * A typed email is not proof of who typed it. So `byEmail` is good for one
+ * thing, rating the session and checking in; it is never a sign-in, and no
+ * other page may accept it. The wallet still needs the emailed link.
+ */
+export type CheckInGuest = { account_id: string; name: string; byEmail: boolean };
+
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/** Remembers the email typed at the session check-in, so tomorrow's scan goes straight to the stars. */
+const CHECKIN_COOKIE = 'quroosh_checkin';
+const THIRTY_DAYS = 60 * 60 * 24 * 30;
+
+/** An email as the accounts hold it, or null when it is not one. */
+export function cleanEmail(value: unknown): string | null {
+  const email = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return email.length <= 254 && EMAIL.test(email) ? email : null;
+}
+
+/**
+ * The account with this email in this project: null when there is none (or
+ * it is disabled), `undefined` when the database cannot answer (0011 not
+ * applied), so the page can fall back to the emailed sign-in link.
+ */
+export async function findSessionAccount(
+  projectId: string,
+  email: string,
+): Promise<{ account_id: string; name: string } | null | undefined> {
+  if (!isQurooshConfigured()) return undefined;
+  const { data, error } = await createQurooshClient().rpc('session_account_by_email', {
+    p_project: projectId,
+    p_email: email,
+  });
+  if (error) return undefined;
+  return (data as { account_id: string; name: string }[] | null)?.[0] ?? null;
+}
+
+/** Whether checking in by email works on this deployment (0011 applied). */
+export async function canCheckInByEmail(projectId: string): Promise<boolean> {
+  return (await findSessionAccount(projectId, '')) !== undefined;
+}
+
+/** Remembers the typed email for this project's check-in page. Only from a server action. */
+export async function rememberCheckInEmail(projectId: string, email: string): Promise<void> {
+  (await cookies()).set(CHECKIN_COOKIE, `${projectId}:${email}`, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: THIRTY_DAYS,
+  });
+}
+
+/** Forgets it ("not you?"). Only from a server action. */
+export async function forgetCheckInEmail(): Promise<void> {
+  (await cookies()).delete(CHECKIN_COOKIE);
+}
+
+/**
+ * Who is checking in here, or null: the signed-in guest of this project if
+ * there is one, otherwise the account of the email typed on this device.
+ * The email is looked up again on every request, so a disabled account or a
+ * corrected email stops working at once.
+ */
+export async function getCheckInGuest(projectId: string): Promise<CheckInGuest | null> {
+  const account = await getGuestAccount();
+  // A session of another project's account is nobody here.
+  if (account && account.project_id === projectId) {
+    return { account_id: account.account_id, name: account.name, byEmail: false };
+  }
+  const [cookieProject, ...rest] = ((await cookies()).get(CHECKIN_COOKIE)?.value ?? '').split(':');
+  const email = cleanEmail(rest.join(':'));
+  if (cookieProject !== projectId || !email) return null;
+  const found = await findSessionAccount(projectId, email);
+  return found ? { ...found, byEmail: true } : null;
 }

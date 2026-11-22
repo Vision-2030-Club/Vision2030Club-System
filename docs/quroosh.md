@@ -553,12 +553,24 @@ The third way to earn: checking in to the day's **dialogue session**
   faces, decided by the database each time it is read:
   - **not signed in** (no `getGuestAccount()`, or another project's): the
     sign-in form (`SignInForm`, shared with the account page). The emailed
-    link brings them **back to the check-in page**: asking for the link from
-    here remembers the page in a cookie, `quroosh_return` (an hour, HttpOnly),
-    and `redeemLinkAction` sends them there instead of the account page when
-    the cookie names the same project. Only `/quroosh/checkin/<uuid>` is
-    accepted (`safeReturnPath`). A link opened on another device lands on the
-    account page as before.
+    link brings them **back to the check-in page**, and since 2026-11-22
+    the link says so itself: asking from here makes the email's link end in
+    `?next=checkin` (`accountLinkUrl`), the link page passes it on, and
+    `redeemLinkAction` opens the check-in page of the link's own project, for
+    both kinds of link ("complete your account" too). So it works in
+    whatever browser opens the email. Before, the page was remembered only in
+    a cookie (`quroosh_return`, an hour, HttpOnly), and a guest whose mail
+    app opened the link in its own browser (Gmail on an iPhone, say) landed
+    on the account page and never saw the stars. The cookie is still read,
+    for a link sent without `next`: the queue does not hold where a request
+    came from, so only the send right after the request
+    (`kickAccountEmails(toCheckIn)`) adds it, and an email the five-minute
+    sweep sends instead has the plain link. Only `/quroosh/checkin/<uuid>`
+    is accepted from the form (`safeReturnPath`).
+  - **A guest signed in in one browser is not signed in in another.** The
+    phone's camera may open the QR code in a browser other than the one the
+    email's link opened in; they are then asked for their email again, and
+    the new link brings them to the stars.
   - **not checked in today:** five stars (radio buttons, so a keyboard and a
     screen reader work) and **تسجيل حضور**, disabled until a star is chosen.
   - **checked in today:** "لقد قمت بتسجيل حضورك لجلسة اليوم بالفعل", their
@@ -578,9 +590,61 @@ The third way to earn: checking in to the day's **dialogue session**
 - **Who can check in:** a guest account (0006), so someone checked in at the
   gate with an email on their pass. Being at the gate is not required on the
   day; the session code is enough.
+- **With the email alone, no link** (Quroosh `0011`, the club's decision,
+  2026-11-22). A guest who is not signed in types the email on their pass
+  and goes straight to the stars: nothing is sent. `enterEmailAction` asks
+  `session_account_by_email` for the account (not disabled; the older of two
+  sharing an email), remembers the email in a cookie (`quroosh_checkin`,
+  `<project id>:<email>`, HttpOnly, thirty days) and reloads the page, so the
+  next day's scan in the same browser opens the stars at once. "Not you?"
+  forgets it. `getCheckInGuest` is who the page and `sessionCheckInAction`
+  act for: the signed-in guest if there is one, otherwise the account of the
+  remembered email, looked up again on every request.
+  - **An email is not proof of who typed it.** Anyone who knows a guest's
+    email can rate and check in as them (once a day, and the quroosh go to
+    that guest), and the form tells whether an email has an account. The
+    club accepted that for the session. So this **never signs a device in**:
+    `getCheckInGuest` is for the check-in page only, the wallet and every
+    other guest page keep asking `getGuestAccount()` and the emailed link.
+    Do not use it anywhere a guest can spend, vote, or read more than a
+    first name. The page greets a guest who only typed an email by first
+    name.
+  - **Before `0011` is applied** the page shows the emailed sign-in link as
+    before (`canCheckInByEmail`).
 - **Before `0009` is applied** the guest's page says check-in is not open,
   the organizers' tab shows the QR code with a note that the migration is
   needed, and the wallet page leaves the session line out.
+
+## Reception
+
+`projects/[id]/quroosh/reception`, built 2026-11-22: the event's
+**attendees** arriving today, for a desk with a laptop. It is not about the
+invited speakers under Guests (the club's decision, 2026-11-22).
+
+- **Who may open it:** the project's managers and the HR team, the people
+  who work the gate. The page asks **Event attendance** who is looking
+  (`getEventAttendanceAccess`, `can.scan`), not Quroosh: a Quroosh `member`
+  or `viewer` who is neither gets a 404.
+- **What it shows:** arrived today, not here yet (registered minus arrived)
+  and registered; a search by part of a name or the last four digits of a
+  mobile with **Check in**; and today's arrivals, newest first (name, last
+  four digits, the time, and "At the desk" for a check-in made by search).
+  Never a full mobile or an email. The page reads itself again after every
+  change and every 30 seconds while on screen.
+- **It stores nothing.** `ReceptionDesk` calls Event attendance's own
+  actions (`findAttendeesAction`, `checkInByIdAction`, `undoCheckInAction`),
+  so every rule is the gate's: one check-in a day, only on the event's days,
+  nobody checks in their own pass (club `0077`), and a new arrival still
+  gets their Quroosh account and the wallet's sign-up bonus. No migration.
+- **The arrivals list** is read with the service role through
+  `listCheckIns` and `getAttendeesById` (club `0076`), after the access
+  check, and shows the latest 300. If that read fails the list says so and
+  checking in still works.
+- **In the sidebar:** under Quroosh for anyone who may open the project's
+  Event attendance, and under Event attendance under the same rule as the
+  Session check-in tab. An HR member who cannot open Quroosh sees neither
+  link; the address still works for them, and so does the gate scanner,
+  which has the same search.
 
 ## The identity
 

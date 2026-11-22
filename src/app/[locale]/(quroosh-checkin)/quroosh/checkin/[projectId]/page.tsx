@@ -3,10 +3,17 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Alert, Button, Card } from '@/components/ui';
 import { QurooshCard, QurooshNote, QurooshPage } from '@/components/QurooshHero';
 import { Link } from '@/i18n/navigation';
-import { accountHomePath, getGuestAccount } from '@/lib/quroosh/accounts';
-import { getSessionPoints, getSessionToday, sessionCheckInPath } from '@/lib/quroosh/sessions';
+import { accountHomePath } from '@/lib/quroosh/accounts';
+import {
+  canCheckInByEmail,
+  getCheckInGuest,
+  getSessionPoints,
+  getSessionToday,
+  sessionCheckInPath,
+} from '@/lib/quroosh/sessions';
 import { formatQuroosh } from '@/lib/quroosh/wallet';
 import { MailIcon, SignInForm } from '@/app/[locale]/(quroosh-public)/quroosh/account/SignInForm';
+import { changeEmailAction, enterEmailAction } from '../actions';
 import { RatingForm, StarsShown } from './RatingForm';
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -20,7 +27,8 @@ const LINK_BUTTON =
  * The dialogue session's check-in: /quroosh/checkin/<club project id>
  * (Quroosh 0009). What the organizers' QR code opens. One page, three faces:
  *
- *   nobody signed in        sign in first; the emailed link brings them back here
+ *   nobody known            type the email on the pass, nothing is sent (0011);
+ *                           before 0011 is applied, the emailed sign-in link
  *   not checked in today    rate the session (1 to 5 stars), then "تسجيل حضور"
  *   checked in today        "already checked in", the button disabled until
  *                           00:00 Riyadh; with ?done=1, the confirmation on top
@@ -51,18 +59,28 @@ export default async function SessionCheckInPage({
     return frame(<Alert tone="warn">{t('notFound')}</Alert>);
   }
 
-  const account = await getGuestAccount();
-  // A session of another project's account is nobody here.
-  if (!account || account.project_id !== projectId) {
+  // The signed-in guest, or the account of the email typed on this device.
+  const account = await getCheckInGuest(projectId);
+  if (!account) {
+    const byEmail = await canCheckInByEmail(projectId);
     return frame(
       <>
-        <QurooshCard icon={<MailIcon className="size-5" />} title={t('signIn.title')}>
-          <SignInForm
-            locale={locale}
-            projectId={projectId}
-            next={sessionCheckInPath(projectId)}
-            look={{ label: t('signIn.email'), hint: t('signIn.hint'), submit: t('signIn.submit') }}
-          />
+        <QurooshCard icon={<MailIcon className="size-5" />} title={t(byEmail ? 'byEmail.title' : 'signIn.title')}>
+          {byEmail ? (
+            <SignInForm
+              locale={locale}
+              projectId={projectId}
+              action={enterEmailAction}
+              look={{ label: t('signIn.email'), hint: t('byEmail.hint'), submit: t('byEmail.submit') }}
+            />
+          ) : (
+            <SignInForm
+              locale={locale}
+              projectId={projectId}
+              next={sessionCheckInPath(projectId)}
+              look={{ label: t('signIn.email'), hint: t('signIn.hint'), submit: t('signIn.submit') }}
+            />
+          )}
         </QurooshCard>
         <QurooshNote>
           {t('signIn.noAccount')} {t('signIn.howToGet')}
@@ -77,10 +95,24 @@ export default async function SessionCheckInPage({
     return frame(<Alert tone="warn">{t('notReady')}</Alert>);
   }
 
+  // Someone who only typed an email is greeted by first name: the full name
+  // on the account is not shown to whoever knows the address.
+  const name = account.byEmail ? (account.name.trim().split(/\s+/)[0] ?? '') : account.name;
   const walletLink = (
-    <Link href={accountHomePath(projectId)} className={LINK_BUTTON}>
-      {t('toWallet')}
-    </Link>
+    <>
+      <Link href={accountHomePath(projectId)} className={LINK_BUTTON}>
+        {t('toWallet')}
+      </Link>
+      {account.byEmail ? (
+        <form action={changeEmailAction} className="text-center">
+          <input type="hidden" name="locale" value={locale} />
+          <input type="hidden" name="project_id" value={projectId} />
+          <button type="submit" className="text-sm font-medium text-brand-600 hover:underline">
+            {t('byEmail.change')}
+          </button>
+        </form>
+      ) : null}
+    </>
   );
 
   if (today) {
@@ -102,7 +134,7 @@ export default async function SessionCheckInPage({
           </section>
         ) : null}
         <Card className="space-y-4 text-center">
-          <p className="text-sm text-ink-muted">{t('greeting', { name: account.name })}</p>
+          <p className="text-sm text-ink-muted">{t('greeting', { name })}</p>
           <Alert tone="info">{t('already')}</Alert>
           <StarsShown rating={today.rating} label={t('yourRating', { rating: today.rating })} />
           <Button type="button" disabled className="min-h-12 w-full text-base">
@@ -118,7 +150,7 @@ export default async function SessionCheckInPage({
   return frame(
     <>
       <Card className="space-y-4">
-        <p className="text-center text-sm text-ink-muted">{t('greeting', { name: account.name })}</p>
+        <p className="text-center text-sm text-ink-muted">{t('greeting', { name })}</p>
         <RatingForm
           locale={locale}
           projectId={projectId}
