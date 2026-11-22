@@ -16,6 +16,12 @@ import { siteUrl } from '@/lib/site';
  * bgcolor, the form mail apps keep; the pictures are PNGs on the site
  * (public/brand/quroosh-email-*), since mail apps drop SVG and CSS rotation,
  * so they show once the site that sends them is deployed.
+ *
+ * Never delete or rename a picture an email has used, even when the layout
+ * stops using it: an email already sent keeps loading it from the site for
+ * ever, and a missing one shows as a broken image in every guest's inbox.
+ * Add a new file instead (quroosh-email-coins-purple.png and the two
+ * quroosh-email-wave-*.png are kept for the emails sent before 2026-11-22).
  */
 export function qurooshEmailHtml(m: {
   ar: boolean;
