@@ -4,7 +4,7 @@ import QRCode from 'qrcode';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { eventDayRange, passQrImageUrl, passUrl } from '@/lib/eventAttendance/links';
 import type { EventTheme } from '@/lib/eventAttendance/types';
-import { siteUrl } from '@/lib/site';
+import { qurooshEmailHtml } from '@/lib/quroosh/emailLayout';
 
 /**
  * Sending the pass emails the club database queued (0075).
@@ -94,15 +94,10 @@ function render(row: PassRow, theme: EventTheme = null): { subject: string; html
 }
 
 /**
- * The pass email of an event that wears Quroosh's identity, in the identity's
- * page design (QurooshPage on the site): a navy hero with the logo ("Powered
- * by RAYH"), a pair of the identity's purple coins (tilted as on the site),
- * the title and the greeting; a wave into a
- * light lavender body; a white card with the message, the QR on its own tile
- * and the purple button; a quiet note; a navy wave closing it. Built from
- * tables with inline styles and bgcolor, the form mail apps keep; the
- * pictures are PNGs on the site (public/brand/quroosh-email-*), since mail
- * apps drop SVG and CSS rotation.
+ * The pass email of an event that wears Quroosh's identity: the Quroosh email
+ * layout (src/lib/quroosh/emailLayout.ts) with the pass's QR on its own white
+ * tile in the card (scanners need the contrast). The first paragraph greets
+ * under the title, the last (what to do at the gate) is the note under the card.
  */
 function renderQuroosh(m: {
   ar: boolean;
@@ -113,61 +108,21 @@ function renderQuroosh(m: {
   href: string;
   token: string;
 }): string {
-  const brand = `${siteUrl()}/brand`;
-  const dir = m.ar ? 'rtl' : 'ltr';
-  const start = m.ar ? 'right' : 'left';
-  const font = m.ar
-    ? "'IBM Plex Sans Arabic',Tahoma,Arial,sans-serif"
-    : "'Titillium Web','Segoe UI',Arial,sans-serif";
-  // The first line greets (under the title, in the hero), the last tells them
-  // what to do at the gate (the note under the card); the rest is the message.
-  const greeting = m.paragraphs[0] ?? '';
-  const note = m.paragraphs.length > 2 ? m.paragraphs[m.paragraphs.length - 1] : '';
-  const body = m.paragraphs.slice(1, note ? -1 : undefined);
-  const navy = '#1E1338';
-  const lavender = '#E9E4F2';
-  const coins = `${brand}/quroosh-email-coins-purple.png`;
-  const table = 'role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"';
-  return (
-    `<!doctype html><html lang="${m.ar ? 'ar' : 'en'}" dir="${dir}">` +
-    `<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">` +
-    `<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"></head>` +
-    `<body style="margin:0;padding:0;background:${lavender}" bgcolor="${lavender}">` +
-    `<table ${table} bgcolor="${lavender}" style="background:${lavender};font-family:${font};direction:${dir}">` +
-    // The hero: the logo on the right and the coins on the left in both
-    // languages, as on the site (the row does not flip), then the title.
-    `<tr><td bgcolor="${navy}" style="background:${navy};padding:28px 24px 8px">` +
-    `<table ${table} dir="rtl" style="max-width:520px;margin:0 auto;direction:rtl"><tr>` +
-    `<td align="right" valign="top"><img src="${brand}/quroosh-email-logo.png" width="170" alt="قروش" style="display:block;width:170px;height:auto;border:0"></td>` +
-    `<td align="left" valign="top"><img src="${coins}" width="120" alt="" style="display:block;width:120px;height:auto;border:0"></td>` +
-    `</tr><tr><td colspan="2" dir="${dir}" style="padding:24px 0 0;text-align:${start};direction:${dir}">` +
-    `<h1 style="margin:0;font-size:30px;line-height:1.3;font-weight:700;color:#F5F3FA">${escapeHtml(m.subject)}</h1>` +
-    `<p style="margin:8px 0 0;font-size:16px;color:#CBC1DB">${escapeHtml(greeting)}</p>` +
-    `</td></tr></table></td></tr>` +
-    // The wave into the light page.
-    `<tr><td style="line-height:0;font-size:0"><img src="${brand}/quroosh-email-wave-top.png" width="600" alt="" style="display:block;width:100%;height:36px;border:0"></td></tr>` +
-    // The white card, then the note under it.
-    `<tr><td style="padding:12px 16px 0"><table ${table} style="max-width:520px;margin:0 auto"><tr>` +
-    `<td bgcolor="#FFFFFF" style="background:#FFFFFF;border:1px solid #8E86A6;border-radius:24px;padding:28px 24px;text-align:${start}">` +
-    body.map((p) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.7;color:#5B5378">${escapeHtml(p)}</p>`).join('') +
+  const note = m.paragraphs.length > 2 ? m.paragraphs[m.paragraphs.length - 1] : undefined;
+  const qr =
     `<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" style="margin:20px auto"><tr>` +
     `<td bgcolor="#FFFFFF" style="background:#FFFFFF;border:1px solid #CBC1DB;border-radius:18px;padding:14px">` +
-    `<img src="${escapeHtml(passQrImageUrl(m.token))}" width="220" height="220" alt="${escapeHtml(m.alt)}" style="display:block;border:0"></td></tr></table>` +
-    `<table ${table}><tr><td align="center" bgcolor="#542F90" style="background:#542F90;border-radius:16px">` +
-    `<a href="${escapeHtml(m.href)}" style="display:block;padding:16px 20px;color:#FFFFFF;font-size:16px;font-weight:700;text-decoration:none">${escapeHtml(m.button)}</a></td></tr></table>` +
-    `<p style="margin:14px 0 0;font-size:12px;color:#8E86A6;word-break:break-all;text-align:center" dir="ltr">${escapeHtml(m.href)}</p>` +
-    `</td></tr>` +
-    (note
-      ? `<tr><td style="padding:16px 0 0"><table ${table}><tr>` +
-        `<td bgcolor="#F1EEF7" style="background:#F1EEF7;border-radius:16px;padding:14px 16px;font-size:14px;line-height:1.7;color:#5B5378;text-align:${start}">` +
-        `<span style="color:#09798B;font-weight:700">&#9432;</span>&nbsp; ${escapeHtml(note)}</td></tr></table></td></tr>`
-      : '') +
-    `</table></td></tr>` +
-    // The navy wave closing it, with the club's line on it.
-    `<tr><td style="padding:28px 0 0;line-height:0;font-size:0"><img src="${brand}/quroosh-email-wave-bottom.png" width="600" alt="" style="display:block;width:100%;height:40px;border:0"></td></tr>` +
-    `<tr><td bgcolor="${navy}" style="background:${navy};padding:4px 16px 24px;font-size:12px;color:#9B91C0;text-align:center">Vision 2030 Club · نادي رؤية 2030</td></tr>` +
-    `</table></body></html>`
-  );
+    `<img src="${escapeHtml(passQrImageUrl(m.token))}" width="220" height="220" alt="${escapeHtml(m.alt)}" style="display:block;border:0"></td></tr></table>`;
+  return qurooshEmailHtml({
+    ar: m.ar,
+    title: m.subject,
+    greeting: m.paragraphs[0] ?? '',
+    body: m.paragraphs.slice(1, note ? -1 : undefined),
+    middle: qr,
+    button: m.button,
+    href: m.href,
+    note,
+  });
 }
 
 async function send(row: PassRow, theme: EventTheme): Promise<{ id: string } | { error: string }> {
