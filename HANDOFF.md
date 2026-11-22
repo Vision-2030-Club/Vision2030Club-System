@@ -65,6 +65,10 @@ docs/                 how each part works
   day's dialogue session and checks in once a day, and 1,000 quroosh are
   paid into their wallet (managers change the amount on Quroosh → Wallet).
   See "The session check-in" in `docs/quroosh.md`.
+- **Quroosh reception team and HR's Directors** (club migration `0078`,
+  written 2026-11-22, **not yet applied**): members listed as receptionists
+  may open Quroosh's Reception and work the event's gate, and HR's Directors
+  may open Quroosh to choose them. See "Reception" in `docs/quroosh.md`.
 - **Session check-in with the email alone** (Quroosh migration `0011`,
   written 2026-11-22, **not yet applied**): at the session's QR code a guest
   types the email on their pass and rates, with no link sent. It is not a
