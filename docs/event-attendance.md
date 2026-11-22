@@ -229,8 +229,10 @@ that gave something for it (points for attending, say) can take it back.
   preview, so a pass made on a preview opens on the live site. The scanner
   reads the token from any address, so scanning still works on a preview.
 - `0075` replaces `my_component_access()` with `0074`'s version plus one
-  branch. A later migration that changes the function must start from
-  `0075`'s.
+  branch, and club `0078` replaces it again (and `app.event_attendance_role`)
+  to make a project's receptionists scanners: see "The reception team" in
+  [`docs/quroosh.md`](quroosh.md). A later migration that changes either
+  function must start from `0078`'s.
 - `0077` replaces `event_check_in` with `0075`'s plus the own-pass check. A
   later migration that changes the function must start from `0077`'s, or
   staff can check themselves in again.

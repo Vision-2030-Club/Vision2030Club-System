@@ -1442,12 +1442,15 @@
       "accounts": "Accounts",
       "wallet": "Quroosh & ledger",
       "challenges": "Challenges",
-      "reception": "Reception"
+      "reception": "Reception",
+      "receptionTeam": "Reception team"
     },
     "role": {
       "manager": "Manager",
       "member": "Member",
-      "viewer": "Viewer"
+      "viewer": "Viewer",
+      "hr": "HR",
+      "reception": "Reception"
     },
     "overview": {
       "title": "Quroosh’s home in the system",
@@ -2184,6 +2187,16 @@
         "question_invalid": "The question could not be saved. Check the fields.",
         "invalid": "This did not work. Try again."
       }
+    },
+    "receptionTeam": {
+      "title": "Reception team",
+      "team": "Receptionists",
+      "teamHint": "Chosen by the project’s managers or HR’s Directors. They can open Reception and check attendees in at the gate, and cannot change anything else.",
+      "none": "Nobody has been added yet.",
+      "add": "Add",
+      "remove": "Remove",
+      "automatic": "Always in",
+      "automaticHint": "The project’s managers and every active member of the HR team work the reception without being listed. HR’s Directors can also open this page to choose the team."
     },
     "reception": {
       "title": "Reception",

@@ -254,6 +254,14 @@ export default async function AppLayout({
             (c) => c.project_id === component.project_id && c.component_key === 'event_attendance',
           ),
         },
+        // Who works the reception (club 0078): the project's managers and
+        // HR's Directors choose them, as in Mock Interviews.
+        {
+          href: `${base}/reception/team`,
+          label: tQuroosh('tabs.receptionTeam'),
+          icon: 'members',
+          show: component.role === 'manager' || permissions.get('members.manage') === 'all',
+        },
         // The same project's Event attendance (0075), when it carries one
         // this person may open: its own pages, one press away.
         {
