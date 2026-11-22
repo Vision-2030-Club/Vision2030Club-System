@@ -127,6 +127,10 @@ That is the gate's fallback when the in-app scanner cannot open the camera.
 - The last check-in can be undone from the result box. **Without a pass**:
   search by part of a name or the last four digits, then Check in
   (recorded as `manual`).
+- Quroosh's **Reception** page (`projects/<id>/quroosh/reception`) is the
+  same search and check-in without a camera, with today's arrivals listed;
+  it calls this component's actions. See "Reception" in
+  [`docs/quroosh.md`](quroosh.md).
 
 ## Email
 
