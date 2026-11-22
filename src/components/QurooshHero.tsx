@@ -6,7 +6,7 @@ import { cx } from '@/components/ui';
 
 // The pictures by path with their sizes, as the rest of the app does: an
 // imported .png needs next-env.d.ts, which CI's typecheck does not have.
-const LOGO = { src: '/brand/quroosh-logo-rayh.png', width: 720, height: 308 };
+const LOGO = { src: '/brand/quroosh-logo-rayh.png', width: 900, height: 383 };
 const COINS = { src: '/brand/quroosh-coins-purple.png', width: 420, height: 311 };
 
 /*
