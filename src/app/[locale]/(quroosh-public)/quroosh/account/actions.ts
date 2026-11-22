@@ -12,6 +12,7 @@ import {
   takeReturnPath,
 } from '@/lib/quroosh/accounts';
 import { kickAccountEmails } from '@/lib/quroosh/accountSync';
+import { sessionCheckInPath } from '@/lib/quroosh/sessions';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 
 /**
@@ -44,15 +45,20 @@ export async function redeemLinkAction(_previous: ActionResult, formData: FormDa
   const locale = localeOf(formData);
   const result = await redeemAccountLink(String(formData.get('token') ?? ''));
   if (!result.ok) return refusal(locale, result.hint);
-  // Back to the page the link was asked for from (the session check-in), when
-  // it is on this device and belongs to the same project.
-  const back = await takeReturnPath();
+  // Back to the page the link was asked for from, the session check-in. The
+  // link says so itself (`next`, see accountLinkUrl), which holds in whatever
+  // browser opened it; the cookie is the older way, for a link sent without
+  // it, and only works in the browser that asked.
+  const remembered = await takeReturnPath();
+  const back =
+    formData.get('next') === 'checkin'
+      ? sessionCheckInPath(result.projectId)
+      : remembered && remembered.endsWith(`/${result.projectId}`)
+        ? remembered
+        : null;
   // Outside any try: redirect() works by throwing.
   redirect({
-    href:
-      back && back.endsWith(`/${result.projectId}`)
-        ? back
-        : `${accountHomePath(result.projectId)}${result.newlyCompleted ? '?created=1' : ''}`,
+    href: back ?? `${accountHomePath(result.projectId)}${result.newlyCompleted ? '?created=1' : ''}`,
     locale,
   });
   return ok();
@@ -73,11 +79,13 @@ export async function requestSignInAction(_previous: ActionResult, formData: For
   if (!UUID.test(projectId) || !isQurooshConfigured()) return ok('sent');
   // Asked for from the session check-in: come back to it after signing in.
   // Asked for from the account page: forget any older page.
-  await rememberReturnPath(safeReturnPath(formData.get('next')));
+  const next = safeReturnPath(formData.get('next'));
+  await rememberReturnPath(next);
 
   // An error here (0006 not applied) reads the same as "no such account".
   await createQurooshClient().rpc('request_account_signin', { p_project: projectId, p_email: email });
-  kickAccountEmails();
+  // From the session check-in: the link in this email leads back to it.
+  kickAccountEmails(next === sessionCheckInPath(projectId) ? { projectId, email } : undefined);
   return ok('sent');
 }
 
