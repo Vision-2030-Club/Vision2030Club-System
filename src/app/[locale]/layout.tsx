@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { routing, localeDirection, type Locale } from '@/i18n/routing';
-import { plexArabic, gilroy, theSansArabic, titillium } from '@/lib/fonts';
+import { plexArabic, gilroy, theSansArabic, titillium, thmanyahSans } from '@/lib/fonts';
 import '../globals.css';
 
 export const metadata: Metadata = {
@@ -46,7 +46,7 @@ export default async function LocaleLayout({
     <html
       lang={locale}
       dir={localeDirection[locale as Locale]}
-      className={`${plexArabic.variable} ${gilroy.variable} ${theSansArabic.variable} ${titillium.variable} h-full`}
+      className={`${plexArabic.variable} ${gilroy.variable} ${theSansArabic.variable} ${titillium.variable} ${thmanyahSans.variable} h-full`}
       // The inline script below adds `data-theme` before React hydrates.
       suppressHydrationWarning
     >

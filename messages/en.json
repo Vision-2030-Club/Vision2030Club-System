@@ -1920,6 +1920,8 @@
       "signIn": {
         "title": "Your Quroosh account",
         "intro": "Enter your email and we will send you a sign-in link.",
+        "cardTitle": "Sign in",
+        "hint": "We will email you a secure sign-in link. Open it on this phone and you will come straight back here.",
         "email": "Email",
         "submit": "Send the sign-in link",
         "sent": "If this email has an account, a sign-in link is on its way. It is good for 15 minutes.",
@@ -2185,13 +2187,18 @@
     "checkin": {
       "eyebrow": "Quroosh",
       "title": "Session check-in",
+      "subtitle": "Rate the session and collect your quroosh.",
       "notFound": "This check-in link is not valid.",
       "notReady": "Session check-in is not open yet. Please try again later.",
       "greeting": "Welcome, {name}",
       "signIn": {
         "title": "Sign in to check in",
         "body": "Enter the email on your pass. We will send you a sign-in link; open it on this phone and you will come straight back here.",
-        "howToGet": "Accounts are created for guests after they check in at the event gate, using the email on their pass."
+        "email": "Email on your pass",
+        "hint": "We will email you a secure sign-in link. Open it on this phone and you will come straight back here.",
+        "submit": "Send my sign-in link",
+        "noAccount": "No account yet?",
+        "howToGet": "Accounts are created when you check in at the event gate with the email on your pass."
       },
       "question": "How would you rate today’s dialogue session?",
       "pick": "Choose from 1 to 5 stars",
@@ -2340,6 +2347,7 @@
     "join": {
       "title": "Sign up for {event}",
       "intro": "Fill in your details to get your entry pass: a QR code you show at the gate.",
+      "cardTitle": "Your details",
       "days": "Event days: {days}",
       "name": "Full name",
       "mobile": "Mobile number",
@@ -2353,6 +2361,7 @@
       "notFound": "This sign-up link is not valid."
     },
     "pass": {
+      "title": "Your entry pass",
       "registered": "You are registered. This is your pass, and a copy is on its way to your email.",
       "show": "Show this code to the staff at the gate, each day you attend.",
       "download": "Save the code as a picture",

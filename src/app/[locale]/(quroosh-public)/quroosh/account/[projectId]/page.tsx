@@ -15,7 +15,8 @@ import {
 } from '@/lib/quroosh/wallet';
 import { signOutAction } from '../actions';
 import { GuestTabs } from '../GuestTabs';
-import { SignInForm } from '../SignInForm';
+import { QurooshCard, QurooshNote } from '@/components/QurooshHero';
+import { MailIcon, SignInForm } from '../SignInForm';
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
@@ -69,79 +70,70 @@ export default async function QurooshAccountPage({
           {created ? <Alert tone="ok">{t('home.created')}</Alert> : null}
           <GuestTabs projectId={projectId} current="wallet" />
 
-          <section className="rounded-2xl bg-brand-950 p-6 text-center text-brand-50 shadow-sm">
+          {/* The balance: a navy card on the light page, its number the mint that shines. */}
+          <section className="rounded-3xl bg-brand-950 p-7 text-center text-brand-50 shadow-xl shadow-brand-950/20">
             <p className="text-sm text-brand-200">{account.name}</p>
             <p className="mt-3 text-sm font-medium text-accent-2">{t('wallet.balance')}</p>
-            <p className="ltr-nums mt-1 text-5xl font-bold tracking-tight tabular-nums" dir="ltr">
+            <p className="ltr-nums mt-1 text-6xl font-bold tracking-tight text-accent tabular-nums" dir="ltr">
               {formatQuroosh(wallet.balance)}
             </p>
-            <p className="mt-3 text-sm text-brand-100">
+            <p className="mt-4 inline-block rounded-full border border-brand-800 px-4 py-1.5 text-sm text-brand-50">
               {wallet.earned > 0
                 ? t('wallet.place', { position: wallet.position, players: wallet.players })
                 : t('wallet.noPlaceYet')}
             </p>
           </section>
 
-          <Card className="space-y-3">
-            <h2 className="font-semibold text-ink">{t('wallet.earnTitle')}</h2>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-ink">{t('wallet.attendance')}</p>
-                <p className="mt-1 text-sm text-ink-muted">
-                  {firstVisitPaid ? t('wallet.attendanceDone') : t('wallet.attendanceHint')}
-                </p>
-              </div>
-              {perDay ? (
-                <span
-                  className={`ltr-nums shrink-0 font-semibold tabular-nums ${firstVisitPaid ? 'text-ok' : 'text-ink'}`}
-                  dir="ltr"
-                >
-                  {formatSigned(perDay)}
-                </span>
-              ) : null}
-            </div>
+          {/* Ways to earn today: one card each, framed mint once collected. */}
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold text-ink">{t('wallet.earnTitle')}</h2>
+            <EarnCard
+              title={t('wallet.attendance')}
+              hint={firstVisitPaid ? t('wallet.attendanceDone') : t('wallet.attendanceHint')}
+              amount={perDay}
+              done={firstVisitPaid}
+            />
             {perSession ? (
-              <div className="flex items-start justify-between gap-3 border-t border-line pt-3">
-                <div>
-                  <p className="text-sm font-medium text-ink">{t('wallet.session')}</p>
-                  <p className="mt-1 text-sm text-ink-muted">
-                    {sessionToday ? t('wallet.sessionDone') : t('wallet.sessionHint')}
-                  </p>
-                </div>
-                <span
-                  className={`ltr-nums shrink-0 font-semibold tabular-nums ${sessionToday ? 'text-ok' : 'text-ink'}`}
-                  dir="ltr"
-                >
-                  {formatSigned(perSession)}
-                </span>
-              </div>
+              <EarnCard
+                title={t('wallet.session')}
+                hint={sessionToday ? t('wallet.sessionDone') : t('wallet.sessionHint')}
+                amount={perSession}
+                done={sessionToday}
+              />
             ) : null}
             {pass ? (
               <a
                 href={passUrl(locale, pass)}
-                className="inline-flex min-h-11 items-center rounded-lg border border-line bg-surface px-4 text-sm font-semibold text-ink hover:bg-surface-muted"
+                className="flex min-h-12 items-center justify-center rounded-2xl border-2 border-line px-4 text-sm font-semibold text-ink hover:bg-surface-muted"
               >
                 {t('wallet.showPass')}
               </a>
             ) : null}
-          </Card>
+          </section>
 
-          <section className="space-y-2">
-            <h2 className="font-semibold text-ink">{t('wallet.ledgerTitle')}</h2>
+          {/* The ledger: a clean list of small cards, a teal strip for what came in
+              and the coins' purple for what went out. */}
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold text-ink">{t('wallet.ledgerTitle')}</h2>
             {entries.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-line p-4 text-sm text-ink-muted">
+              <p className="rounded-2xl border-2 border-dashed border-line p-4 text-sm text-ink-muted">
                 {t('wallet.ledgerEmpty')}
               </p>
             ) : (
-              <ul className="divide-y divide-line rounded-xl border border-line bg-surface shadow-sm">
+              <ul className="space-y-2">
                 {entries.map((entry) => (
-                  <li key={entry.id} className="flex items-center justify-between gap-3 p-4">
+                  <li
+                    key={entry.id}
+                    className={`flex items-center justify-between gap-3 rounded-2xl border border-line border-s-4 bg-surface px-4 py-3 ${
+                      entry.amount > 0 ? 'border-s-accent-3' : 'border-s-coin'
+                    }`}
+                  >
                     <div>
                       <p className="text-sm font-medium text-ink">{t(`wallet.kind.${entry.kind}`)}</p>
                       {entry.day ? <p className="text-xs text-ink-muted">{eventDay(entry.day, locale)}</p> : null}
                     </div>
                     <span
-                      className={`ltr-nums font-semibold tabular-nums ${entry.amount > 0 ? 'text-ok' : 'text-ink'}`}
+                      className={`ltr-nums font-bold tabular-nums ${entry.amount > 0 ? 'text-accent-3' : 'text-ink-muted'}`}
                       dir="ltr"
                     >
                       {formatSigned(entry.amount)}
@@ -188,16 +180,58 @@ export default async function QurooshAccountPage({
     );
   }
 
+  // Nobody signed in: the identity's sign-in card, as on the session check-in.
   return (
     <div className="mx-auto max-w-md space-y-5">
       <div>
-        <h1 className="text-balance text-2xl font-semibold tracking-tight text-ink">{t('signIn.title')}</h1>
-        <p className="mt-2 text-sm text-ink-muted">{t('signIn.intro')}</p>
+        <h1 className="text-balance text-3xl font-bold text-ink">{t('signIn.title')}</h1>
+        <p className="mt-2 text-base text-ink-muted">{t('signIn.intro')}</p>
       </div>
-      <Card>
-        <SignInForm locale={locale} projectId={projectId} />
-      </Card>
-      <p className="text-xs text-ink-muted">{t('signIn.howToGet')}</p>
+      <QurooshCard icon={<MailIcon className="size-5" />} title={t('signIn.cardTitle')}>
+        <SignInForm
+          locale={locale}
+          projectId={projectId}
+          look={{ label: t('signIn.email'), hint: t('signIn.hint'), submit: t('signIn.submit') }}
+        />
+      </QurooshCard>
+      <QurooshNote>{t('signIn.howToGet')}</QurooshNote>
+    </div>
+  );
+}
+
+/**
+ * One way to earn quroosh today, as its own card: framed in mint with a thick
+ * strip on the reading side once collected, in lavender while still to do.
+ */
+function EarnCard({
+  title,
+  hint,
+  amount,
+  done,
+}: {
+  title: string;
+  hint: string;
+  amount: number | null;
+  done: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-start justify-between gap-3 rounded-2xl border-2 border-s-[6px] bg-surface p-5 ${
+        done ? 'border-accent border-s-accent-3' : 'border-brand-200 border-s-brand-300'
+      }`}
+    >
+      <div>
+        <p className="font-semibold text-ink">{title}</p>
+        <p className="mt-1 text-sm text-ink-muted">{hint}</p>
+      </div>
+      {amount ? (
+        <span
+          className={`ltr-nums shrink-0 text-xl font-bold tabular-nums ${done ? 'text-accent-3' : 'text-ink'}`}
+          dir="ltr"
+        >
+          {formatSigned(amount)}
+        </span>
+      ) : null}
     </div>
   );
 }

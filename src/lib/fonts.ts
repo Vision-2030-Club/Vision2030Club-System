@@ -44,14 +44,37 @@ export const theSansArabic = localFont({
  * The Quroosh (قروش) face, used inside that component's pages: Titillium
  * Web, as the identity specifies. It has no Arabic glyphs, so Arabic text
  * falls back to IBM Plex Sans Arabic glyph by glyph (see globals.css).
+ *
+ * No generated fallback face: next/font would add "titillium Fallback", an
+ * Arial with Titillium's metrics, and Arial carries Arabic, so every Arabic
+ * letter stopped there and IBM Plex Sans Arabic was never used.
  */
 export const titillium = localFont({
   variable: '--font-quroosh',
   display: 'swap',
+  adjustFontFallback: false,
   src: [
     { path: '../fonts/TitilliumWeb-300.woff2', weight: '300', style: 'normal' },
     { path: '../fonts/TitilliumWeb-400.woff2', weight: '400', style: 'normal' },
     { path: '../fonts/TitilliumWeb-600.woff2', weight: '600', style: 'normal' },
     { path: '../fonts/TitilliumWeb-700.woff2', weight: '700', style: 'normal' },
+  ],
+});
+
+/**
+ * Arabic on the Quroosh guest pages: thmanyah Sans (خط ثمانية الرقمي), the
+ * files exactly as thmanyah ships them (woff2), with their license beside
+ * them (src/fonts/thmanyah-LICENSE.pdf). The license allows websites only as
+ * part of a compiled product and forbids changing, renaming or handing out
+ * the files: leave them as they are, and load them only through next/font,
+ * never from public/.
+ */
+export const thmanyahSans = localFont({
+  variable: '--font-quroosh-arabic',
+  display: 'swap',
+  src: [
+    { path: '../fonts/thmanyahsans-Regular.woff2', weight: '400', style: 'normal' },
+    { path: '../fonts/thmanyahsans-Medium.woff2', weight: '500', style: 'normal' },
+    { path: '../fonts/thmanyahsans-Bold.woff2', weight: '600 700', style: 'normal' },
   ],
 });

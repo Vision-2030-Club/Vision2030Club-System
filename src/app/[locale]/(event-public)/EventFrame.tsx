@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { LocaleSwitch } from '@/components/LocaleSwitch';
-import { QurooshLogo } from '@/components/QurooshLogo';
+import { QurooshPage } from '@/components/QurooshHero';
 import type { EventTheme } from '@/lib/eventAttendance/types';
 
 /**
@@ -13,15 +13,23 @@ import type { EventTheme } from '@/lib/eventAttendance/types';
  * the address before the first paint, but `/event/...` says nothing about
  * the project, so the small script here sets it, placed first so it runs
  * before the page below it is painted.
+ *
+ * Quroosh's pages take the identity's page design (`QurooshPage`): the navy
+ * hero holds the page's `title` and `subtitle`, the body below is light.
  */
 export function EventFrame({
   theme,
   name,
+  title,
+  subtitle,
   children,
 }: {
   theme: EventTheme;
   /** The project's name in the page's language. */
   name: string;
+  /** Quroosh only: the hero's heading (the project's name if left out) and the line under it. */
+  title?: ReactNode;
+  subtitle?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -33,19 +41,25 @@ export function EventFrame({
           }}
         />
       ) : null}
-      <header className={theme === 'quroosh' ? 'bg-brand-950' : 'border-b border-line bg-surface'}>
-        <div className="mx-auto flex max-w-xl items-center gap-4 px-4 py-4">
-          {theme === 'quroosh' ? (
-            <QurooshLogo name={name} className="h-12 text-accent-2" />
-          ) : (
-            <span className="min-w-0 truncate text-lg font-semibold text-ink">{name}</span>
-          )}
-          <div className="ms-auto rounded-lg bg-surface">
-            <LocaleSwitch />
-          </div>
+      {theme === 'quroosh' ? (
+        <div className="quroosh-type flex min-h-dvh flex-col">
+          <QurooshPage name={name} title={title ?? name} subtitle={subtitle}>
+            {children}
+          </QurooshPage>
         </div>
-      </header>
-      <main className="mx-auto max-w-xl px-4 py-6">{children}</main>
+      ) : (
+        <>
+          <header className="border-b border-line bg-surface">
+            <div className="mx-auto flex max-w-xl items-center gap-4 px-4 py-4">
+              <span className="min-w-0 truncate text-lg font-semibold text-ink">{name}</span>
+              <div className="ms-auto rounded-lg bg-surface">
+                <LocaleSwitch />
+              </div>
+            </div>
+          </header>
+          <main className="mx-auto max-w-xl px-4 py-6">{children}</main>
+        </>
+      )}
     </>
   );
 }
