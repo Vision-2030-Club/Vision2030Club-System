@@ -39,7 +39,7 @@ docs/                 how each part works
   `schema_migrations` table of its database; `npm run db:push` and
   `npm run db:push:interviews` apply what is missing. Quroosh has a third
   database of its own (`supabase/quroosh/migrations`, `npm run
-  db:push:quroosh`, up to `0010`); see
+  db:push:quroosh`, up to `0011`); see
   `docs/quroosh.md`.
 - **Event attendance** (club migration `0075`, written 2026-11-18, **not yet
   applied**) keeps the public's names, mobiles and emails in the club
@@ -65,6 +65,11 @@ docs/                 how each part works
   day's dialogue session and checks in once a day, and 1,000 quroosh are
   paid into their wallet (managers change the amount on Quroosh → Wallet).
   See "The session check-in" in `docs/quroosh.md`.
+- **Session check-in with the email alone** (Quroosh migration `0011`,
+  written 2026-11-22, **not yet applied**): at the session's QR code a guest
+  types the email on their pass and rates, with no link sent. It is not a
+  sign-in and must not be used for anything else. Until `0011` is applied
+  the page keeps sending the sign-in link.
 - **Attendance pays the first visit only** (Quroosh migration `0010`,
   written 2026-11-21, **not yet applied**): a guest's first check-in at the
   gate pays 5,000 quroosh and later days pay nothing. See "The wallet" in
