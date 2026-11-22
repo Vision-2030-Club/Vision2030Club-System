@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { ActionForm } from '@/components/ActionForm';
 import { Input, Label, cx } from '@/components/ui';
+import type { ActionResult } from '@/lib/actions';
 import { requestSignInAction } from './actions';
 
 /**
@@ -11,22 +12,27 @@ import { requestSignInAction } from './actions';
  * `look` lets a page with its own design (the check-in) give the field its
  * label, hint and button words, a mail icon in the field, and a big button;
  * without it the form is the account page's, as before.
+ *
+ * `action` replaces what the form does with the email. The session check-in
+ * uses it to let a guest in with the email alone, no link sent (0011).
  */
 export async function SignInForm({
   locale,
   projectId,
   next,
   look,
+  action,
 }: {
   locale: string;
   projectId: string;
   next?: string;
   look?: { label: string; hint: string; submit: string };
+  action?: (state: ActionResult, formData: FormData) => Promise<ActionResult>;
 }) {
   const t = await getTranslations('quroosh.account.signIn');
   return (
     <ActionForm
-      action={requestSignInAction}
+      action={action ?? requestSignInAction}
       submitLabel={look?.submit ?? t('submit')}
       successText={t('sent')}
       className={look ? 'space-y-5' : undefined}

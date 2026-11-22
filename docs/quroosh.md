@@ -590,6 +590,27 @@ The third way to earn: checking in to the day's **dialogue session**
 - **Who can check in:** a guest account (0006), so someone checked in at the
   gate with an email on their pass. Being at the gate is not required on the
   day; the session code is enough.
+- **With the email alone, no link** (Quroosh `0011`, the club's decision,
+  2026-11-22). A guest who is not signed in types the email on their pass
+  and goes straight to the stars: nothing is sent. `enterEmailAction` asks
+  `session_account_by_email` for the account (not disabled; the older of two
+  sharing an email), remembers the email in a cookie (`quroosh_checkin`,
+  `<project id>:<email>`, HttpOnly, thirty days) and reloads the page, so the
+  next day's scan in the same browser opens the stars at once. "Not you?"
+  forgets it. `getCheckInGuest` is who the page and `sessionCheckInAction`
+  act for: the signed-in guest if there is one, otherwise the account of the
+  remembered email, looked up again on every request.
+  - **An email is not proof of who typed it.** Anyone who knows a guest's
+    email can rate and check in as them (once a day, and the quroosh go to
+    that guest), and the form tells whether an email has an account. The
+    club accepted that for the session. So this **never signs a device in**:
+    `getCheckInGuest` is for the check-in page only, the wallet and every
+    other guest page keep asking `getGuestAccount()` and the emailed link.
+    Do not use it anywhere a guest can spend, vote, or read more than a
+    first name. The page greets a guest who only typed an email by first
+    name.
+  - **Before `0011` is applied** the page shows the emailed sign-in link as
+    before (`canCheckInByEmail`).
 - **Before `0009` is applied** the guest's page says check-in is not open,
   the organizers' tab shows the QR code with a note that the migration is
   needed, and the wallet page leaves the session line out.

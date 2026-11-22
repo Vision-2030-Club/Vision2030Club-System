@@ -2234,6 +2234,12 @@
         "noAccount": "No account yet?",
         "howToGet": "Accounts are created when you check in at the event gate with the email on your pass."
       },
+      "byEmail": {
+        "title": "Enter your email to check in",
+        "hint": "Type the email on your pass. Nothing is sent to you: you go straight to the rating.",
+        "submit": "Continue",
+        "change": "Not you? Use another email"
+      },
       "question": "How would you rate today’s dialogue session?",
       "pick": "Choose from 1 to 5 stars",
       "stars": {
@@ -2261,6 +2267,8 @@
         "account_disabled": "This account is not active. Please contact the Quroosh team.",
         "not_found": "Your account does not belong to this event.",
         "not_ready": "Session check-in is not open yet. Please try again later.",
+        "no_account": "No account has this email. Use the email on your pass; accounts are created when you check in at the event gate.",
+        "email_invalid": "Please check the email address.",
         "invalid": "This did not work. Please try again."
       }
     }
