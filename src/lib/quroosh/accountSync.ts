@@ -1,9 +1,10 @@
 import 'server-only';
 import { after } from 'next/server';
-import { escapeHtml, isEmailConfigured, sendEmail } from '@/lib/email/resend';
+import { isEmailConfigured, sendEmail } from '@/lib/email/resend';
 import { getAttendeesById, listAttendees, listCheckIns } from '@/lib/eventAttendance/api';
 import { newToken } from '@/lib/interviews/tokens';
 import { accountLinkUrl, hashToken } from '@/lib/quroosh/accounts';
+import { qurooshEmailHtml } from '@/lib/quroosh/emailLayout';
 import { syncWallet } from '@/lib/quroosh/wallet';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
@@ -154,7 +155,7 @@ type EmailRow = {
   locale: 'ar' | 'en';
 };
 
-/** The two messages, in the guest's language, in the Quroosh colours. */
+/** The two messages, in the guest's language, in the Quroosh email layout. */
 function render(row: EmailRow, href: string): { subject: string; html: string; text: string } {
   const ar = row.locale !== 'en';
   const complete = row.kind === 'complete';
@@ -193,17 +194,17 @@ function render(row: EmailRow, href: string): { subject: string; html: string; t
         ];
   const button = ar ? (complete ? 'إكمال إنشاء الحساب' : 'الدخول إلى حسابي') : complete ? 'Complete my account' : 'Sign in';
 
-  const body = paragraphs.map((p) => `<p style="margin:0 0 12px;line-height:1.7">${escapeHtml(p)}</p>`).join('');
-  const html =
-    `<!doctype html><html lang="${ar ? 'ar' : 'en'}" dir="${ar ? 'rtl' : 'ltr'}">` +
-    `<body style="margin:0;background:#F5F8FA;font-family:'IBM Plex Sans Arabic','Titillium Web',Segoe UI,Arial,sans-serif;color:#1E1338">` +
-    `<div style="max-width:560px;margin:0 auto;padding:32px 20px">` +
-    `<div style="background:#1E1338;border-radius:12px 12px 0 0;padding:20px 28px;color:#BEE5EC;font-size:22px;font-weight:700">${ar ? 'قروش' : 'Quroosh'}</div>` +
-    `<div style="background:#fff;border:1px solid #CBC1DB;border-top:0;border-radius:0 0 12px 12px;padding:28px">` +
-    `<h1 style="margin:0 0 16px;font-size:20px;color:#542F90">${escapeHtml(subject)}</h1>${body}` +
-    `<p style="margin:24px 0"><a href="${escapeHtml(href)}" style="display:inline-block;background:#90D4D6;color:#1E1338;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:700">${escapeHtml(button)}</a></p>` +
-    `<p style="margin:0;font-size:12px;color:#3E3661;word-break:break-all">${escapeHtml(href)}</p>` +
-    `</div><p style="margin:16px 0 0;font-size:12px;color:#3E3661;text-align:center">Vision 2030 Club · نادي رؤية 2030</p></div></body></html>`;
+  // The Quroosh email layout: the greeting under the title, the link's
+  // lifetime as the note under the card, the rest in the card.
+  const html = qurooshEmailHtml({
+    ar,
+    title: subject,
+    greeting: paragraphs[0],
+    body: paragraphs.slice(1, -1),
+    button,
+    href,
+    note: paragraphs[paragraphs.length - 1],
+  });
   const text = [subject, '', ...paragraphs, '', `${button}: ${href}`].join('\n');
   return { subject, html, text };
 }
