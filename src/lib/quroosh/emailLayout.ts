@@ -35,22 +35,29 @@ export function qurooshEmailHtml(m: {
   const font = m.ar ? "'IBM Plex Sans Arabic',Tahoma,Arial,sans-serif" : "'Titillium Web','Segoe UI',Arial,sans-serif";
   const navy = '#1E1338';
   const lavender = '#E9E4F2';
+  // Mail apps in dark mode (Gmail above all) flip background colours but not
+  // background images, so the navy is also painted as a one-colour gradient:
+  // the hero and the footer stay navy, behind the logo and coins drawn on it.
+  const keepNavy = `background:${navy};background-image:linear-gradient(${navy},${navy})`;
   const table = 'role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"';
   return (
     `<!doctype html><html lang="${m.ar ? 'ar' : 'en'}" dir="${dir}">` +
     `<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">` +
+    `<style>u + .body .q-screen{background:#000;mix-blend-mode:screen}u + .body .q-diff{background:#000;mix-blend-mode:difference}</style>` +
     `<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"></head>` +
-    `<body style="margin:0;padding:0;background:${lavender}" bgcolor="${lavender}">` +
+    `<body class="body" style="margin:0;padding:0;background:${lavender}" bgcolor="${lavender}">` +
     `<table ${table} bgcolor="${lavender}" style="background:${lavender};font-family:${font};direction:${dir}">` +
     // The hero: the logo on the right and the coins on the left in both
     // languages, as on the site (the row does not flip), then the title.
-    `<tr><td bgcolor="${navy}" style="background:${navy};padding:28px 24px 8px">` +
+    `<tr><td bgcolor="${navy}" style="${keepNavy};padding:28px 24px 8px">` +
     `<table ${table} dir="rtl" style="max-width:520px;margin:0 auto;direction:rtl"><tr>` +
     `<td align="right" valign="top"><img src="${brand}/quroosh-email-logo.png" width="170" alt="قروش" style="display:block;width:170px;height:auto;border:0"></td>` +
     `<td align="left" valign="top"><img src="${brand}/quroosh-email-coins-purple.png" width="120" alt="" style="display:block;width:120px;height:auto;border:0"></td>` +
     `</tr><tr><td colspan="2" dir="${dir}" style="padding:24px 0 0;text-align:${start};direction:${dir}">` +
+    `<div class="q-screen"><div class="q-diff">` +
     `<h1 style="margin:0;font-size:30px;line-height:1.3;font-weight:700;color:#F5F3FA">${escapeHtml(m.title)}</h1>` +
     `<p style="margin:8px 0 0;font-size:16px;color:#CBC1DB">${escapeHtml(m.greeting)}</p>` +
+    `</div></div>` +
     `</td></tr></table></td></tr>` +
     // The wave into the light page.
     `<tr><td style="line-height:0;font-size:0"><img src="${brand}/quroosh-email-wave-top.png" width="600" alt="" style="display:block;width:100%;height:36px;border:0"></td></tr>` +
@@ -71,7 +78,8 @@ export function qurooshEmailHtml(m: {
     `</table></td></tr>` +
     // The navy wave closing it, with the club's line on it.
     `<tr><td style="padding:28px 0 0;line-height:0;font-size:0"><img src="${brand}/quroosh-email-wave-bottom.png" width="600" alt="" style="display:block;width:100%;height:40px;border:0"></td></tr>` +
-    `<tr><td bgcolor="${navy}" style="background:${navy};padding:4px 16px 24px;font-size:12px;color:#9B91C0;text-align:center">Vision 2030 Club · نادي رؤية 2030</td></tr>` +
+    `<tr><td bgcolor="${navy}" style="${keepNavy};padding:4px 16px 24px;font-size:12px;color:#9B91C0;text-align:center">` +
+    `<div class="q-screen"><div class="q-diff">Vision 2030 Club · نادي رؤية 2030</div></div></td></tr>` +
     `</table></body></html>`
   );
 }
