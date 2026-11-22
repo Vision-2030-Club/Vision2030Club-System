@@ -118,6 +118,12 @@ That is the gate's fallback when the in-app scanner cannot open the camera.
   checked in at 16:12".
 - When the managers set the event's days, the gate refuses any other day
   (`not_an_event_day`). With no days set, any day counts.
+- **Nobody checks themselves in** (club `0077`). An attendee has no access
+  to the gate at all; a manager or HR member who is also signed up to the
+  event is refused on their own pass (`own_pass`), by scan, by search and
+  by the button on the pass page. The pass is theirs when its mobile or
+  email is the one on their member record. Someone else at the gate checks
+  them in. Until `0077` is applied, staff can still do it.
 - The last check-in can be undone from the result box. **Without a pass**:
   search by part of a name or the last four digits, then Check in
   (recorded as `manual`).
@@ -221,6 +227,9 @@ that gave something for it (points for attending, say) can take it back.
 - `0075` replaces `my_component_access()` with `0074`'s version plus one
   branch. A later migration that changes the function must start from
   `0075`'s.
+- `0077` replaces `event_check_in` with `0075`'s plus the own-pass check. A
+  later migration that changes the function must start from `0077`'s, or
+  staff can check themselves in again.
 - A new column on `event_attendees` or `event_check_ins` must be nullable or
   have a default: rows already exist without it.
 - The QR code's picture must stay dark on white whatever the theme; the

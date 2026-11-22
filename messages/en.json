@@ -2381,6 +2381,7 @@
       "forbidden": "You may not do this for this event.",
       "not_found": "Not found.",
       "wrong_event": "This pass is for another event.",
+      "own_pass": "You cannot check yourself in. Ask someone else at the gate.",
       "attendee_cancelled": "This pass was cancelled.",
       "not_an_event_day": "Today is not one of the event’s days.",
       "not_checked_in": "This person is not checked in today.",
