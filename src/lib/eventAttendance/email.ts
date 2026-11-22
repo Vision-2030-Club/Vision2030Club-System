@@ -96,8 +96,8 @@ function render(row: PassRow, theme: EventTheme = null): { subject: string; html
 /**
  * The pass email of an event that wears Quroosh's identity, in the identity's
  * page design (QurooshPage on the site): a navy hero with the logo ("Powered
- * by RAYH"), a pair of the identity's coins (teal in English, purple in
- * Arabic, tilted as on the site), the title and the greeting; a wave into a
+ * by RAYH"), a pair of the identity's purple coins (tilted as on the site),
+ * the title and the greeting; a wave into a
  * light lavender body; a white card with the message, the QR on its own tile
  * and the purple button; a quiet note; a navy wave closing it. Built from
  * tables with inline styles and bgcolor, the form mail apps keep; the
@@ -116,7 +116,6 @@ function renderQuroosh(m: {
   const brand = `${siteUrl()}/brand`;
   const dir = m.ar ? 'rtl' : 'ltr';
   const start = m.ar ? 'right' : 'left';
-  const end = m.ar ? 'left' : 'right';
   const font = m.ar
     ? "'IBM Plex Sans Arabic',Tahoma,Arial,sans-serif"
     : "'Titillium Web','Segoe UI',Arial,sans-serif";
@@ -127,7 +126,7 @@ function renderQuroosh(m: {
   const body = m.paragraphs.slice(1, note ? -1 : undefined);
   const navy = '#1E1338';
   const lavender = '#E9E4F2';
-  const coins = `${brand}/quroosh-email-coins-${m.ar ? 'purple' : 'teal'}.png`;
+  const coins = `${brand}/quroosh-email-coins-purple.png`;
   const table = 'role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"';
   return (
     `<!doctype html><html lang="${m.ar ? 'ar' : 'en'}" dir="${dir}">` +
@@ -135,12 +134,13 @@ function renderQuroosh(m: {
     `<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"></head>` +
     `<body style="margin:0;padding:0;background:${lavender}" bgcolor="${lavender}">` +
     `<table ${table} bgcolor="${lavender}" style="background:${lavender};font-family:${font};direction:${dir}">` +
-    // The hero: the logo at the reading start, the coins at the far end, then the title.
+    // The hero: the logo on the right and the coins on the left in both
+    // languages, as on the site (the row does not flip), then the title.
     `<tr><td bgcolor="${navy}" style="background:${navy};padding:28px 24px 8px">` +
-    `<table ${table} style="max-width:520px;margin:0 auto"><tr>` +
-    `<td align="${start}" valign="top"><img src="${brand}/quroosh-email-logo.png" width="170" alt="قروش" style="display:block;width:170px;height:auto;border:0"></td>` +
-    `<td align="${end}" valign="top"><img src="${coins}" width="120" alt="" style="display:block;width:120px;height:auto;border:0"></td>` +
-    `</tr><tr><td colspan="2" style="padding:24px 0 0;text-align:${start}">` +
+    `<table ${table} dir="rtl" style="max-width:520px;margin:0 auto;direction:rtl"><tr>` +
+    `<td align="right" valign="top"><img src="${brand}/quroosh-email-logo.png" width="170" alt="قروش" style="display:block;width:170px;height:auto;border:0"></td>` +
+    `<td align="left" valign="top"><img src="${coins}" width="120" alt="" style="display:block;width:120px;height:auto;border:0"></td>` +
+    `</tr><tr><td colspan="2" dir="${dir}" style="padding:24px 0 0;text-align:${start};direction:${dir}">` +
     `<h1 style="margin:0;font-size:30px;line-height:1.3;font-weight:700;color:#F5F3FA">${escapeHtml(m.subject)}</h1>` +
     `<p style="margin:8px 0 0;font-size:16px;color:#CBC1DB">${escapeHtml(greeting)}</p>` +
     `</td></tr></table></td></tr>` +

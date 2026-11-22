@@ -1,22 +1,21 @@
 import Image from 'next/image';
-import { getLocale } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { LocaleSwitch } from '@/components/LocaleSwitch';
+import { QurooshThemeKeeper } from '@/components/QurooshThemeKeeper';
 import { cx } from '@/components/ui';
 
 // The pictures by path with their sizes, as the rest of the app does: an
 // imported .png needs next-env.d.ts, which CI's typecheck does not have.
 const LOGO = { src: '/brand/quroosh-logo-rayh.png', width: 720, height: 308 };
-const COINS_TEAL = { src: '/brand/quroosh-coins-teal.png', width: 420, height: 311 };
-const COINS_PURPLE = { src: '/brand/quroosh-coins-purple.png', width: 420, height: 311 };
+const COINS = { src: '/brand/quroosh-coins-purple.png', width: 420, height: 311 };
 
 /*
  * The Quroosh guest pages' design (the identity file and the Figma "Session
  * check-in"): a navy hero with the logo ("Powered by RAYH") and a pair of
  * the identity's coins, the page's title and a line under it, the language
  * as a pill, and a soft wave into a light lavender page; the body holds a
- * white card; a navy wave closes the page. The coins are teal in English and
- * purple in Arabic, as the design shows them. Pictures are cut from the
+ * white card; a navy wave closes the page. The same purple coins and the same
+ * places in both languages. Pictures are cut from the
  * identity PDF (public/brand/quroosh-*.png). Colours are theme tokens, so it
  * only looks right under `data-theme="quroosh"`.
  */
@@ -39,6 +38,7 @@ export async function QurooshPage({
 }) {
   return (
     <>
+      <QurooshThemeKeeper />
       <QurooshHero name={name} title={title} subtitle={subtitle} width={width} />
       <main className={cx('mx-auto w-full flex-1 space-y-5 px-5 pt-6 pb-12', width)}>{children}</main>
       <QurooshFooterWave />
@@ -58,7 +58,6 @@ export async function QurooshHero({
   subtitle?: ReactNode;
   width?: string;
 }) {
-  const ar = (await getLocale()) === 'ar';
   return (
     <div className="relative">
       <header className="relative overflow-hidden bg-brand-950 text-brand-50">
@@ -68,10 +67,12 @@ export async function QurooshHero({
           className="pointer-events-none absolute -top-24 start-0 size-72 rounded-full bg-brand-600/25 blur-3xl"
         />
         <div className={cx('relative mx-auto w-full px-6 pt-9 pb-14', width)}>
-          <div className="flex items-start justify-between gap-2">
+          {/* The logo on the right and the coins on the left in both languages, as
+              the identity places them; the row does not flip with the page. */}
+          <div dir="rtl" className="flex items-start justify-between gap-2">
             <Image {...LOGO} alt={name} priority className="h-auto w-44 shrink-0" sizes="176px" />
             <Image
-              {...(ar ? COINS_PURPLE : COINS_TEAL)}
+              {...COINS}
               alt=""
               aria-hidden="true"
               priority
