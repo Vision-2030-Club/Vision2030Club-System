@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Alert, Card } from '@/components/ui';
-import { redirect } from '@/i18n/navigation';
+import { Link, redirect } from '@/i18n/navigation';
 import { accountHomePath, getGuestAccount } from '@/lib/quroosh/accounts';
 import { getGuestChallenges, type GuestChallenge } from '@/lib/quroosh/challenges';
 import { formatQuroosh, formatSigned } from '@/lib/quroosh/wallet';
@@ -24,8 +24,9 @@ const STATUS_LOOK: Record<GuestChallenge['status'], { frame: string; badge: stri
  * Today's challenges (Quroosh 0008), for a signed-in guest of this project:
  * which booths have one, and what the guest got in those they played.
  *
- * There is no way to start one from here, on purpose: a challenge begins by
- * scanning the QR code at its booth, so that the guest is standing there.
+ * Each card opens its challenge, the same page the booth's QR code opens, so
+ * a guest can play from here without scanning. A finished one shows the
+ * result.
  */
 export default async function QurooshChallengesPage({
   params,
@@ -42,7 +43,7 @@ export default async function QurooshChallengesPage({
   }
 
   const t = await getTranslations('quroosh.account.challenges');
-  const challenges = await getGuestChallenges(account.account_id);
+  const challenges = await getGuestChallenges(account.account_id, projectId);
 
   return (
     <div className="mx-auto max-w-md space-y-5">
@@ -68,11 +69,8 @@ export default async function QurooshChallengesPage({
         <ul className="space-y-4">
           {challenges.map((challenge) => {
             const look = STATUS_LOOK[challenge.status];
-            return (
-              <li
-                key={challenge.id}
-                className={`rounded-2xl border-2 border-s-[6px] bg-surface p-5 ${look.frame}`}
-              >
+            const body = (
+              <>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-lg font-semibold text-ink">{challenge.booth}</p>
@@ -94,10 +92,25 @@ export default async function QurooshChallengesPage({
                   <span className={`rounded-full px-3 py-1 text-xs font-semibold ${look.badge}`}>
                     {t(`status.${challenge.status}`)}
                   </span>
-                  {challenge.status === 'done' ? null : (
-                    <span className="text-xs text-ink-muted">{t('scanToStart')}</span>
-                  )}
+                  {challenge.token ? (
+                    <span className="text-xs font-medium text-ink-muted">{t(`tap.${challenge.status}`)}</span>
+                  ) : null}
                 </div>
+              </>
+            );
+            const frame = `block rounded-2xl border-2 border-s-[6px] bg-surface p-5 ${look.frame}`;
+            return (
+              <li key={challenge.id}>
+                {challenge.token ? (
+                  <Link
+                    href={`/quroosh/challenge/${challenge.token}`}
+                    className={`${frame} transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 active:scale-[0.99]`}
+                  >
+                    {body}
+                  </Link>
+                ) : (
+                  <div className={frame}>{body}</div>
+                )}
               </li>
             );
           })}
