@@ -57,7 +57,7 @@ export async function ChallengeFields({
             step={1}
             dir="ltr"
             required
-            defaultValue={values?.maxPoints ?? 3000}
+            defaultValue={values?.maxPoints ?? 900}
           />
         </div>
       </div>

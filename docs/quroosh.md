@@ -485,8 +485,8 @@ paid into their wallet for being right and for being quick. Built
 2026-11-19.
 
 - **A challenge** (`challenges`) belongs to a booth and has a topic, the
-  seconds allowed per question (20), the most it pays (3,000) and optionally
-  a **day**. With a day it can be started on that day only; without one, any
+  seconds allowed per question (20), the most it pays (900 since `0013`;
+  3,000 before) and optionally a **day**. With a day it can be started on that day only; without one, any
   day. The design wants a new quiz per booth per day: the managers make one
   challenge per booth per day. Its `token` (made by the app, `newToken`) is
   what the booth's QR code holds: `/quroosh/challenge/<token>`.
