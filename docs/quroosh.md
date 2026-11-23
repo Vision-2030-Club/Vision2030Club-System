@@ -515,8 +515,11 @@ paid into their wallet for being right and for being quick. Built
   countdown, the result), chosen by the database each time it is read. The
   question is a client component (`QuestionForm`) that sends itself with no
   choice when its countdown ends. `/quroosh/account/<project id>/challenges`
-  lists today's challenges and what the guest got; it has **no start
-  button on purpose**: a challenge begins at its booth.
+  lists today's challenges and what the guest got. Since 2026-11-23 each
+  card is a link to its challenge's page, so a guest can play **without
+  scanning**; the booth's QR code still opens the same page. The links'
+  tokens come from `challenge_list` on the server (no migration), and only
+  for the challenges the guest already sees.
 - **Managers** (`projects/[id]/quroosh/challenges`, managers only): the list
   with how many played and the average; a challenge's page with its QR code
   to print, its settings, its questions (add, rewrite, hide; the right

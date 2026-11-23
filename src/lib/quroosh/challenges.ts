@@ -47,6 +47,8 @@ export type GuestChallenge = {
   max_points: number;
   status: 'new' | 'open' | 'done';
   points: number | null;
+  /** What the booth's QR code holds, so the guest's list can open the challenge with a tap. */
+  token: string | null;
 };
 
 /** `challenge_list`: one line of the managers' list. */
@@ -107,11 +109,27 @@ export async function getChallengeState(accountId: string, challengeId: string):
   return error ? null : ((data as ChallengeState | null) ?? null);
 }
 
-/** Null before 0008 is applied; an empty list when no booth has a challenge today. */
-export async function getGuestChallenges(accountId: string): Promise<GuestChallenge[] | null> {
-  const { data, error } = await createQurooshClient().rpc('challenges_for_account', { p_account: accountId });
-  if (error) return null;
-  return ((data ?? []) as GuestChallenge[]).map((row) => ({ ...row, questions: Number(row.questions) }));
+/**
+ * Null before 0008 is applied; an empty list when no booth has a challenge today.
+ *
+ * Each line carries its challenge's token, so a guest can open it from the
+ * list instead of scanning the booth's QR code. `challenges_for_account`
+ * does not return tokens, so they are read from the project's list on the
+ * server; only the tokens of the challenges this guest already sees leave it.
+ */
+export async function getGuestChallenges(accountId: string, projectId: string): Promise<GuestChallenge[] | null> {
+  const db = createQurooshClient();
+  const [mine, all] = await Promise.all([
+    db.rpc('challenges_for_account', { p_account: accountId }),
+    db.rpc('challenge_list', { p_project: projectId }),
+  ]);
+  if (mine.error) return null;
+  const tokens = new Map(((all.data ?? []) as ChallengeRow[]).map((row) => [row.id, row.token]));
+  return ((mine.data ?? []) as Omit<GuestChallenge, 'token'>[]).map((row) => ({
+    ...row,
+    questions: Number(row.questions),
+    token: tokens.get(row.id) ?? null,
+  }));
 }
 
 /** Seconds with one decimal, for "your time". */
