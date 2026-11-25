@@ -146,8 +146,9 @@ export default async function QurooshFinalAdminPage({
               <li key={project.id}>
                 <Card className={cx('space-y-3', project.hidden && 'opacity-70')}>
                   <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
-                    <span className="ltr-nums grid size-8 shrink-0 place-items-center rounded-lg bg-brand-950 text-sm font-bold text-accent-2 tabular-nums">
-                      {index + 1}
+                    {/* `ltr-nums` on the number alone: its inline-block would undo the square's grid. */}
+                    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand-950 text-sm font-bold text-accent-2">
+                      <span className="ltr-nums tabular-nums">{index + 1}</span>
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
@@ -225,11 +226,11 @@ async function ProjectFields({ prefix, name, brief }: { prefix: string; name?: s
     <>
       <div>
         <Label htmlFor={`${prefix}-name`}>{t('name')}</Label>
-        <Input id={`${prefix}-name`} name="name" defaultValue={name} maxLength={120} required />
+        <Input id={`${prefix}-name`} name="name" dir="auto" defaultValue={name} maxLength={120} required />
       </div>
       <div>
         <Label htmlFor={`${prefix}-brief`}>{t('brief')}</Label>
-        <Textarea id={`${prefix}-brief`} name="brief" defaultValue={brief ?? ''} maxLength={1000} rows={4} />
+        <Textarea id={`${prefix}-brief`} name="brief" dir="auto" defaultValue={brief ?? ''} maxLength={1000} rows={4} />
         <p className="mt-1 text-xs text-ink-muted">{t('briefHint')}</p>
       </div>
     </>
