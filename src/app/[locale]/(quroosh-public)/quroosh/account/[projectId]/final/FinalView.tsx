@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { Alert, cx } from '@/components/ui';
 import { Medal, MEDALS } from '@/components/QurooshMedal';
-import { FINAL_STEP, type FinalBoardRow, type FinalProject, type FinalStatus } from '@/lib/quroosh/final';
+import { FINAL_STEP, mostToGive, type FinalBoardRow, type FinalProject, type FinalStatus } from '@/lib/quroosh/final';
 import { formatQuroosh } from '@/lib/quroosh/wallet';
 import { GuestTabs } from '../../GuestTabs';
 import { CoinIcon, GiveForm } from './GiveForm';
@@ -19,6 +19,7 @@ export async function FinalView({
   projects,
   board,
   balance,
+  firstGift,
 }: {
   locale: string;
   projectId: string;
@@ -27,11 +28,14 @@ export async function FinalView({
   projects: FinalProject[] | null;
   board: FinalBoardRow[] | null;
   balance: number;
+  /** The guest has not given yet: this gift is capped at 75% of the balance. */
+  firstGift: boolean;
 }) {
   const t = await getTranslations('quroosh.account.final');
   const open = status === 'open';
   const given = (projects ?? []).reduce((sum, project) => sum + project.mine, 0);
   const lead = board?.[0]?.received ?? 0;
+  const most = mostToGive(balance, firstGift);
 
   return (
     <div className="mx-auto max-w-md space-y-6">
@@ -68,6 +72,10 @@ export async function FinalView({
               <li className="flex gap-2">
                 <CoinIcon className="mt-0.5 size-4 shrink-0 text-accent-3" />
                 {t('rules.steps', { step: formatQuroosh(FINAL_STEP) })}
+              </li>
+              <li className="flex gap-2">
+                <CoinIcon className="mt-0.5 size-4 shrink-0 text-accent-3" />
+                {t('rules.first')}
               </li>
               <li className="flex gap-2">
                 <CoinIcon className="mt-0.5 size-4 shrink-0 text-accent-3" />
@@ -179,6 +187,8 @@ export async function FinalView({
                         finalProjectId={project.id}
                         projectName={project.name}
                         balance={balance}
+                        most={most}
+                        firstGift={firstGift}
                         step={FINAL_STEP}
                       />
                     ) : null}
