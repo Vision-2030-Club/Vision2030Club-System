@@ -18,6 +18,17 @@ import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh
 /** Gifts go in steps of this many quroosh (the database's CHECK says the same). */
 export const FINAL_STEP = 250;
 
+/**
+ * The most a gift can be: the balance, down to a whole step. A guest's first
+ * gift is at most 75% of their balance (the club's decision, 2026-11-25), the
+ * same integer sum `final_give` makes, so the page offers exactly what the
+ * database will accept.
+ */
+export function mostToGive(balance: number, firstGift: boolean): number {
+  const usable = firstGift ? Math.floor((Math.max(balance, 0) * 3) / 4) : Math.max(balance, 0);
+  return Math.floor(usable / FINAL_STEP) * FINAL_STEP;
+}
+
 /** hidden: guests do not see it. open: guests give. closed: results only. */
 export type FinalStatus = 'hidden' | 'open' | 'closed';
 export const FINAL_STATUSES: readonly FinalStatus[] = ['hidden', 'open', 'closed'];
@@ -56,6 +67,12 @@ export async function getFinalProjectsFor(accountId: string): Promise<FinalProje
     received: Number(row.received),
     mine: Number(row.mine),
   }));
+}
+
+/** Whether this account has given yet; null when it cannot be read (the page then assumes a first gift). */
+export async function getFinalHasGiven(accountId: string): Promise<boolean | null> {
+  const { data, error } = await createQurooshClient().rpc('final_has_given', { p_account: accountId });
+  return error || typeof data !== 'boolean' ? null : data;
 }
 
 /** The projects that collected the most, most first. */

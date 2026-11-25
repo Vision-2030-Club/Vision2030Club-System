@@ -2009,7 +2009,8 @@
         "rules": {
           "steps": "Give in steps of {step} quroosh.",
           "many": "Back as many projects as you like, as many times as you like.",
-          "place": "Giving never lowers your own place on the leaderboard."
+          "place": "Giving never lowers your own place on the leaderboard.",
+          "first": "Your first gift can be up to 75% of your balance; after that, up to all of it."
         },
         "closed": "Giving is closed. Thank you for backing the projects.",
         "boardTitle": "Top 10 projects",
@@ -2030,7 +2031,10 @@
           "send": "Give {amount}",
           "sending": "Sending…",
           "cancel": "Cancel",
-          "sent": "{amount} quroosh sent to {name}."
+          "sent": "{amount} quroosh sent to {name}.",
+          "allFirst": "75%",
+          "firstNote": "Your first gift: up to 75% of your balance ({most}).",
+          "notEnoughFirst": "Your first gift is up to 75% of your balance, which is under 250"
         },
         "errors": {
           "forbidden": "Sign in again to give.",
@@ -2040,7 +2044,8 @@
           "project_not_found": "This project is no longer on the list.",
           "amount_invalid": "Give in steps of 250 quroosh.",
           "not_enough": "Your balance is less than this amount.",
-          "invalid": "That did not work. Try again."
+          "invalid": "That did not work. Try again.",
+          "first_gift_cap": "Your first gift can be at most 75% of your balance."
         }
       }
     },
@@ -2319,7 +2324,7 @@
     },
     "final": {
       "title": "Final Wave",
-      "intro": "The closing ceremony: list the projects on stage with a short brief. Guests open the Final Wave tab of their wallet and give the projects quroosh in steps of {step}. Giving lowers a guest’s balance, never their place on the guests’ leaderboard.",
+      "intro": "The closing ceremony: list the projects on stage with a short brief. Guests open the Final Wave tab of their wallet and give the projects quroosh in steps of {step}. Giving lowers a guest’s balance, never their place on the guests’ leaderboard. A guest’s first gift is at most 75% of their balance.",
       "notReady": "The Final Wave is not ready on this deployment yet: Quroosh migration 0014 has to be applied first.",
       "statProjects": "Projects shown",
       "statGiven": "Quroosh given",
