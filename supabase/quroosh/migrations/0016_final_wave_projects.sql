@@ -1,9 +1,10 @@
--- Quroosh 0015: the ten projects of the Final Wave (الحفل الختامي) for
+-- Quroosh 0016: the ten projects of the Final Wave (الحفل الختامي) for
 -- Quroosh 2026.
 --
--- Data only: no table, column or function changes. Needs 0014. Adds the ten
--- projects on stage at the closing ceremony, each with its brief, in the
--- order the club gave them (2026-11-25). Their wording is the club's.
+-- Data only: no table, column or function changes. Needs 0014 (not 0015).
+-- Adds the ten projects on stage at the closing ceremony, each with its
+-- brief, in the order the club gave them (2026-11-25). Their wording is the
+-- club's.
 --
 -- The projects are added to the list only: the Final Wave stays as it was
 -- (hidden until a manager opens it on the الحفل الختامي page). Managers can
