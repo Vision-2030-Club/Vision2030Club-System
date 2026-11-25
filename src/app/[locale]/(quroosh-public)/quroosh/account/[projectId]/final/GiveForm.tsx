@@ -16,8 +16,8 @@ const PRESETS = [500, 1000, 2500];
  * Giving one Final Wave project quroosh (Quroosh 0014).
  *
  * Closed, it is one button. Open, it is a stepper that moves in steps of
- * 250 (never below one step, never above the balance, or 75% of it for the
- * guest's first gift), a few quick amounts and "all I can", what will be left, and a button that says exactly how
+ * 250 (never below one step, never above the balance), a few quick amounts
+ * and "all I have", what will be left, and a button that says exactly how
  * much is being sent. The database checks the step and the balance again
  * under a lock; what is shown here is only the guest's choice.
  */
@@ -27,8 +27,6 @@ export function GiveForm({
   finalProjectId,
   projectName,
   balance,
-  most,
-  firstGift,
   step,
 }: {
   locale: string;
@@ -36,9 +34,6 @@ export function GiveForm({
   finalProjectId: string;
   projectName: string;
   balance: number;
-  /** The most this gift can be: the balance, or 75% of it for a first gift, down to a step (`mostToGive`). */
-  most: number;
-  firstGift: boolean;
   step: number;
 }) {
   const t = useTranslations('quroosh.account.final.give');
@@ -53,7 +48,9 @@ export function GiveForm({
     return result;
   }, { ok: false });
 
-  // The chosen amount, kept inside what may be given (it can shrink after a gift).
+  // The most that can be given: the balance, down to a whole step.
+  const most = Math.floor(Math.max(balance, 0) / step) * step;
+  // The chosen amount, kept inside what the balance allows (it can shrink after a gift).
   const value = Math.min(Math.max(amount, step), Math.max(most, step));
   const canGive = most >= step;
 
@@ -79,7 +76,7 @@ export function GiveForm({
           className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand-950 px-4 text-base font-semibold text-accent-2 shadow-md shadow-brand-950/15 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-muted disabled:shadow-none"
         >
           <CoinIcon className="size-5" />
-          {canGive ? t('open') : balance >= step ? t('notEnoughFirst') : t('notEnough', { step: format(step) })}
+          {canGive ? t('open') : t('notEnough', { step: format(step) })}
         </button>
       </div>
     );
@@ -143,15 +140,9 @@ export function GiveForm({
             value === most ? 'border-brand-950 bg-brand-950 text-accent-2' : 'border-line bg-surface text-ink',
           )}
         >
-          {firstGift ? t('allFirst') : t('all')}
+          {t('all')}
         </button>
       </div>
-
-      {firstGift ? (
-        <p className="rounded-xl bg-brand-50 px-3 py-2 text-center text-xs font-medium text-brand-700">
-          {t('firstNote', { most: format(most) })}
-        </p>
-      ) : null}
 
       <p className="text-center text-xs text-ink-muted">
         {t('left', { left: format(balance - value) })}

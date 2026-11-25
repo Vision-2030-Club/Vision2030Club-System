@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
 import { redirect } from '@/i18n/navigation';
 import { accountHomePath, getGuestAccount } from '@/lib/quroosh/accounts';
-import { getFinalBoard, getFinalHasGiven, getFinalProjectsFor, getFinalStatus } from '@/lib/quroosh/final';
+import { getFinalBoard, getFinalProjectsFor, getFinalStatus } from '@/lib/quroosh/final';
 import { getWalletOverview } from '@/lib/quroosh/wallet';
 import { FinalView } from './FinalView';
 
@@ -42,11 +42,10 @@ export default async function QurooshFinalPage({
     return null;
   }
 
-  const [projects, board, wallet, hasGiven] = await Promise.all([
+  const [projects, board, wallet] = await Promise.all([
     status ? getFinalProjectsFor(account.account_id) : null,
     status ? getFinalBoard(projectId, TOP) : null,
     getWalletOverview(account.account_id),
-    status ? getFinalHasGiven(account.account_id) : null,
   ]);
 
   return (
@@ -57,8 +56,6 @@ export default async function QurooshFinalPage({
       projects={projects}
       board={board}
       balance={wallet?.balance ?? 0}
-      // Unknown counts as a first gift: the lower limit is the safe one to offer.
-      firstGift={hasGiven !== true}
     />
   );
 }

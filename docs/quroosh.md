@@ -651,20 +651,6 @@ the most are the ceremony's leaderboard.
   down to a step, quick amounts (500, 1,000, 2,500, all I have), what will
   be left, and a button that names the amount. A guest may give any project
   any number of times. A balance under 250 shows the button disabled.
-- **The first gift is at most 75% of the balance** (the club's decision,
-  2026-11-25), rounded down to a step: with 9,785 a guest's first gift is at
-  most 7,250. After that, any gift up to the whole balance. `final_give`
-  refuses more with `first_gift_cap`; the page asks `final_has_given` and
-  offers only what will be accepted (`mostToGive` in `src/lib/quroosh/final.ts`,
-  the same integer sum), with "75%" in place of "all I have" and a note
-  under the stepper. The check runs under the account lock, so two "first"
-  gifts sent at once cannot both get the first gift's allowance.
-- **The ten projects of Quroosh 2026** are in Quroosh `0015` (data only, like
-  `0012`): جايك، هوستلي، محصلة، Reach more، سراج، C2C، أكاديمية فريد، رعد، قطة
-  باي، MyTrip, with the club's briefs, in that order. It finds the project the
-  same way `0012` does (the one project with guest accounts) and refuses
-  otherwise; a project already on the list by name is left alone, so it is
-  safe to run twice. It does not open the Final Wave.
 - **The database decides** (`final_give`): it locks the account's row
   (`for update`, the lock `sync_wallet` takes), checks the account, that
   giving is open, the project, the step (also a CHECK on `final_gifts`) and
@@ -798,9 +784,6 @@ Drive, it is 10 MB).
 - A challenge pays through `app.challenge_advance` only, once, when its last
   question is answered. Do not add a second place that writes `challenge`
   entries. The same for `session` entries: `session_check_in` only.
-- The 75% first-gift limit is computed twice, in `final_give` and in
-  `mostToGive`, with the same integer sum. Change both together, or the page
-  will offer amounts the database refuses.
 - A Final Wave gift spends through `final_give` only, which locks the
   account's row before reading the balance. Never check the balance in the
   app and then write a `vote` entry: two tabs would both pass the check.

@@ -19,15 +19,9 @@
 -- EARNED, and their place on the guests' leaderboard does not move (the
 -- Quroosh design: "التصويت ما ينقص ترتيب الحاضر").
 --
--- A guest's FIRST gift is at most 75% of their balance at that moment,
--- rounded down to a step of 250 (the club's decision, 2026-11-25), so nobody
--- spends everything on the first project they see. After that, any gift up
--- to the whole balance.
---
 -- The balance check is made after locking the account's row (`for update`),
 -- the same lock sync_wallet (0010) takes, so two gifts sent at once from two
--- tabs cannot both spend the same quroosh, and cannot both count as the
--- first gift.
+-- tabs cannot both spend the same quroosh.
 --
 -- As everywhere in this database: Row Level Security on and NO policies,
 -- every function executable by service_role only, and this database never
@@ -264,21 +258,8 @@ as $$
    order by f.position, f.created_at;
 $$;
 
--- Whether an account has given anything yet: its next gift is its first
--- (capped at 75%) until it has.
-create or replace function public.final_has_given(p_account uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public, pg_temp
-as $$
-  select exists (select 1 from final_gifts g where g.account_id = p_account);
-$$;
-
 -- Gives a project quroosh from an account's balance, in steps of 250, and
 -- writes the matching 'vote' entry on the ledger in the same transaction.
--- The account's first gift is at most 75% of its balance, down to a step.
 -- Returns the account's balance after the gift.
 --
 -- Refuses:
@@ -288,7 +269,6 @@ $$;
 --   project_not_found  no such project on the guests' list
 --   amount_invalid     not a positive multiple of 250
 --   not_enough         the balance is less than the amount
---   first_gift_cap     a first gift above 75% of the balance
 create or replace function public.final_give(p_account uuid, p_project uuid, p_final_project uuid, p_amount integer)
 returns bigint
 language plpgsql
@@ -328,13 +308,6 @@ begin
   if v_balance < p_amount then
     perform app.refuse('not_enough', 'Your balance is less than this amount.');
   end if;
-  -- The first gift: 75% of the balance at most, down to a whole step. The
-  -- account's row is locked, so a second gift sent at the same moment waits
-  -- and then sees this one.
-  if not exists (select 1 from final_gifts g where g.account_id = p_account)
-     and p_amount > (v_balance * 3 / 4) / 250 * 250 then
-    perform app.refuse('first_gift_cap', 'Your first gift can be at most 75% of your balance.');
-  end if;
 
   insert into final_gifts (project_id, account_id, final_project_id, amount)
   values (p_project, p_account, p_final_project, p_amount)
@@ -359,7 +332,6 @@ revoke execute on function public.final_projects_admin(uuid) from public, anon, 
 revoke execute on function public.final_board(uuid, integer) from public, anon, authenticated;
 revoke execute on function public.final_for_account(uuid) from public, anon, authenticated;
 revoke execute on function public.final_give(uuid, uuid, uuid, integer) from public, anon, authenticated;
-revoke execute on function public.final_has_given(uuid) from public, anon, authenticated;
 
 grant execute on function public.final_status(uuid) to service_role;
 grant execute on function public.final_save_status(uuid, text) to service_role;
@@ -369,6 +341,5 @@ grant execute on function public.final_projects_admin(uuid) to service_role;
 grant execute on function public.final_board(uuid, integer) to service_role;
 grant execute on function public.final_for_account(uuid) to service_role;
 grant execute on function public.final_give(uuid, uuid, uuid, integer) to service_role;
-grant execute on function public.final_has_given(uuid) to service_role;
 
 notify pgrst, 'reload schema';
