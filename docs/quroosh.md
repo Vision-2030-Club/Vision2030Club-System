@@ -421,9 +421,9 @@ quroosh, the challenges, the votes) will hang on. The project must carry
 ## The wallet (Quroosh 0007)
 
 The first part of the **Quroosh market**: guests collect quroosh during the
-event and see their balance and a leaderboard. Built 2026-11-19. Still to
-come, on the same ledger: voting for the projects on the last day. The
-booths' challenges are below.
+event and see their balance and a leaderboard. Built 2026-11-19. The
+booths' challenges are below, and giving to the projects on the last day is
+"The Final Wave" further down.
 
 - **The ledger.** `wallet_entries` holds one row per thing that moved
   quroosh for an account: `kind` (`attendance` today; `challenge`, `vote`
@@ -618,6 +618,57 @@ The third way to earn: checking in to the day's **dialogue session**
   the organizers' tab shows the QR code with a note that the migration is
   needed, and the wallet page leaves the session line out.
 
+## The Final Wave (Quroosh 0014)
+
+الحفل الختامي, the closing ceremony: the last part of the Quroosh market.
+Built 2026-11-25. The managers list the projects that pitch on stage, and
+guests give them quroosh from their wallet; the ten projects that collected
+the most are the ceremony's leaderboard.
+
+- **The managers' page** (`projects/[id]/quroosh/final`, "الحفل الختامي" in
+  the Quroosh sidebar, managers only): who sees it (below), how much has
+  been given, the top ten as guests see it, every project with what it
+  collected, how many gifts and from how many guests, and adding a project
+  (a name, up to 120 characters, and a brief, up to 1,000), rewriting one,
+  or hiding one. **Nothing is deleted**: a hidden project leaves the guests'
+  list and the leaderboard, and keeps what it collected (show it again and
+  it is all back).
+- **Who sees it** (`final_settings.status`): `hidden` (the default: guests
+  have no tab, so the projects can be prepared first), `open` (guests give),
+  `closed` (guests see the results and the projects, and give nothing more).
+  Giving is refused by the database unless the status is `open`.
+- **The guest's page**, `/quroosh/account/<project id>/final`, signed in with
+  `getGuestAccount()` only (never the session check-in's email, which is not
+  proof of who someone is). Its tab joins the wallet's tab row once the
+  status is `open` or `closed`, with a small mint dot while giving is open.
+  The page shows the balance (stuck to the top while scrolling) and what the
+  guest gave, the rules, the top ten projects (medals for the first three
+  and a bar for each one's share of the leader's total), then every project
+  with its brief, what it collected and what this guest gave it.
+  `FinalView.tsx` draws it from what `page.tsx` read.
+- **Giving** (`GiveForm.tsx`): "ادعم هذا المشروع" opens a stepper that moves
+  in steps of **250** (`FINAL_STEP`), from 250 up to the balance rounded
+  down to a step, quick amounts (500, 1,000, 2,500, all I have), what will
+  be left, and a button that names the amount. A guest may give any project
+  any number of times. A balance under 250 shows the button disabled.
+- **The database decides** (`final_give`): it locks the account's row
+  (`for update`, the lock `sync_wallet` takes), checks the account, that
+  giving is open, the project, the step (also a CHECK on `final_gifts`) and
+  that the balance covers the gift, then writes the gift and a `vote` entry
+  of minus the amount on the ledger (`source_ref` = the gift's id), in one
+  transaction. Two gifts sent at once from two tabs cannot both spend the
+  same quroosh (tested 2026-11-25 on a local copy of the migrations: three
+  gifts at once against a balance of two, one refused).
+- **It lowers the balance, never the place.** A gift is a minus entry, so
+  `earned` (what guests are ranked by) does not move. The guest's ledger
+  shows it as "الحفل الختامي".
+- **Leaderboard** (`final_board`): the shown projects that collected
+  something, most first, equal amounts sharing a place, top ten. Project
+  names are public (they are on stage); guests' names never appear here.
+- **Before `0014` is applied** the tab is not shown, the guest's page says
+  the Final Wave is not open, the managers' page says the migration is
+  needed, and the wallet is not affected.
+
 ## Reception
 
 `projects/[id]/quroosh/reception`, built 2026-11-22: the event's
@@ -733,6 +784,9 @@ Drive, it is 10 MB).
 - A challenge pays through `app.challenge_advance` only, once, when its last
   question is answered. Do not add a second place that writes `challenge`
   entries. The same for `session` entries: `session_check_in` only.
+- A Final Wave gift spends through `final_give` only, which locks the
+  account's row before reading the balance. Never check the balance in the
+  app and then write a `vote` entry: two tabs would both pass the check.
 - Attendance's "first visit only" is a check in `sync_wallet` made safe by
   locking the account row (`for update`) first. Keep the lock if the
   function is changed, or two passes at once can pay two days.

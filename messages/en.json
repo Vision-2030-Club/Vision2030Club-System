@@ -1443,7 +1443,8 @@
       "wallet": "Quroosh & ledger",
       "challenges": "Challenges",
       "reception": "Reception",
-      "receptionTeam": "Reception team"
+      "receptionTeam": "Reception team",
+      "final": "Final Wave"
     },
     "role": {
       "manager": "Manager",
@@ -1943,7 +1944,8 @@
         "label": "Quroosh market",
         "wallet": "My wallet",
         "leaderboard": "Leaderboard",
-        "challenges": "Challenges"
+        "challenges": "Challenges",
+        "final": "Final Wave"
       },
       "wallet": {
         "balance": "Your quroosh",
@@ -1962,7 +1964,7 @@
         "kind": {
           "attendance": "Sign-up bonus",
           "challenge": "Challenge",
-          "vote": "Vote",
+          "vote": "Final Wave",
           "adjustment": "Adjustment",
           "session": "Session"
         }
@@ -1995,6 +1997,50 @@
           "new": "Tap to start",
           "open": "Tap to carry on",
           "done": "Tap to see your result"
+        }
+      },
+      "final": {
+        "title": "The Final Wave",
+        "intro": "The projects on stage tonight. Back the ones you believe in with quroosh from your wallet.",
+        "introClosed": "Giving has ended. Here is how the guests backed the projects.",
+        "notReady": "The Final Wave is not open yet.",
+        "balance": "Your balance",
+        "given": "You gave",
+        "rules": {
+          "steps": "Give in steps of {step} quroosh.",
+          "many": "Back as many projects as you like, as many times as you like.",
+          "place": "Giving never lowers your own place on the leaderboard."
+        },
+        "closed": "Giving is closed. Thank you for backing the projects.",
+        "boardTitle": "Top 10 projects",
+        "boardEmpty": "No project has been backed yet. Be the first.",
+        "projectsTitle": "The projects",
+        "projectsEmpty": "The projects will appear here soon.",
+        "received": "Collected {amount}",
+        "yours": "You gave {amount}",
+        "give": {
+          "open": "Back this project",
+          "notEnough": "You need at least {step} quroosh to give",
+          "howMuch": "How much would you like to give?",
+          "less": "{step} less",
+          "more": "{step} more",
+          "unit": "quroosh",
+          "all": "All I have",
+          "left": "{left} left in your wallet after this",
+          "send": "Give {amount}",
+          "sending": "Sending…",
+          "cancel": "Cancel",
+          "sent": "{amount} quroosh sent to {name}."
+        },
+        "errors": {
+          "forbidden": "Sign in again to give.",
+          "not_found": "Sign in again to give.",
+          "account_disabled": "This account is not active.",
+          "final_closed": "Giving is not open right now.",
+          "project_not_found": "This project is no longer on the list.",
+          "amount_invalid": "Give in steps of 250 quroosh.",
+          "not_enough": "Your balance is less than this amount.",
+          "invalid": "That did not work. Try again."
         }
       }
     },
@@ -2060,7 +2106,7 @@
       "kind": {
         "attendance": "Sign-up bonus",
         "challenge": "Challenge",
-        "vote": "Vote",
+        "vote": "Final Wave",
         "adjustment": "Adjustment",
         "session": "Session"
       },
@@ -2269,6 +2315,55 @@
         "no_account": "No account has this email. Use the email on your pass; accounts are created when you check in at the event gate.",
         "email_invalid": "Please check the email address.",
         "invalid": "This did not work. Please try again."
+      }
+    },
+    "final": {
+      "title": "Final Wave",
+      "intro": "The closing ceremony: list the projects on stage with a short brief. Guests open the Final Wave tab of their wallet and give the projects quroosh in steps of {step}. Giving lowers a guest’s balance, never their place on the guests’ leaderboard.",
+      "notReady": "The Final Wave is not ready on this deployment yet: Quroosh migration 0014 has to be applied first.",
+      "statProjects": "Projects shown",
+      "statGiven": "Quroosh given",
+      "statGifts": "Gifts",
+      "statusTitle": "Who sees it",
+      "saveStatus": "Save",
+      "status": {
+        "hidden": {
+          "label": "Hidden",
+          "hint": "Guests do not see the tab. Prepare the projects here first."
+        },
+        "open": {
+          "label": "Open for giving",
+          "hint": "Guests see the projects and give quroosh."
+        },
+        "closed": {
+          "label": "Closed",
+          "hint": "Guests see the results and cannot give any more."
+        }
+      },
+      "boardTitle": "Top 10, as guests see it",
+      "boardEmpty": "No project has been given anything yet.",
+      "givers": "Guests: {count}",
+      "gifts": "Gifts: {count}",
+      "projectsTitle": "Projects on stage",
+      "projectsEmpty": "No projects yet. Add the first one below.",
+      "hidden": "Hidden",
+      "edit": "Edit name and brief",
+      "save": "Save",
+      "show": "Show to guests again",
+      "hide": "Hide from guests",
+      "newTitle": "Add a project",
+      "add": "Add project",
+      "name": "Project name",
+      "brief": "Brief",
+      "briefHint": "A few lines guests read before giving. At most 1,000 characters.",
+      "errors": {
+        "forbidden": "Only the project’s managers can do this.",
+        "not_configured": "The Quroosh database is not configured on this deployment.",
+        "status_invalid": "Choose hidden, open or closed.",
+        "not_found": "This project is not on the list.",
+        "name_invalid": "Write the project’s name (at most 120 characters).",
+        "brief_invalid": "The brief is at most 1,000 characters.",
+        "invalid": "That did not work. Try again."
       }
     }
   },
