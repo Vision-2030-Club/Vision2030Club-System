@@ -243,6 +243,14 @@ export default async function AppLayout({
           icon: 'tasks',
           show: component.role === 'manager',
         },
+        // The Final Wave (Quroosh 0014): the closing ceremony's projects that
+        // guests give quroosh to, and opening or closing the giving: managers only.
+        {
+          href: `${base}/final`,
+          label: tQuroosh('tabs.final'),
+          icon: 'stage',
+          show: component.role === 'manager',
+        },
         // The reception desk: the event's attendees arriving today. It is
         // Event attendance's gate (0075) without a camera, so it shows to
         // whoever may work that gate: the managers and the HR team.

@@ -39,7 +39,7 @@ docs/                 how each part works
   `schema_migrations` table of its database; `npm run db:push` and
   `npm run db:push:interviews` apply what is missing. Quroosh has a third
   database of its own (`supabase/quroosh/migrations`, `npm run
-  db:push:quroosh`, up to `0013`); see
+  db:push:quroosh`, up to `0014`); see
   `docs/quroosh.md`.
 - **Event attendance** (club migration `0075`, written 2026-11-18, **not yet
   applied**) keeps the public's names, mobiles and emails in the club
@@ -84,6 +84,12 @@ docs/                 how each part works
   paying at most 900 quroosh once `0013` is applied. Guests open them with a
   tap from their Challenges tab; the booth's QR code, printed from the
   challenge's page under Quroosh → Challenges, opens the same page.
+- **The Final Wave (الحفل الختامي)** (Quroosh migration `0014`, written
+  2026-11-25, **not yet applied**): managers list the closing ceremony's
+  projects (a name and a brief) on Quroosh → الحفل الختامي and open giving;
+  guests give them quroosh from their wallet in steps of 250, and see the
+  top ten projects. Giving lowers a guest's balance, never their place. See
+  "The Final Wave" in `docs/quroosh.md`.
 - The real club is in the database (98 active members when it was loaded on
   2026-09-16). The management team has tested it in rounds since; what each
   round changed is in `docs/data-and-testing.md`.
