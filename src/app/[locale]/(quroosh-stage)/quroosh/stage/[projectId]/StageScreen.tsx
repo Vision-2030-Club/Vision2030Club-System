@@ -30,9 +30,16 @@ import { isStageSnapshot, type StageProject, type StageSnapshot } from '@/lib/qu
 /** The canvas, in pixels. */
 const W = 1620;
 const H = 3240;
-/** The band the rows live in; the header is above it and the footer below. */
-const BOARD_TOP = 446;
-const BOARD_H = 2400;
+/**
+ * Under the header: the QR code with the quroosh given and the times given.
+ * At the top, not the foot, since 2026-11-26: the foot of the stage screen
+ * is the part the hall sees least.
+ */
+const WAY_IN_TOP = 446;
+const WAY_IN_H = 340;
+/** The band the rows live in: under the way in, above the waves. */
+const BOARD_TOP = WAY_IN_TOP + WAY_IN_H + 14;
+const BOARD_H = 2320;
 
 const POLL_MS = 2000;
 /** A read slower than this is given up. */
@@ -169,58 +176,63 @@ function rises(before: StageSnapshot | null, after: StageSnapshot, gap: number, 
   return pops;
 }
 
-/** How a row is drawn at a given height: fewer projects, larger type. Class names are whole, for Tailwind. */
-type RowSpec = { pad: string; medal: number; name: string; total: string; brief: string | null; meta: string };
+/**
+ * How a row is drawn at a given height: fewer projects, larger type. A row
+ * is the name, the total, the bar and the supporters, and nothing else: the
+ * projects' briefs were taken off (2026-11-26) so the type could be read
+ * from the back of the hall. Class names are whole, for Tailwind.
+ */
+type RowSpec = { pad: string; medal: number; name: string; total: string; meta: string; bar: string };
 
 function rowSpec(rowH: number): RowSpec {
   if (rowH >= 380) {
     return {
       pad: 'py-[18px]',
-      medal: 124,
-      name: 'text-[72px] leading-[100px]',
-      total: 'text-[100px]',
-      brief: 'text-[40px] leading-[54px] line-clamp-3',
-      meta: 'text-[32px]',
+      medal: 160,
+      name: 'text-[112px] leading-[150px]',
+      total: 'text-[150px]',
+      meta: 'text-[52px]',
+      bar: 'h-[26px]',
     };
   }
   if (rowH >= 290) {
     return {
       pad: 'py-[14px]',
-      medal: 110,
-      name: 'text-[64px] leading-[92px]',
-      total: 'text-[92px]',
-      brief: 'text-[36px] leading-[49px] line-clamp-2',
-      meta: 'text-[30px]',
+      medal: 140,
+      name: 'text-[100px] leading-[132px]',
+      total: 'text-[132px]',
+      meta: 'text-[46px]',
+      bar: 'h-[24px]',
     };
   }
-  // Ten projects, the ceremony's size: 240 a row.
-  if (rowH >= 236) {
+  // Ten projects, the ceremony's size: 232 a row.
+  if (rowH >= 220) {
     return {
       pad: 'py-[10px]',
-      medal: 96,
-      name: 'text-[56px] leading-[78px]',
-      total: 'text-[78px]',
-      brief: 'text-[33px] leading-[45px] line-clamp-2',
-      meta: 'text-[26px]',
+      medal: 124,
+      name: 'text-[88px] leading-[116px]',
+      total: 'text-[116px]',
+      meta: 'text-[42px]',
+      bar: 'h-[22px]',
     };
   }
   if (rowH >= 170) {
     return {
       pad: 'py-[8px]',
-      medal: 80,
-      name: 'text-[50px] leading-[68px]',
-      total: 'text-[66px]',
-      brief: 'text-[29px] leading-[40px] line-clamp-1',
-      meta: 'text-[24px]',
+      medal: 96,
+      name: 'text-[66px] leading-[88px]',
+      total: 'text-[86px]',
+      meta: 'text-[32px]',
+      bar: 'h-[16px]',
     };
   }
   return {
     pad: 'py-[6px]',
-    medal: 60,
-    name: 'text-[42px] leading-[58px]',
-    total: 'text-[52px]',
-    brief: null,
-    meta: 'text-[22px]',
+    medal: 64,
+    name: 'text-[46px] leading-[62px]',
+    total: 'text-[58px]',
+    meta: 'text-[24px]',
+    bar: 'h-[12px]',
   };
 }
 
@@ -362,7 +374,7 @@ export function StageScreen({
             />
           </div>
           <h1 className="mt-[4px] text-center text-[112px] leading-[1.3] font-bold text-brand-50">{labels.title}</h1>
-          <p className="mt-[2px] flex items-center justify-center gap-[22px] text-[48px] leading-[1.35] font-semibold text-accent-2">
+          <p className="mt-[2px] flex items-center justify-center gap-[22px] text-[54px] leading-[1.3] font-semibold text-accent-2">
             {board && !closed ? <LiveDot still={stale} /> : null}
             {board ? (closed ? labels.closed : labels.open) : labels.soon}
           </p>
@@ -370,38 +382,36 @@ export function StageScreen({
 
         {board ? (
           <>
-            <Board board={board} pops={pops} labels={labels} />
-            <footer className="absolute inset-x-0 bottom-0 h-[390px]">
-              {/* `isolate`: the waves' fins carry a z-index of their own, which
-                  would otherwise lift one over the QR code's white frame. */}
-              <div className="absolute inset-x-0 bottom-0 isolate h-[110px]">
-                <QurooshWaves className="h-full" />
-              </div>
-              <div
-                className={cx(
-                  'absolute inset-x-[70px] top-[8px] flex h-[300px] items-center gap-[50px]',
-                  closed && 'justify-center text-center',
-                )}
-              >
-                {closed ? null : (
-                  <div className="shrink-0 rounded-[34px] bg-surface p-[16px]">
-                    {/* A data URL made on the server: nothing for next/image to optimise.
-                        Dark on white whatever the theme, so phones can read it. */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={qr} alt={labels.qrAlt} width={268} height={268} className="size-[268px]" />
-                  </div>
-                )}
-                <div className={cx('min-w-0', !closed && 'flex-1')}>
-                  <p className="text-[46px] leading-[1.35] font-bold text-balance text-brand-50">
-                    {closed ? labels.thanks : labels.scan}
-                  </p>
-                  <div className={cx('mt-[18px] flex gap-[80px]', closed && 'justify-center')}>
-                    <Stat label={labels.given} value={board.total} />
-                    <Stat label={labels.gifts} value={board.gifts} />
-                  </div>
+            <section
+              className={cx(
+                'absolute inset-x-[70px] flex items-center gap-[50px]',
+                closed && 'justify-center text-center',
+              )}
+              style={{ top: WAY_IN_TOP, height: WAY_IN_H }}
+            >
+              {closed ? null : (
+                <div className="shrink-0 rounded-[34px] bg-surface p-[16px]">
+                  {/* A data URL made on the server: nothing for next/image to optimise.
+                      Dark on white whatever the theme, so phones can read it. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={qr} alt={labels.qrAlt} width={300} height={300} className="size-[300px]" />
+                </div>
+              )}
+              <div className={cx('min-w-0', !closed && 'flex-1')}>
+                <p className="text-[54px] leading-[1.3] font-bold text-balance text-brand-50">
+                  {closed ? labels.thanks : labels.scan}
+                </p>
+                <div className={cx('mt-[16px] flex gap-[90px]', closed && 'justify-center')}>
+                  <Stat label={labels.given} value={board.total} />
+                  <Stat label={labels.gifts} value={board.gifts} />
                 </div>
               </div>
-            </footer>
+            </section>
+            <Board board={board} pops={pops} labels={labels} />
+            {/* `isolate`: the waves' fins carry a z-index of their own. */}
+            <div className="absolute inset-x-0 bottom-0 isolate h-[110px]">
+              <QurooshWaves className="h-full" />
+            </div>
             {/* Once, each time the final results come up: when a manager closes
                 giving, and when the page is opened after that. Not before the
                 canvas is placed, or the coins would fall while it is still unseen. */}
@@ -542,7 +552,7 @@ function Row({
               {pop ? (
                 <span
                   key={pop.key}
-                  className="absolute end-full top-1/2 me-[18px] -mt-[36px] block animate-[stage-pop_1800ms_ease-out_both] rounded-full bg-brand-950 px-[22px] text-[50px] leading-[72px] font-bold whitespace-nowrap text-accent-2"
+                  className="absolute end-full top-1/2 me-[18px] -mt-[45px] block animate-[stage-pop_1800ms_ease-out_both] rounded-full bg-brand-950 px-[26px] text-[64px] leading-[90px] font-bold whitespace-nowrap text-accent-2"
                 >
                   {/* Left to right on the Arabic page too: "+250", not "250+". */}
                   <span className="ltr-nums" dir="ltr">
@@ -559,16 +569,10 @@ function Row({
             </div>
           </div>
 
-          {spec.brief && project.brief ? (
-            <p dir="auto" className={cx('text-brand-200', spec.brief)}>
-              {project.brief}
-            </p>
-          ) : null}
-
           <div className="mt-[4px] flex items-center gap-[22px]">
             {/* Its share of the leader's total. A block that grows from the start
                 side, so it runs the right way in both languages. */}
-            <div className="h-[14px] min-w-0 flex-1 overflow-hidden rounded-full bg-brand-800">
+            <div className={cx('min-w-0 flex-1 overflow-hidden rounded-full bg-brand-800', spec.bar)}>
               <div
                 className="h-full rounded-full bg-accent transition-[width] duration-[900ms] ease-out"
                 style={{ width: `${project.share}%` }}
@@ -636,12 +640,12 @@ function Stat({ label, value }: { label: string; value: number }) {
   const shown = useCountUp(value);
   return (
     <div>
-      <p className="text-[72px] leading-none font-bold text-accent">
+      <p className="text-[96px] leading-none font-bold text-accent">
         <span className="ltr-nums" dir="ltr">
           {format(shown)}
         </span>
       </p>
-      <p className="mt-[10px] text-[28px] leading-[1.35] text-brand-200">{label}</p>
+      <p className="mt-[8px] text-[40px] leading-[1.3] text-brand-200">{label}</p>
     </div>
   );
 }

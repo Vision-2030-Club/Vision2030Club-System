@@ -709,9 +709,12 @@ already has.
   - `hidden` (and whenever the board cannot be read): a holding screen with
     the logo, "يُفتح الدعم قريبًا" and the guests' QR code, large. **No
     project names.**
-  - `open`: every project guests can see, ranked, each with its place, name,
-    brief, total, supporters and a bar for its share of the leader's total;
-    below them the guests' QR code and the totals (quroosh given, gifts).
+  - `open`: under the title, the guests' QR code with the totals (quroosh
+    given, gifts); then every project guests can see, ranked, each with its
+    place, name, total, supporters and a bar for its share of the leader's
+    total. Since 2026-11-26 the briefs are not shown and the QR code is at
+    the top: on the day the type was too small to read from the hall, and
+    the foot of the screen is the part the hall sees least.
     Totals count up, a row that overtakes another slides past it, and
     "+500" rises beside a total that grew.
   - `closed`: "النتائج النهائية", the first three places framed in their
