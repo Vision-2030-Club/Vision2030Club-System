@@ -11,6 +11,7 @@ import { accountHomePath, type AccountRow } from '@/lib/quroosh/accounts';
 import { siteUrl } from '@/lib/site';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
 import { CopyField } from '../../interviews/CopyField';
+import { GuestStartQr } from '../GuestStartQr';
 import { resendAccountEmailAction, syncAccountsAction } from './actions';
 
 /** How many rows the page shows. */
@@ -99,6 +100,8 @@ export default async function QurooshAccountsPage({
           tone={waiting > 0 ? 'warn' : 'neutral'}
         />
       </div>
+
+      <GuestStartQr projectId={id} locale={locale} />
 
       <Card className="space-y-4">
         <CopyField label={t('accounts.signInLink')} value={`${siteUrl()}/${locale}${accountHomePath(id)}`} />

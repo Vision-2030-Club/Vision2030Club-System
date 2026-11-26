@@ -77,6 +77,13 @@ Event attendance).
 `/<locale>/event/join/<project id>`, no account. The managers' overview page
 shows this link and its QR code to print at the gate.
 
+**For a project that carries Quroosh** (since Quroosh `0017`, 2026-11-26),
+this link only sends the person to their Quroosh account page, where they
+make an account with name, mobile and email and are registered here with
+`source = 'quroosh_signup'` and no pass email. What follows describes the
+form as it still works for other projects. See "Guests make their own
+account" in `docs/quroosh.md`.
+
 - Name, mobile (with the Quroosh forms' country picker,
   `src/lib/quroosh/phones.ts`) and email. Sign-up must be **open** (the
   managers' setting; closed when the component is attached).

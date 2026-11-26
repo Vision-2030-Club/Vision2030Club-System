@@ -9,6 +9,7 @@ import { can, getQurooshAccess } from '@/lib/quroosh/access';
 import { FINAL_STATUSES, FINAL_STEP, getFinalProjectsAdmin, getFinalStatus } from '@/lib/quroosh/final';
 import { formatQuroosh } from '@/lib/quroosh/wallet';
 import { isQurooshConfigured } from '@/lib/supabase/quroosh';
+import { GuestStartQr } from '../GuestStartQr';
 import { hideFinalProjectAction, saveFinalProjectAction, saveFinalStatusAction } from './actions';
 
 /**
@@ -71,6 +72,9 @@ export default async function QurooshFinalAdminPage({
         <StatTile label={t('final.statGiven')} value={formatQuroosh(total)} />
         <StatTile label={t('final.statGifts')} value={formatQuroosh(gifts)} />
       </div>
+
+      {/* Where guests come in: sign up or sign in, then this tab (0017). */}
+      <GuestStartQr projectId={id} locale={locale} />
 
       {/* Who sees it, and whether they may give. */}
       <Card className="space-y-4">

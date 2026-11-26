@@ -687,6 +687,62 @@ the most are the ceremony's leaderboard.
   the Final Wave is not open, the managers' page says the migration is
   needed, and the wallet is not affected.
 
+## Guests make their own account (Quroosh 0017)
+
+The club's decision of 2026-11-26: a guest no longer needs a pass scanned at
+the gate, or an email to confirm, to get into Quroosh. Built the same day.
+
+- **One QR code** (`GuestStartQr`, on the managers' **Accounts** page and the
+  **الحفل الختامي** page, with its link and a PNG to download) opens the
+  guest's account page, `/quroosh/account/<project id>`. It never changes.
+  Signed in on that phone: the wallet. Not signed in: two tabs (`StartTabs`),
+  **حساب جديد** (new account) and **لدي حساب** (sign in, the emailed link as
+  before; `?signin=1` opens this side).
+- **A new account** (`SignUpForm` → `signUpAction` → `signUpGuest` in
+  `src/lib/quroosh/accounts.ts`): name, mobile with the country picker, and
+  email. No pass, no QR code, no email to confirm. The account is signed in on
+  this device at once and the guest lands on their wallet with a welcome line
+  and the **sign-up bonus** (`wallet_attendance_points`, 5,000 unless a
+  manager changed it), paid as the account's `attendance` entry
+  (`source_ref` `signup:<account id>`).
+- **No QR code ever appears on the guest's phone.** The QR card is for the
+  managers' screen only. The wallet's "show my pass" button is left out for
+  a guest whose attendee record came from signing up
+  (`source = 'quroosh_signup'`): they have no pass to show.
+- **The steps, in order:**
+  1. `account_email_taken`: an email with an active account is refused
+     (`account_exists`) before anything is written, and the form links to
+     the sign-in tab.
+  2. `registerAttendee` (Event attendance, club database) with
+     `source = 'quroosh_signup'` and **no pass email**, so the person is on
+     the attendee list and reception can still find them by name. One per
+     mobile, as always; Event attendance's **sign-up switch** must be open
+     (closed, the page offers sign-in only).
+  3. A mobile registered before is accepted only with the email it was
+     registered with (`phone_taken` otherwise, never saying which email). The
+     account takes the attendee's own name and mobile.
+  4. `account_sign_up` (Quroosh database, one transaction): the account
+     (`origin = 'signup'`, completed), its session, the bonus. An attendee who
+     already has an account is refused (`account_exists`).
+- **Nobody signs in to somebody else's wallet this way.** A session is only
+  started for the account the same call made. Existing accounts still sign in
+  with the emailed link; knowing someone's email or mobile gets you nothing.
+  New accounts are not proof of who someone is: anyone can make one with any
+  email nobody has used yet (the club accepted that on 2026-11-26).
+- **With the gate.** A guest who signed up and is later checked in keeps one
+  account: `sync_accounts` finds it by attendee and makes nothing (no "complete
+  your account" email), and `sync_wallet` pays nothing more, since the account
+  already has its standing `attendance` entry.
+- **The event's sign-up link** (`/event/join/<project id>`) for a project that
+  carries Quroosh now only sends the person to the account page. Projects
+  without Quroosh keep the pass and its QR code.
+- `accounts.origin` (`gate` or `signup`) tells the two apart; every account
+  made before `0017` is `gate`. `checked_in_at` is the sign-up time for
+  `signup` accounts.
+- **Before `0017` is applied** the new-account form answers that sign-up is
+  not open yet (`signup_not_ready`) and registers nobody; signing in works as
+  before.
+
 ## Reception
 
 `projects/[id]/quroosh/reception`, built 2026-11-22: the event's
@@ -805,6 +861,10 @@ Drive, it is 10 MB).
 - The 75% first-gift limit is computed twice, in `final_give` and in
   `mostToGive`, with the same integer sum. Change both together, or the page
   will offer amounts the database refuses.
+- `signUpGuest` must only ever set the session cookie for the account
+  `account_sign_up` has just made. Never add a "sign in with email and
+  mobile" path to an existing account: those are not secrets, and the
+  wallet can spend.
 - A Final Wave gift spends through `final_give` only, which locks the
   account's row before reading the balance. Never check the balance in the
   app and then write a `vote` entry: two tabs would both pass the check.

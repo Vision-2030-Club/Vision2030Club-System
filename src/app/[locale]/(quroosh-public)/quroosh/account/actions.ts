@@ -6,9 +6,11 @@ import { fail, ok, type ActionResult } from '@/lib/actions';
 import {
   accountHomePath,
   endGuestSession,
+  getGuestAccount,
   redeemAccountLink,
   rememberReturnPath,
   safeReturnPath,
+  signUpGuest,
   takeReturnPath,
 } from '@/lib/quroosh/accounts';
 import { kickAccountEmails } from '@/lib/quroosh/accountSync';
@@ -90,6 +92,36 @@ export async function requestSignInAction(_previous: ActionResult, formData: For
 }
 
 /** Signs this device out, and shows the sign-in page again. */
+/**
+ * A guest makes their own account (Quroosh 0017): name, mobile and email,
+ * no pass and no email to confirm. On success this device is signed in and
+ * the answer carries the wallet's address (`href`, without the language),
+ * which the form opens: the sign-up bonus is already in it. Someone already
+ * signed in to this project is sent straight to their wallet.
+ */
+export async function signUpAction(_previous: ActionResult, formData: FormData): Promise<ActionResult> {
+  const locale = localeOf(formData);
+  // A field no person sees; anything in it means a bot filled the form.
+  if (String(formData.get('website') ?? '') !== '') return refusal(locale, 'invalid');
+  const projectId = String(formData.get('project_id') ?? '');
+  if (!UUID.test(projectId)) return refusal(locale, 'not_found');
+
+  const current = await getGuestAccount();
+  if (!current || current.project_id !== projectId) {
+    const result = await signUpGuest({
+      projectId,
+      name: String(formData.get('name') ?? ''),
+      phone: String(formData.get('phone') ?? ''),
+      country: String(formData.get('phone_country') ?? ''),
+      email: String(formData.get('email') ?? ''),
+      locale,
+    });
+    if (!result.ok) return refusal(locale, result.hint);
+    return ok('created', { href: `${accountHomePath(projectId)}?welcome=${result.bonus}` });
+  }
+  return ok('created', { href: accountHomePath(projectId) });
+}
+
 export async function signOutAction(formData: FormData): Promise<void> {
   const locale = localeOf(formData);
   const projectId = String(formData.get('project_id') ?? '');
