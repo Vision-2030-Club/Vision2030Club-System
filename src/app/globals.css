@@ -270,3 +270,26 @@ html.theme-animate {
   html.theme-animate { transition: none; }
   .shell-fade { animation: none; }
 }
+
+/* Quroosh's stage screen (StageScreen.tsx): the Final Wave's projects on the
+   stage's 1620x3240 screen. A "+amount" rising beside a total that grew, the
+   flash of the row it belongs to, and the coins of the final results.
+   Not behind `motion-safe:`, unlike everything above: the motion is what the
+   hall is watching, and a stage computer with Windows animations switched
+   off would otherwise show a board that never moves. */
+@keyframes stage-pop {
+  0% { opacity: 0; transform: translateY(16px) scale(0.8); }
+  15% { opacity: 1; transform: translateY(0) scale(1.12); }
+  80% { opacity: 1; transform: translateY(-48px) scale(1); }
+  100% { opacity: 0; transform: translateY(-72px) scale(1); }
+}
+
+@keyframes stage-flash {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes stage-coin {
+  from { transform: translateY(-320px) rotate(0deg); }
+  to { transform: translateY(3600px) rotate(var(--stage-spin, 540deg)); }
+}

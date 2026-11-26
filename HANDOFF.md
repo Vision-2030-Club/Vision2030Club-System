@@ -93,6 +93,11 @@ docs/                 how each part works
   first gift to 75% of their balance, and `0016` (data only, **not yet
   applied**) adds the ten projects of Quroosh 2026. See "The Final Wave" in
   `docs/quroosh.md`.
+- **The stage screen** (2026-11-26, no migration): `/quroosh/stage/<project
+  id>`, a page open to anyone with the address, drawn for the stage's
+  1620x3240 screen, that ranks the Final Wave's projects live and shows the
+  final results once giving is closed. Its link is on Quroosh → الحفل
+  الختامي. See "The stage screen" in `docs/quroosh.md`.
 - **Guests make their own Quroosh account** (Quroosh migration `0017`,
   written 2026-11-26, **not yet applied**): one QR code (on Quroosh →
   Accounts and → الحفل الختامي) opens a page where a guest makes an account

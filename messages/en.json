@@ -2407,6 +2407,29 @@
       "link": "The guests’ page",
       "download": "Download the QR code",
       "permanent": "It never changes. A guest already signed in on their phone lands on their wallet. New accounts follow the Event attendance sign-up switch."
+    },
+    "stage": {
+      "title": "The Final Wave",
+      "open": "Giving is open",
+      "closed": "Final results",
+      "soon": "Giving opens soon",
+      "supporters": "Supporters",
+      "given": "Quroosh given",
+      "gifts": "Gifts",
+      "unit": "quroosh",
+      "scan": "Scan the code, open your wallet and back a project",
+      "join": "Scan the code to make your Quroosh account and get your wallet ready",
+      "thanks": "Thank you for backing the projects",
+      "qrAlt": "QR code for the guests’ Quroosh page",
+      "card": {
+        "title": "Stage screen",
+        "hint": "An open page with no sign-in, drawn for the stage’s 1620×3240 screen: every project ranked live by the quroosh it collected, with its supporters and the guests’ QR code. While the Final Wave is hidden it shows a waiting screen and no project names; once closed, the final results. It is for the stage: do not pass the link around.",
+        "link": "Stage screen link",
+        "open": "Open the stage screen",
+        "setup": "On the stage’s computer: open the link in Chrome at 100% zoom, then F11 for full screen, and keep the window in front.",
+        "rotate": "If the picture is sideways, add to the end of the link:",
+        "exact": "If the screen’s processor crops exact pixels, add:"
+      }
     }
   },
   "eventAttendance": {
