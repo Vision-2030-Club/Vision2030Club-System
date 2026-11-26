@@ -705,6 +705,10 @@ the gate, or an email to confirm, to get into Quroosh. Built the same day.
   and the **sign-up bonus** (`wallet_attendance_points`, 5,000 unless a
   manager changed it), paid as the account's `attendance` entry
   (`source_ref` `signup:<account id>`).
+- **No QR code ever appears on the guest's phone.** The QR card is for the
+  managers' screen only. The wallet's "show my pass" button is left out for
+  a guest whose attendee record came from signing up
+  (`source = 'quroosh_signup'`): they have no pass to show.
 - **The steps, in order:**
   1. `account_email_taken`: an email with an active account is refused
      (`account_exists`) before anything is written, and the form links to

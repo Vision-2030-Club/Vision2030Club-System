@@ -58,9 +58,11 @@ export default async function QurooshAccountPage({
       // Null before 0009 is applied: the session line is left out.
       getSessionPoints(projectId),
       // Their pass is what the gate scans. Its link is theirs already (it was
-      // emailed to them); trouble reading it only hides the button.
+      // emailed to them); trouble reading it only hides the button. A guest
+      // who made their own account (0017) has no pass to show: no QR code
+      // appears on their phone, so the button is left out for them.
       getAttendeesById(projectId, [account.attendee_id])
-        .then((people) => people[0]?.token ?? null)
+        .then((people) => (people[0] && people[0].source !== 'quroosh_signup' ? people[0].token : null))
         .catch(() => null),
     ]);
     // The event's day on the club's clock, as the ledger writes it.
