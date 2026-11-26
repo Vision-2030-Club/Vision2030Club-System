@@ -720,6 +720,13 @@ already has.
   - `closed`: "النتائج النهائية", the first three places framed in their
     medal's colour, a shower of coins once (also when the page is opened
     after closing), then nothing moves.
+- **Adjustments (Quroosh `0018`, 2026-11-26).** A project's total is its
+  guests' gifts **plus** its rows in `final_adjustments` (an amount, plus or
+  minus, and a note saying why). There is no screen for them: they are
+  written by hand in the SQL editor. They are never gifts: wallets, the
+  count of gifts and the count of supporters do not change. Every place a
+  total is shown (the managers' list, the board, the guest's list, the stage
+  screen) includes them. `delete from final_adjustments;` undoes them all.
 - **Ranking** (`rankStage` in `src/lib/quroosh/stageBoard.ts`, used for the
   page and the route alike): the rule of `final_board`, most first with
   equal totals sharing a place, but **every shown project is listed**: one
