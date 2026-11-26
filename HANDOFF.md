@@ -39,7 +39,7 @@ docs/                 how each part works
   `schema_migrations` table of its database; `npm run db:push` and
   `npm run db:push:interviews` apply what is missing. Quroosh has a third
   database of its own (`supabase/quroosh/migrations`, `npm run
-  db:push:quroosh`, up to `0016`); see
+  db:push:quroosh`, up to `0017`); see
   `docs/quroosh.md`.
 - **Event attendance** (club migration `0075`, written 2026-11-18, **not yet
   applied**) keeps the public's names, mobiles and emails in the club
@@ -92,6 +92,14 @@ docs/                 how each part works
   Quroosh `0015` (written 2026-11-25, **not yet applied**) limits a guest's
   first gift to 75% of their balance, and `0016` (data only, **not yet
   applied**) adds the ten projects of Quroosh 2026. See "The Final Wave" in
+  `docs/quroosh.md`.
+- **Guests make their own Quroosh account** (Quroosh migration `0017`,
+  written 2026-11-26, **not yet applied**): one QR code (on Quroosh →
+  Accounts and → الحفل الختامي) opens a page where a guest makes an account
+  with name, mobile and email, no pass and no email to confirm, and lands on
+  their wallet with the sign-up bonus; or signs in to the one they have. The
+  event's sign-up link sends Quroosh guests there too. Needs Event
+  attendance's sign-up switch open. See "Guests make their own account" in
   `docs/quroosh.md`.
 - The real club is in the database (98 active members when it was loaded on
   2026-09-16). The management team has tested it in rounds since; what each

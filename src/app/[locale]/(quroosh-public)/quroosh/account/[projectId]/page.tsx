@@ -1,9 +1,12 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Alert, Button, Card } from '@/components/ui';
-import { getAttendeesById } from '@/lib/eventAttendance/api';
+import { getAttendeesById, UUID } from '@/lib/eventAttendance/api';
+import type { EventPublic } from '@/lib/eventAttendance/types';
+import { COUNTRIES } from '@/lib/quroosh/phones';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { eventDay, passUrl } from '@/lib/eventAttendance/links';
-import { getGuestAccount } from '@/lib/quroosh/accounts';
+import { accountHomePath, getGuestAccount } from '@/lib/quroosh/accounts';
 import { getSessionPoints } from '@/lib/quroosh/sessions';
 import { CLUB_TIME_ZONE } from '@/lib/time';
 import {
@@ -17,6 +20,8 @@ import { signOutAction } from '../actions';
 import { GuestTabs } from '../GuestTabs';
 import { QurooshCard, QurooshNote } from '@/components/QurooshHero';
 import { MailIcon, SignInForm } from '../SignInForm';
+import { SignUpForm } from '../SignUpForm';
+import { StartTabs } from '../StartTabs';
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
@@ -36,10 +41,10 @@ export default async function QurooshAccountPage({
   searchParams,
 }: {
   params: Promise<{ locale: string; projectId: string }>;
-  searchParams: Promise<{ created?: string }>;
+  searchParams: Promise<{ created?: string; welcome?: string; signin?: string }>;
 }) {
   const { locale, projectId } = await params;
-  const { created } = await searchParams;
+  const { created, welcome, signin } = await searchParams;
   setRequestLocale(locale);
   const t = await getTranslations('quroosh.account');
 
@@ -68,6 +73,14 @@ export default async function QurooshAccountPage({
       return (
         <div className="mx-auto max-w-md space-y-5">
           {created ? <Alert tone="ok">{t('home.created')}</Alert> : null}
+          {/* Just made their own account (0017): say so, with the bonus it brought. */}
+          {welcome !== undefined ? (
+            <Alert tone="ok">
+              {/^[1-9][0-9]{0,6}$/.test(welcome)
+                ? t('home.welcomeBonus', { name: account.name, bonus: formatQuroosh(Number(welcome)) })
+                : t('home.welcomeNew', { name: account.name })}
+            </Alert>
+          ) : null}
           <GuestTabs projectId={projectId} current="wallet" />
 
           {/* The balance: a navy card on the light page, its number the mint that shines. */}
@@ -180,22 +193,68 @@ export default async function QurooshAccountPage({
     );
   }
 
-  // Nobody signed in: the identity's sign-in card, as on the session check-in.
+  // Nobody signed in: make an account (0017) or sign in to one. Making one
+  // needs the event's sign-up to be open (Event attendance's switch); when it
+  // is not, or the project has no Event attendance, only signing in is offered.
+  const [signupOpen, tStart] = await Promise.all([eventSignupOpen(projectId), getTranslations('quroosh.account.start')]);
+  const regionNames = new Intl.DisplayNames([locale], { type: 'region' });
+  const countries = COUNTRIES.map(([iso, dial]) => ({ iso, dial, name: regionNames.of(iso) ?? iso }));
+  const signInCard = (
+    <QurooshCard icon={<MailIcon className="size-5" />} title={t('signIn.cardTitle')}>
+      <SignInForm
+        locale={locale}
+        projectId={projectId}
+        look={{ label: t('signIn.email'), hint: t('signIn.hint'), submit: t('signIn.submit') }}
+      />
+    </QurooshCard>
+  );
+
   return (
     <div className="mx-auto max-w-md space-y-5">
       <div>
         <h1 className="text-balance text-3xl font-bold text-ink">{t('signIn.title')}</h1>
-        <p className="mt-2 text-base text-ink-muted">{t('signIn.intro')}</p>
+        <p className="mt-2 text-base text-ink-muted">{signupOpen ? tStart('intro') : t('signIn.intro')}</p>
       </div>
-      <QurooshCard icon={<MailIcon className="size-5" />} title={t('signIn.cardTitle')}>
-        <SignInForm
-          locale={locale}
-          projectId={projectId}
-          look={{ label: t('signIn.email'), hint: t('signIn.hint'), submit: t('signIn.submit') }}
+      {signupOpen ? (
+        <StartTabs
+          initial={signin ? 'signin' : 'signup'}
+          labels={{ label: tStart('label'), signup: tStart('signup'), signin: tStart('signin') }}
+          signUp={
+            <QurooshCard icon={<UserPlusIcon />} title={tStart('cardTitle')}>
+              <SignUpForm
+                projectId={projectId}
+                locale={locale}
+                countries={countries}
+                signInHref={`${accountHomePath(projectId)}?signin=1`}
+              />
+            </QurooshCard>
+          }
+          signIn={signInCard}
         />
-      </QurooshCard>
-      <QurooshNote>{t('signIn.howToGet')}</QurooshNote>
+      ) : (
+        <>
+          {signInCard}
+          <QurooshNote>{t('signIn.howToGet')}</QurooshNote>
+        </>
+      )}
     </div>
+  );
+}
+
+/** Whether the project's event takes sign-ups (Event attendance, club database). False when it cannot tell. */
+async function eventSignupOpen(projectId: string): Promise<boolean> {
+  if (!UUID.test(projectId)) return false;
+  const { data } = await createAdminClient().rpc('event_public', { p_project: projectId });
+  return (data as EventPublic[] | null)?.[0]?.signup_open === true;
+}
+
+function UserPlusIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M3 19.5c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
+      <path d="M18 8v6M15 11h6" />
+    </svg>
   );
 }
 

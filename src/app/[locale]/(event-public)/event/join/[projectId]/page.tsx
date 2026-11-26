@@ -5,13 +5,16 @@ import { eventDayRange } from '@/lib/eventAttendance/links';
 import type { EventPublic } from '@/lib/eventAttendance/types';
 import { COUNTRIES } from '@/lib/quroosh/phones';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { QurooshCard, QurooshNote } from '@/components/QurooshHero';
+import { redirect } from '@/i18n/navigation';
+import { accountHomePath } from '@/lib/quroosh/accounts';
 import { EventFrame } from '../../../EventFrame';
 import { JoinForm } from './JoinForm';
 
 /**
  * The public sign-up form of a project's event: /event/join/<club project
- * id> (0075). Anyone may open it. `event_public` says whether the project
+ * id> (0075). Anyone may open it. For a Quroosh event it only sends the
+ * person on to their Quroosh account page, where they make an account with
+ * no pass (Quroosh 0017). `event_public` says whether the project
  * carries Event attendance and whether sign-up is open; it returns nothing
  * about anyone who signed up.
  */
@@ -46,20 +49,10 @@ export default async function EventJoinPage({
   const countries = COUNTRIES.map(([iso, dial]) => ({ iso, dial, name: regionNames.of(iso) ?? iso }));
 
   if (quroosh) {
-    // Quroosh: the identity's page design. The title and the intro sit in the
-    // navy hero; the form is a white card on the light page.
-    return (
-      <EventFrame theme={event.theme} name={name} title={t('join.title', { event: name })} subtitle={t('join.intro')}>
-        {event.signup_open ? (
-          <QurooshCard icon={<TicketIcon />} title={t('join.cardTitle')}>
-            <JoinForm projectId={projectId} locale={locale} countries={countries} />
-          </QurooshCard>
-        ) : (
-          <Alert tone="warn">{t('join.closed')}</Alert>
-        )}
-        {days ? <QurooshNote>{t('join.days', { days })}</QurooshNote> : null}
-      </EventFrame>
-    );
+    // Quroosh (0017, the club's decision of 2026-11-26): no pass and no QR
+    // code. The sign-up link opens the guest's Quroosh account page, where
+    // name, mobile and email make the account and open the wallet at once.
+    redirect({ href: accountHomePath(projectId), locale });
   }
 
   return (
@@ -79,14 +72,5 @@ export default async function EventJoinPage({
         )}
       </div>
     </EventFrame>
-  );
-}
-
-function TicketIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
-      <path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2.5a2.5 2.5 0 0 0 0 5V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2.5a2.5 2.5 0 0 0 0-5z" />
-      <path d="M14 5v14" strokeDasharray="2 2.5" />
-    </svg>
   );
 }

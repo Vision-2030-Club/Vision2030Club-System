@@ -2,6 +2,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { cache } from 'react';
 import { cookies } from 'next/headers';
+import { getAttendeesById, registerAttendee } from '@/lib/eventAttendance/api';
 import { newToken, TOKEN_PATTERN } from '@/lib/interviews/tokens';
 import { siteUrl } from '@/lib/site';
 import { createQurooshClient, isQurooshConfigured } from '@/lib/supabase/quroosh';
@@ -118,6 +119,12 @@ export async function redeemAccountLink(
   const row = (data as { project_id: string; newly_completed: boolean }[] | null)?.[0];
   if (!row) return { ok: false, hint: 'invalid' };
 
+  await setSessionCookie(session);
+  return { ok: true, projectId: row.project_id, newlyCompleted: row.newly_completed };
+}
+
+/** Signs this device in with a session the database has just stored. Only from a server action. */
+async function setSessionCookie(session: string): Promise<void> {
   (await cookies()).set(SESSION_COOKIE, session, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -126,7 +133,89 @@ export async function redeemAccountLink(
     path: '/',
     maxAge: THIRTY_DAYS,
   });
-  return { ok: true, projectId: row.project_id, newlyCompleted: row.newly_completed };
+}
+
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+export type SignUpResult = { ok: true; bonus: number } | { ok: false; hint: string; message: string };
+
+/**
+ * A guest makes their own account (Quroosh 0017, the club's decision of
+ * 2026-11-26): name, mobile and email, no pass, no gate, no email to confirm.
+ * The account is signed in on this device at once and paid the sign-up bonus.
+ * Only from a server action (it sets a cookie).
+ *
+ * 1. An email that already has an account is refused (`account_exists`)
+ *    before anyone is registered: they sign in with the emailed link.
+ * 2. The person is registered in Event attendance (club database), one per
+ *    mobile, with no pass email, so reception still finds them by name.
+ * 3. A mobile registered before is only accepted with the email it was
+ *    registered with (`phone_taken` otherwise), and the account takes the
+ *    attendee's own details, as the gate's sync would.
+ * 4. `account_sign_up` makes the account, its session and the bonus in one
+ *    transaction, and refuses an attendee who already has an account.
+ *
+ * So a session is only ever started for an account this call made: nobody
+ * signs in to somebody else's wallet by knowing their email or mobile.
+ */
+export async function signUpGuest(input: {
+  projectId: string;
+  name: string;
+  phone: string;
+  country: string;
+  email: string;
+  locale: 'ar' | 'en';
+}): Promise<SignUpResult> {
+  if (!isQurooshConfigured()) return { ok: false, hint: 'not_configured', message: 'Quroosh is not configured.' };
+  const email = input.email.trim().toLowerCase();
+  if (email.length > 254 || !EMAIL.test(email)) {
+    return { ok: false, hint: 'email_invalid', message: 'The email address is not valid.' };
+  }
+
+  const db = createQurooshClient();
+  const taken = await db.rpc('account_email_taken', { p_project: input.projectId, p_email: email });
+  // An error here is 0017 not applied yet: say so rather than register anyone.
+  if (taken.error) return { ok: false, hint: 'signup_not_ready', message: taken.error.message };
+  if (taken.data === true) return { ok: false, hint: 'account_exists', message: 'This email already has an account.' };
+
+  const registered = await registerAttendee({
+    projectId: input.projectId,
+    name: input.name,
+    phone: input.phone,
+    country: input.country,
+    email,
+    locale: input.locale,
+    source: 'quroosh_signup',
+    requireOpen: true,
+    sendPass: false,
+  });
+  if (!registered.ok) return { ok: false, hint: registered.hint, message: registered.message };
+
+  const attendee = (await getAttendeesById(input.projectId, [registered.attendeeId]).catch(() => []))[0];
+  if (!attendee) return { ok: false, hint: 'invalid', message: 'The registration could not be read back.' };
+  if (!registered.created && (attendee.email ?? '').toLowerCase() !== email) {
+    // Never say which email: whoever typed the number may not be its owner.
+    return { ok: false, hint: 'phone_taken', message: 'This mobile number is registered with another email.' };
+  }
+
+  const session = newToken();
+  const { data, error } = await db.rpc('account_sign_up', {
+    p_project: input.projectId,
+    p_attendee: attendee.id,
+    p_name: attendee.name,
+    p_phone: attendee.phone,
+    p_email: email,
+    p_locale: input.locale,
+    p_session_hash: hashToken(session),
+  });
+  if (error) {
+    return { ok: false, hint: error.hint && /^[a-z_]+$/.test(error.hint) ? error.hint : 'invalid', message: error.message };
+  }
+  const row = (data as { account_id: string; bonus: number }[] | null)?.[0];
+  if (!row) return { ok: false, hint: 'invalid', message: 'The account was not made.' };
+
+  await setSessionCookie(session);
+  return { ok: true, bonus: Number(row.bonus) };
 }
 
 /**
