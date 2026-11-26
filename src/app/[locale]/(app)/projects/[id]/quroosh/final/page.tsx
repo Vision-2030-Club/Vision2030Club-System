@@ -8,7 +8,9 @@ import { localized } from '@/lib/format';
 import { can, getQurooshAccess } from '@/lib/quroosh/access';
 import { FINAL_STATUSES, FINAL_STEP, getFinalProjectsAdmin, getFinalStatus } from '@/lib/quroosh/final';
 import { formatQuroosh } from '@/lib/quroosh/wallet';
+import { siteUrl } from '@/lib/site';
 import { isQurooshConfigured } from '@/lib/supabase/quroosh';
+import { CopyField } from '../../interviews/CopyField';
 import { GuestStartQr } from '../GuestStartQr';
 import { hideFinalProjectAction, saveFinalProjectAction, saveFinalStatusAction } from './actions';
 
@@ -75,6 +77,41 @@ export default async function QurooshFinalAdminPage({
 
       {/* Where guests come in: sign up or sign in, then this tab (0017). */}
       <GuestStartQr projectId={id} locale={locale} />
+
+      {/* The stage's screen: the same ranking, drawn for the hall (docs/quroosh.md,
+          "The stage screen"). Text and a link only: this card reads nothing. */}
+      <Card className="space-y-4">
+        <div>
+          <h2 className="font-semibold text-ink">{t('stage.card.title')}</h2>
+          <p className="mt-1 text-sm text-ink-muted">{t('stage.card.hint')}</p>
+        </div>
+        {/* The production address, like every link people are handed. */}
+        <CopyField label={t('stage.card.link')} value={`${siteUrl()}/${locale}/quroosh/stage/${id}`} />
+        {/* Opens on this deployment, so it can be tried on a preview too. */}
+        <a
+          href={`/${locale}/quroosh/stage/${id}`}
+          target="_blank"
+          rel="noopener"
+          className="inline-flex items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+        >
+          {t('stage.card.open')}
+        </a>
+        <ul className="space-y-1 text-xs text-ink-muted">
+          <li>{t('stage.card.setup')}</li>
+          <li>
+            {t('stage.card.rotate')}{' '}
+            <code dir="ltr" className="ltr-nums">
+              ?rotate=90
+            </code>
+          </li>
+          <li>
+            {t('stage.card.exact')}{' '}
+            <code dir="ltr" className="ltr-nums">
+              ?fit=exact
+            </code>
+          </li>
+        </ul>
+      </Card>
 
       {/* Who sees it, and whether they may give. */}
       <Card className="space-y-4">
