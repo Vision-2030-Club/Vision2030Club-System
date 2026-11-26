@@ -687,6 +687,66 @@ the most are the ceremony's leaderboard.
   the Final Wave is not open, the managers' page says the migration is
   needed, and the wallet is not affected.
 
+## The stage screen
+
+The Final Wave's projects ranked live on the screen on the stage at the
+closing ceremony. Built 2026-11-26. No migration: it reads what `0014`
+already has.
+
+- **The address:** `/<locale>/quroosh/stage/<project id>`, **open to anyone
+  who has it, with no sign-in** (the club's decision, 2026-11-26): it shows
+  what the hall sees anyway. The managers' **الحفل الختامي** page has a card
+  with the link. Nobody touches the screen; it asks
+  `/api/quroosh/stage?project=<id>` every two seconds.
+- **The canvas** is exactly **1620x3240**, the stage's screen, written in
+  plain pixels (`StageScreen.tsx`) and then moved and scaled as one piece to
+  fit the window, so lines break on a laptop as they do on the wall. Two
+  switches in the address, for the stage's computer: `?fit=exact` draws it
+  unscaled, one canvas pixel per screen pixel from the top-left corner (for
+  a processor that crops exact pixels), and `?rotate=90` or `?rotate=270`
+  turns it for a screen fed sideways.
+- **What it shows, by `final_settings.status`:**
+  - `hidden` (and whenever the board cannot be read): a holding screen with
+    the logo, "يُفتح الدعم قريبًا" and the guests' QR code, large. **No
+    project names.**
+  - `open`: every project guests can see, ranked, each with its place, name,
+    brief, total, supporters and a bar for its share of the leader's total;
+    below them the guests' QR code and the totals (quroosh given, gifts).
+    Totals count up, a row that overtakes another slides past it, and
+    "+500" rises beside a total that grew.
+  - `closed`: "النتائج النهائية", the first three places framed in their
+    medal's colour, a shower of coins once (also when the page is opened
+    after closing), then nothing moves.
+- **Ranking** (`rankStage` in `src/lib/quroosh/stageBoard.ts`, used for the
+  page and the route alike): the rule of `final_board`, most first with
+  equal totals sharing a place, but **every shown project is listed**: one
+  that has collected nothing has no place and no medal yet and sits below,
+  in the managers' order. Hidden projects are left out, and the totals are
+  summed over the shown ones.
+- **Two things are public here that were not before** (the club's decision,
+  2026-11-26): each project's **supporter count**, and through the "+amount"
+  roughly the **size of a gift**. Never who gave: nothing about a guest
+  leaves the server (`getStageSnapshot` in `src/lib/quroosh/stage.ts`).
+- **When a read fails** (the database slow or down) the route answers 503 and
+  the screen keeps its last board; after a few misses only the live dot
+  dims. If the page itself fails it shows plain navy and tries again by
+  itself (`error.tsx`). The hall never sees an error.
+- **Motion always runs here**, whatever the computer's reduced-motion
+  setting, unlike the rest of the app (`motion-safe:`): a stage computer
+  with Windows animations switched off would otherwise show a board that
+  never moves.
+- **If the address is passed around**, a good answer may be reused by
+  Vercel's CDN for one second (`s-maxage=1`), so a hall of phones costs the
+  database about one read a second. The screen itself, asking every two
+  seconds, always gets a fresh read.
+- **On the stage's computer:** Chrome at 100% zoom, F11 for full screen, the
+  window in front and not covered (the browser slows a covered window
+  down), sleep and notifications off. If the screen is captured, capture
+  the display, not the window.
+- **A mistyped project id** shows the holding screen for ever: the database
+  cannot tell an unknown project from a hidden one. Use the card's link.
+- **Before `0014` is applied** the screen stays on the holding screen.
+
 ## Guests make their own account (Quroosh 0017)
 
 The club's decision of 2026-11-26: a guest no longer needs a pass scanned at
@@ -868,6 +928,18 @@ Drive, it is 10 MB).
 - A Final Wave gift spends through `final_give` only, which locks the
   account's row before reading the balance. Never check the balance in the
   app and then write a `vote` entry: two tabs would both pass the check.
+- The stage screen is open to anyone. `getStageSnapshot` must send nothing
+  but the status while the Final Wave is hidden, never a hidden project, and
+  never anything about a guest. It builds each project field by field: do
+  not spread `final_projects_admin`'s row into it.
+- `StageScreen.tsx` is a client component: from `src/lib/quroosh` it may
+  import `stageBoard.ts` and nothing else. `final.ts` and `wallet.ts` are
+  server-only, and importing `formatQuroosh` or `FINAL_STEP` there breaks
+  the build, which CI does not run.
+- A row's place on the stage screen is its `translateY` alone, and the rows
+  keep one order in the page (by id). Sorting them in the page, or putting
+  a transform animation on the row itself, makes a row jump instead of
+  slide.
 - Attendance's "first visit only" is a check in `sync_wallet` made safe by
   locking the account row (`for update`) first. Keep the lock if the
   function is changed, or two passes at once can pay two days.
